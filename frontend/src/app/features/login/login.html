@@ -1,0 +1,75 @@
+<div class="login-page d-flex align-items-center justify-content-center py-5">
+  <div class="card shadow-sm login-card">
+    <div class="card-body p-4 p-sm-5">
+      <div class="text-center mb-4">
+        <i class="bi bi-envelope-paper-fill text-primary login-logo" aria-hidden="true"></i>
+        <h1 class="h4 mt-3 mb-1">Mailserver UI</h1>
+        <p class="text-body-secondary small mb-0">Sign in to continue</p>
+      </div>
+
+      @if (error(); as message) {
+      <div class="alert alert-danger py-2" role="alert">{{ message }}</div>
+      } @if (loadingConfig()) {
+      <div class="text-center text-body-secondary py-3">
+        <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+        Loading…
+      </div>
+      } @else { @if (config()?.local_enabled) {
+      <form (submit)="onSubmit(); $event.preventDefault()" novalidate>
+        <div class="mb-3">
+          <label for="username" class="form-label">Username</label>
+          <input
+            id="username"
+            type="text"
+            autocomplete="username"
+            class="form-control"
+            [class.is-invalid]="
+                  loginForm.username().touched() && loginForm.username().errors().length
+                "
+            [formField]="loginForm.username"
+          />
+          @if (loginForm.username().touched() && loginForm.username().errors().length) {
+          <div class="invalid-feedback">{{ loginForm.username().errors()[0].message }}</div>
+          }
+        </div>
+
+        <div class="mb-3">
+          <label for="password" class="form-label">Password</label>
+          <input
+            id="password"
+            type="password"
+            autocomplete="current-password"
+            class="form-control"
+            [class.is-invalid]="
+                  loginForm.password().touched() && loginForm.password().errors().length
+                "
+            [formField]="loginForm.password"
+          />
+          @if (loginForm.password().touched() && loginForm.password().errors().length) {
+          <div class="invalid-feedback">{{ loginForm.password().errors()[0].message }}</div>
+          }
+        </div>
+
+        <button type="submit" class="btn btn-primary w-100" [disabled]="submitting() || loginForm().invalid()">
+          @if (submitting()) {
+          <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+          } Sign in
+        </button>
+      </form>
+      } @if (config()?.local_enabled && config()?.oidc_enabled) {
+      <div class="d-flex align-items-center my-3 text-body-secondary">
+        <hr class="flex-grow-1" />
+        <span class="px-2 small">or</span>
+        <hr class="flex-grow-1" />
+      </div>
+      } @if (config()?.oidc_enabled) {
+      <button type="button" class="btn btn-outline-secondary w-100" (click)="onOidcLogin()">
+        <i class="bi bi-shield-lock me-2" aria-hidden="true"></i>
+        Sign in with SSO
+      </button>
+      } @if (!config()?.local_enabled && !config()?.oidc_enabled) {
+      <p class="text-center text-body-secondary mb-0">No sign-in method is currently enabled.</p>
+      } }
+    </div>
+  </div>
+</div>

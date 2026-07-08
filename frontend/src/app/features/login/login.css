@@ -1,0 +1,17 @@
+.login-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, var(--bs-primary-bg-subtle), var(--bs-body-bg));
+  padding-inline: 1rem;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 26rem;
+  border: 0;
+  border-radius: 1rem;
+}
+
+.login-logo {
+  font-size: 2.75rem;
+  line-height: 1;
+}

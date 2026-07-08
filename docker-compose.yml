@@ -1,0 +1,36 @@
+---
+services:
+  mailserver:
+    image: mailserver/docker-mailserver:latest
+    ports:
+      - "25:25"
+      - "465:465"
+      - "587:587"
+      - "143:143"
+      - "993:993"
+      - "4190:4190"
+    volumes:
+      - mailserver-mail:/var/mail
+      - mailserver-config:/tmp/docker-mailserver/
+
+  mailserver-ui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    ports:
+      - "8000:8000"
+    volumes:
+      - mailserver-ui:/var/lib/mailserver-ui
+      - mailserver-config:/var/lib/mailserver-config
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  mailserver-mail:
+  mailserver-config:
+  mailserver-ui:

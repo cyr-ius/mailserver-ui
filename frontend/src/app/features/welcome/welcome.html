@@ -1,0 +1,49 @@
+<nav class="navbar navbar-expand bg-body-tertiary border-bottom px-3">
+  <span class="navbar-brand d-flex align-items-center gap-2">
+    <i class="bi bi-envelope-paper-fill text-primary" aria-hidden="true"></i>
+    Mailserver UI
+  </span>
+  <div class="ms-auto d-flex align-items-center gap-3">
+    @if (user(); as u) {
+    <span class="text-body-secondary small d-none d-sm-inline">
+      <i class="bi bi-person-circle me-1" aria-hidden="true"></i>
+      {{ u.display_name }}
+    </span>
+    }
+    <button type="button" class="btn btn-sm btn-outline-secondary" (click)="onLogout()" [disabled]="loggingOut()">
+      @if (loggingOut()) {
+      <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+      } Sign out
+    </button>
+  </div>
+</nav>
+
+<main class="container py-5">
+  <div class="text-center welcome-hero mx-auto">
+    <i class="bi bi-check-circle-fill text-success welcome-icon" aria-hidden="true"></i>
+    @if (user(); as u) {
+    <h1 class="h2 mt-3">Welcome, {{ u.display_name }} 👋</h1>
+    <p class="text-body-secondary">You are signed in and ready to go.</p>
+
+    <div class="card text-start shadow-sm mt-4">
+      <div class="card-body">
+        <h2 class="h6 text-uppercase text-body-secondary mb-3">Session</h2>
+        <dl class="row mb-0">
+          <dt class="col-5 col-sm-4 text-body-secondary fw-normal">Username</dt>
+          <dd class="col-7 col-sm-8">{{ u.username }}</dd>
+
+          <dt class="col-5 col-sm-4 text-body-secondary fw-normal">Role</dt>
+          <dd class="col-7 col-sm-8">
+            <span class="badge text-bg-secondary text-capitalize">{{ u.role }}</span>
+          </dd>
+
+          <dt class="col-5 col-sm-4 text-body-secondary fw-normal">Provider</dt>
+          <dd class="col-7 col-sm-8">
+            <span class="badge text-bg-light text-uppercase">{{ u.provider }}</span>
+          </dd>
+        </dl>
+      </div>
+    </div>
+    }
+  </div>
+</main>
