@@ -4,16 +4,23 @@ Copyright (C) 2021-2024  Cyr-ius (github.com/cyr-ius)
 """
 
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.openapi.docs import get_swagger_ui_html
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from sqlmodel import Session
 
 from .config import settings
-from .routers import auth
+from .database import create_db_and_tables, engine
+from .exceptions import BaseAPIException
+from .routers import auth, users
+from .routers import settings as settings_router
 from .security import RateLimitMiddleware, SecurityHeadersMiddleware
+from .services import user_service
 from .utils import resolve_safe_path
 
 logger = logging.getLogger(__name__)
@@ -23,6 +30,15 @@ logging.basicConfig(
 )
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Initialise the database and seed the default admin on startup."""
+    create_db_and_tables()
+    with Session(engine) as session:
+        user_service.ensure_default_admin(session)
+    yield
+
+
 app = FastAPI(
     title="PowerDNS UI",
     description="REST API for docker mailserver management",
@@ -30,7 +46,20 @@ app = FastAPI(
     openapi_url="/api/openapi.json" if settings.swagger_enabled else None,
     docs_url=None,
     redoc_url=None,
+    lifespan=lifespan,
 )
+
+
+# ── Exception handlers ────────────────────────────────────────────────────────
+@app.exception_handler(BaseAPIException)
+async def api_exception_handler(request: Request, exc: BaseAPIException) -> JSONResponse:
+    """Turn typed application exceptions into consistent JSON error responses."""
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+        headers=exc.headers,
+    )
+
 
 # ── Middleware ───────────────────────────────────────────────────────────────
 app.add_middleware(SecurityHeadersMiddleware)
@@ -47,6 +76,8 @@ if settings.rate_limit_enabled:
 
 # ── API routers ───────────────────────────────────────────────────────────────
 app.include_router(auth.router)
+app.include_router(users.router)
+app.include_router(settings_router.router)
 
 # ── Self-hosted static assets (Swagger UI, no Internet dependency) ─────────────
 static_dir = Path(__file__).resolve().parent / "static"
@@ -54,7 +85,7 @@ app.mount("/api/static", StaticFiles(directory=static_dir), name="static")
 
 
 @app.get("/api/docs", include_in_schema=False)
-async def swagger_ui():
+async def swagger_ui() -> HTMLResponse:
     if not settings.swagger_enabled:
         raise HTTPException(status_code=404, detail="Not Found")
     return get_swagger_ui_html(
@@ -67,7 +98,7 @@ async def swagger_ui():
 
 
 @app.get("/api/health")
-async def health() -> dict:
+async def health() -> dict[str, str]:
     return {
         "status": "healthy",
         "app": "Docker Mailserver UI",

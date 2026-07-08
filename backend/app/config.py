@@ -34,18 +34,21 @@ class Settings(BaseSettings):
 
     app_version: str = "0.1.0"
 
+    # SQLite database storing local/OIDC users. Defaults to a file under
+    # ``DATA_DIR``; override with the ``DATABASE_URL`` env variable if needed.
+    database_url: str = f"sqlite:///{Path(DATA_DIR) / 'mailserver-ui.db'}"
+    database_echo: bool = False
+
+    # Username of the default admin account seeded on first startup. Its
+    # password is generated randomly and printed once to the logs.
     admin_username: str = "admin"
-    # Local admin password. Provide either a plaintext value (hashed at compare
-    # time) or a precomputed bcrypt hash via ``admin_password_hash``.
-    admin_password: str = "admin"
-    admin_password_hash: str = ""
 
     secret_key: str = "change-this-secret-key-in-production"
     auth_cookie_name: str = "pc_token"
     # Session lifetime for the local/OIDC JWT stored in the auth cookie.
     auth_token_ttl_seconds: int = 8 * 3600
-    # Mark the auth cookie Secure. Disable only for local HTTP development.
-    cookie_secure: bool = True
+    # The auth cookie ``Secure`` flag is detected per request from the scheme
+    # (honouring ``X-Forwarded-Proto`` behind trusted proxies), not configured.
 
     # OIDC configuration
     oidc_enabled: bool = False

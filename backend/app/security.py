@@ -4,8 +4,9 @@ from collections import defaultdict, deque
 from threading import Lock
 
 from fastapi import Request, status
-from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import JSONResponse, Response
+from starlette.types import ASGIApp
 
 from app.client_ip import get_client_ip
 from app.config import settings
@@ -33,7 +34,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     ]
     _CSP: str = "; ".join(_CSP_DIRECTIVES) + ";"
 
-    async def dispatch(self, request: Request, call_next):
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
@@ -42,9 +43,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Permissions-Policy"] = (
             "camera=(), microphone=(), geolocation=(), payment=()"
         )
-        response.headers["Strict-Transport-Security"] = (
-            "max-age=31536000; includeSubDomains"
-        )
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         response.headers["Content-Security-Policy"] = self._CSP
         return response
 
@@ -73,9 +72,7 @@ class _SlidingWindowLimiter:
         # bucket is never dropped while any of its hits could still be live.
         self._max_window = 0.0
 
-    def check(
-        self, key: str, max_requests: int, window_seconds: int
-    ) -> tuple[bool, int]:
+    def check(self, key: str, max_requests: int, window_seconds: int) -> tuple[bool, int]:
         """Record a hit for ``key`` and report whether it is allowed.
 
         Returns ``(allowed, retry_after)`` where ``retry_after`` is the whole
@@ -102,9 +99,7 @@ class _SlidingWindowLimiter:
             return
         self._last_cleanup = now
         boundary = now - self._max_window
-        stale = [
-            key for key, hits in self._hits.items() if not hits or hits[-1] <= boundary
-        ]
+        stale = [key for key, hits in self._hits.items() if not hits or hits[-1] <= boundary]
         for key in stale:
             del self._hits[key]
 
@@ -125,7 +120,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
     def __init__(
         self,
-        app,
+        app: ASGIApp,
         *,
         max_requests: int,
         window_seconds: int,
@@ -149,7 +144,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 "the key. Set TRUSTED_PROXIES so the real client IP is used."
             )
 
-    async def dispatch(self, request: Request, call_next) -> Response:
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         path = request.url.path
         if not path.startswith("/api/") or path in self._EXEMPT_PATHS:
             return await call_next(request)
@@ -166,9 +161,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             )
 
         if not allowed:
-            logger.warning(
-                "Rate limit exceeded: ip=%s path=%s bucket=%s", ip, path, bucket
-            )
+            logger.warning("Rate limit exceeded: ip=%s path=%s bucket=%s", ip, path, bucket)
             return JSONResponse(
                 {"detail": "Too many attempts. Please try again later."},
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,

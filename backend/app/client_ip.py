@@ -9,10 +9,12 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
+IPNetwork = ipaddress.IPv4Network | ipaddress.IPv6Network
 
-def _parse_trusted_proxies(raw: str) -> list[ipaddress._BaseNetwork]:
+
+def _parse_trusted_proxies(raw: str) -> list[IPNetwork]:
     """Parse the comma-separated ``trusted_proxies`` setting into networks."""
-    networks: list[ipaddress._BaseNetwork] = []
+    networks: list[IPNetwork] = []
     for item in (part.strip() for part in raw.split(",")):
         if not item:
             continue
@@ -21,6 +23,34 @@ def _parse_trusted_proxies(raw: str) -> list[ipaddress._BaseNetwork]:
         except ValueError:
             logger.warning("Ignoring invalid trusted proxy entry: %s", item)
     return networks
+
+
+def _peer_is_trusted(request: Request, trusted: list[IPNetwork]) -> bool:
+    """Return True when the direct peer is one of the configured trusted proxies."""
+    peer = request.client.host if request.client else None
+    if peer is None:
+        return False
+    try:
+        addr = ipaddress.ip_address(peer)
+    except ValueError:
+        return False
+    return any(addr in net for net in trusted)
+
+
+def is_secure_request(request: Request) -> bool:
+    """Return True when the original request reached us over HTTPS.
+
+    The ``X-Forwarded-Proto`` header is honoured only when the direct peer is a
+    configured trusted proxy, mirroring :func:`get_client_ip`; otherwise the
+    header is ignored to prevent spoofing and the ASGI scheme is used.
+    """
+    trusted = _parse_trusted_proxies(settings.trusted_proxies)
+    if trusted and _peer_is_trusted(request, trusted):
+        forwarded = request.headers.get("x-forwarded-proto", "")
+        proto = forwarded.split(",")[0].strip().lower()
+        if proto:
+            return proto == "https"
+    return request.url.scheme == "https"
 
 
 def get_client_ip(request: Request) -> str | None:
