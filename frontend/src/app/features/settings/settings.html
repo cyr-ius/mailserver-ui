@@ -1,0 +1,197 @@
+<nav class="navbar navbar-expand bg-body-tertiary border-bottom px-3">
+  <span class="navbar-brand d-flex align-items-center gap-2">
+    <i class="bi bi-envelope-paper-fill text-primary" aria-hidden="true"></i>
+    Mailserver UI
+  </span>
+  <div class="ms-auto d-flex align-items-center gap-3">
+    <a class="btn btn-sm btn-outline-secondary" routerLink="/welcome">
+      <i class="bi bi-house me-1" aria-hidden="true"></i>
+      Home
+    </a>
+    @if (user(); as u) {
+    <span class="text-body-secondary small d-none d-sm-inline">
+      <i class="bi bi-person-circle me-1" aria-hidden="true"></i>
+      {{ u.display_name }}
+    </span>
+    }
+    <button type="button" class="btn btn-sm btn-outline-secondary" (click)="onLogout()" [disabled]="loggingOut()">
+      @if (loggingOut()) {
+      <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+      } Sign out
+    </button>
+  </div>
+</nav>
+
+<main class="container py-4">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h1 class="h4 mb-0">
+      <i class="bi bi-gear-fill text-primary me-2" aria-hidden="true"></i>
+      Settings
+    </h1>
+  </div>
+
+  <ul class="nav nav-tabs mb-3">
+    <li class="nav-item">
+      <button type="button" class="nav-link" [class.active]="activeTab() === 'oidc'" (click)="setTab('oidc')">
+        <i class="bi bi-shield-lock me-1" aria-hidden="true"></i>
+        OIDC / SSO
+      </button>
+    </li>
+    <li class="nav-item">
+      <button type="button" class="nav-link disabled" disabled>
+        <i class="bi bi-hdd-network me-1" aria-hidden="true"></i>
+        Syslog
+        <span class="badge text-bg-light ms-1">soon</span>
+      </button>
+    </li>
+    <li class="nav-item">
+      <button type="button" class="nav-link disabled" disabled>
+        <i class="bi bi-envelope me-1" aria-hidden="true"></i>
+        Email
+        <span class="badge text-bg-light ms-1">soon</span>
+      </button>
+    </li>
+  </ul>
+
+  @if (successMessage(); as msg) {
+  <div class="alert alert-success py-2" role="alert">{{ msg }}</div>
+  } @if (loadError(); as msg) {
+  <div class="alert alert-danger py-2" role="alert">{{ msg }}</div>
+  } @if (activeTab() === 'oidc') { @if (loading()) {
+  <div class="text-center text-body-secondary py-5">
+    <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+    Loading configuration…
+  </div>
+  } @else {
+  <div class="card shadow-sm settings-card">
+    <div class="card-body">
+      <form (submit)="onSubmit(); $event.preventDefault()" novalidate>
+        <div class="form-check form-switch mb-4">
+          <input id="oidc-enabled" type="checkbox" class="form-check-input" [formField]="oidcForm.enabled" />
+          <label for="oidc-enabled" class="form-check-label fw-medium"> Enable OIDC single sign-on </label>
+        </div>
+
+        <h2 class="h6 text-uppercase text-body-secondary mb-3">Provider</h2>
+        <div class="row g-3 mb-4">
+          <div class="col-12 col-lg-6">
+            <label for="oidc-issuer" class="form-label">Issuer URL</label>
+            <input
+              id="oidc-issuer"
+              type="url"
+              class="form-control"
+              placeholder="https://idp.example.com/realms/main"
+              [formField]="oidcForm.issuer"
+            />
+            <div class="form-text">Base URL exposing /.well-known/openid-configuration.</div>
+          </div>
+          <div class="col-12 col-lg-6">
+            <label for="oidc-client-id" class="form-label">Client ID</label>
+            <input
+              id="oidc-client-id"
+              type="text"
+              autocomplete="off"
+              class="form-control"
+              [formField]="oidcForm.client_id"
+            />
+          </div>
+          <div class="col-12 col-lg-6">
+            <label for="oidc-client-secret" class="form-label">Client secret</label>
+            <input
+              id="oidc-client-secret"
+              type="password"
+              autocomplete="new-password"
+              class="form-control"
+              [placeholder]="secretStored() ? '•••••••• (unchanged)' : 'Enter client secret'"
+              [formField]="oidcForm.client_secret"
+            />
+            <div class="form-text">Leave empty to keep the current secret.</div>
+          </div>
+          <div class="col-12 col-lg-6">
+            <label for="oidc-scope" class="form-label">Scopes</label>
+            <input id="oidc-scope" type="text" class="form-control" [formField]="oidcForm.scope" />
+          </div>
+          <div class="col-12 col-lg-6">
+            <label for="oidc-redirect" class="form-label">Redirect URI</label>
+            <input
+              id="oidc-redirect"
+              type="url"
+              class="form-control"
+              placeholder="https://mail.example.com/api/auth/oidc/callback"
+              [formField]="oidcForm.redirect_uri"
+            />
+          </div>
+          <div class="col-12 col-lg-6">
+            <label for="oidc-logout-redirect" class="form-label"> Post-logout redirect URI </label>
+            <input
+              id="oidc-logout-redirect"
+              type="url"
+              class="form-control"
+              [formField]="oidcForm.post_logout_redirect_uri"
+            />
+          </div>
+        </div>
+
+        <h2 class="h6 text-uppercase text-body-secondary mb-3">Group mapping</h2>
+        <div class="row g-3 mb-3">
+          <div class="col-12 col-lg-6">
+            <label for="oidc-admin-claim" class="form-label">Admin group claim</label>
+            <input
+              id="oidc-admin-claim"
+              type="text"
+              class="form-control"
+              placeholder="groups"
+              [formField]="oidcForm.admin_group_claim"
+            />
+          </div>
+          <div class="col-12 col-lg-6">
+            <label for="oidc-admin-group" class="form-label">Admin group value</label>
+            <input id="oidc-admin-group" type="text" class="form-control" [formField]="oidcForm.admin_group" />
+          </div>
+          <div class="col-12 col-lg-6">
+            <label for="oidc-user-claim" class="form-label">User group claim</label>
+            <input
+              id="oidc-user-claim"
+              type="text"
+              class="form-control"
+              placeholder="groups"
+              [formField]="oidcForm.user_group_claim"
+            />
+          </div>
+          <div class="col-12 col-lg-6">
+            <label for="oidc-user-group" class="form-label">User group value</label>
+            <input id="oidc-user-group" type="text" class="form-control" [formField]="oidcForm.user_group" />
+          </div>
+        </div>
+
+        <div class="form-check form-switch mb-2">
+          <input
+            id="oidc-restrict"
+            type="checkbox"
+            class="form-check-input"
+            [formField]="oidcForm.restrict_to_groups"
+          />
+          <label for="oidc-restrict" class="form-check-label">
+            Restrict access to members of the configured groups
+          </label>
+        </div>
+        <div class="form-check form-switch mb-4">
+          <input id="oidc-only" type="checkbox" class="form-check-input" [formField]="oidcForm.oidc_only" />
+          <label for="oidc-only" class="form-check-label"> Disable local login (SSO only) </label>
+        </div>
+
+        @if (formError(); as msg) {
+        <div class="alert alert-danger py-2" role="alert">{{ msg }}</div>
+        }
+
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-primary" [disabled]="saving()">
+            @if (saving()) {
+            <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+            } Save changes
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+  } }
+</main>

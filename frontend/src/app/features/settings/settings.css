@@ -1,0 +1,7 @@
+.settings-card {
+  max-width: 960px;
+}
+
+.nav-tabs .nav-link {
+  color: var(--bs-secondary-color);
+}

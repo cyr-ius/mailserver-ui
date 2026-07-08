@@ -1,0 +1,145 @@
+<nav class="navbar navbar-expand bg-body-tertiary border-bottom px-3">
+  <span class="navbar-brand d-flex align-items-center gap-2">
+    <i class="bi bi-envelope-paper-fill text-primary" aria-hidden="true"></i>
+    Mailserver UI
+  </span>
+  <div class="ms-auto d-flex align-items-center gap-3">
+    <a class="btn btn-sm btn-outline-secondary" routerLink="/welcome">
+      <i class="bi bi-house me-1" aria-hidden="true"></i>
+      Home
+    </a>
+    <a class="btn btn-sm btn-outline-secondary" routerLink="/settings">
+      <i class="bi bi-gear me-1" aria-hidden="true"></i>
+      Settings
+    </a>
+    @if (currentUser(); as u) {
+    <span class="text-body-secondary small d-none d-sm-inline">
+      <i class="bi bi-person-circle me-1" aria-hidden="true"></i>
+      {{ u.display_name }}
+    </span>
+    }
+    <button type="button" class="btn btn-sm btn-outline-secondary" (click)="onLogout()" [disabled]="loggingOut()">
+      @if (loggingOut()) {
+      <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+      } Sign out
+    </button>
+  </div>
+</nav>
+
+<main class="container py-4">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h1 class="h4 mb-0">
+      <i class="bi bi-people-fill text-primary me-2" aria-hidden="true"></i>
+      Users
+    </h1>
+  </div>
+
+  @if (successMessage(); as msg) {
+  <div class="alert alert-success py-2" role="alert">{{ msg }}</div>
+  } @if (loadError(); as msg) {
+  <div class="alert alert-danger py-2" role="alert">{{ msg }}</div>
+  } @if (loading()) {
+  <div class="text-center text-body-secondary py-5">
+    <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+    Loading users…
+  </div>
+  } @else {
+  <div class="card shadow-sm">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th scope="col">Username</th>
+            <th scope="col" class="d-none d-md-table-cell">Display name</th>
+            <th scope="col">Role</th>
+            <th scope="col">Provider</th>
+            <th scope="col" class="d-none d-lg-table-cell">Last login</th>
+            <th scope="col" class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (u of users(); track u.id) {
+          <tr>
+            <td class="fw-medium">{{ u.username }}</td>
+            <td class="d-none d-md-table-cell text-body-secondary">{{ u.display_name || '—' }}</td>
+            <td>
+              <span class="badge text-bg-secondary text-capitalize">{{ u.role }}</span>
+            </td>
+            <td>
+              <span class="badge text-bg-light text-uppercase">{{ u.provider }}</span>
+            </td>
+            <td class="d-none d-lg-table-cell text-body-secondary small">
+              {{ u.last_login_at ? (u.last_login_at | date: 'short') : 'Never' }}
+            </td>
+            <td class="text-end">
+              @if (u.provider === 'local') {
+              <button type="button" class="btn btn-sm btn-outline-primary" (click)="startEdit(u)">
+                <i class="bi bi-key me-1" aria-hidden="true"></i>
+                Change password
+              </button>
+              } @else {
+              <span class="text-body-secondary small">
+                <i class="bi bi-shield-lock me-1" aria-hidden="true"></i>
+                Managed by SSO
+              </span>
+              }
+            </td>
+          </tr>
+          @if (editingId() === u.id) {
+          <tr class="table-active">
+            <td colspan="6">
+              <form class="row g-2 align-items-start py-2" (submit)="onSubmit(); $event.preventDefault()" novalidate>
+                <div class="col-12 col-sm-4">
+                  <label [attr.for]="'pw-' + u.id" class="form-label small mb-1"> New password </label>
+                  <input
+                    [id]="'pw-' + u.id"
+                    type="password"
+                    autocomplete="new-password"
+                    class="form-control form-control-sm"
+                    [formField]="passwordForm.password"
+                  />
+                </div>
+                <div class="col-12 col-sm-4">
+                  <label [attr.for]="'pwc-' + u.id" class="form-label small mb-1"> Confirm password </label>
+                  <input
+                    [id]="'pwc-' + u.id"
+                    type="password"
+                    autocomplete="new-password"
+                    class="form-control form-control-sm"
+                    [formField]="passwordForm.confirm"
+                  />
+                </div>
+                <div class="col-12 col-sm-4 d-flex align-items-end gap-2 pt-sm-4">
+                  <button
+                    type="submit"
+                    class="btn btn-sm btn-primary"
+                    [disabled]="saving() || passwordForm().invalid()"
+                  >
+                    @if (saving()) {
+                    <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+                    } Save
+                  </button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" (click)="cancelEdit()">Cancel</button>
+                </div>
+                @if (formError(); as msg) {
+                <div class="col-12">
+                  <div class="text-danger small">{{ msg }}</div>
+                </div>
+                }
+                <div class="col-12">
+                  <div class="form-text">Minimum {{ minLength }} characters.</div>
+                </div>
+              </form>
+            </td>
+          </tr>
+          } } @empty {
+          <tr>
+            <td colspan="6" class="text-center text-body-secondary py-4">No users found.</td>
+          </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+  }
+</main>

@@ -22,6 +22,21 @@ export const authGuard: CanActivateFn = async () => {
   return router.createUrlTree(['/login']);
 };
 
+/** Guard protecting admin-only routes; redirects non-admins to /welcome. */
+export const adminGuard: CanActivateFn = async () => {
+  const auth = inject(AuthService);
+  const router = inject(Router);
+
+  await ensureLoaded(auth);
+  if (!auth.isAuthenticated()) {
+    return router.createUrlTree(['/login']);
+  }
+  if (auth.user()?.role === 'admin') {
+    return true;
+  }
+  return router.createUrlTree(['/welcome']);
+};
+
 /** Guard for the login page; sends already-authenticated users to /welcome. */
 export const guestGuard: CanActivateFn = async () => {
   const auth = inject(AuthService);

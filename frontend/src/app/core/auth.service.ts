@@ -26,9 +26,7 @@ export class AuthService {
 
   /** Load the public auth configuration (which methods are enabled). */
   async loadConfig(): Promise<AuthConfig> {
-    const config = await firstValueFrom(
-      this.http.get<AuthConfig>('/api/auth/config'),
-    );
+    const config = await firstValueFrom(this.http.get<AuthConfig>('/api/auth/config'));
     this._config.set(config);
     return config;
   }
@@ -36,9 +34,7 @@ export class AuthService {
   /** Probe the current session; safe to call repeatedly. */
   async refreshSession(): Promise<SessionUser | null> {
     try {
-      const user = await firstValueFrom(
-        this.http.get<SessionUser>('/api/auth/me'),
-      );
+      const user = await firstValueFrom(this.http.get<SessionUser>('/api/auth/me'));
       this._user.set(user);
       return user;
     } catch {
@@ -51,9 +47,7 @@ export class AuthService {
 
   /** Authenticate with local credentials. Throws on failure. */
   async login(credentials: LoginRequest): Promise<SessionUser> {
-    const user = await firstValueFrom(
-      this.http.post<SessionUser>('/api/auth/login', credentials),
-    );
+    const user = await firstValueFrom(this.http.post<SessionUser>('/api/auth/login', credentials));
     this._user.set(user);
     return user;
   }

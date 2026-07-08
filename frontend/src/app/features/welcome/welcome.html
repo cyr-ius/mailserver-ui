@@ -4,7 +4,16 @@
     Mailserver UI
   </span>
   <div class="ms-auto d-flex align-items-center gap-3">
-    @if (user(); as u) {
+    @if (isAdmin()) {
+    <a class="btn btn-sm btn-outline-secondary" routerLink="/users">
+      <i class="bi bi-people me-1" aria-hidden="true"></i>
+      Users
+    </a>
+    <a class="btn btn-sm btn-outline-secondary" routerLink="/settings">
+      <i class="bi bi-gear me-1" aria-hidden="true"></i>
+      Settings
+    </a>
+    } @if (user(); as u) {
     <span class="text-body-secondary small d-none d-sm-inline">
       <i class="bi bi-person-circle me-1" aria-hidden="true"></i>
       {{ u.display_name }}

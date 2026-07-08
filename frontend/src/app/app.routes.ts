@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 
-import { authGuard, guestGuard } from './core/auth.guard';
+import { adminGuard, authGuard, guestGuard } from './core/auth.guard';
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'welcome' },
@@ -13,6 +13,16 @@ export const routes: Routes = [
     path: 'welcome',
     canActivate: [authGuard],
     loadComponent: () => import('./features/welcome/welcome').then((m) => m.Welcome),
+  },
+  {
+    path: 'users',
+    canActivate: [adminGuard],
+    loadComponent: () => import('./features/users/users').then((m) => m.Users),
+  },
+  {
+    path: 'settings',
+    canActivate: [adminGuard],
+    loadComponent: () => import('./features/settings/settings').then((m) => m.Settings),
   },
   { path: '**', redirectTo: 'welcome' },
 ];
