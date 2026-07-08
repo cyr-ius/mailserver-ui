@@ -12,7 +12,7 @@ Index des **règles propres à ce dépôt**. Les détails sont dans `references/
 | Couche      | Techno                      | Version                                          |
 | ----------- | --------------------------- | ------------------------------------------------ |
 | Frontend    | Angular                     | 22 (Signals, Signal Forms, Zoneless, Standalone) |
-| Backend     | FastAPI                     | 0.135.1 (async, Pydantic v2)                     |
+| Backend     | FastAPI                     | 0.139.0 (async, Pydantic v2)                     |
 | UI          | Bootstrap / Bootstrap Icons | 5.3.8 / 1.13.1                                   |
 | Runtimes    | Python / Node.js            | 3.14 / 18+                                       |
 | Déploiement | Docker                      | multi-stage, conteneur unique SPA                |

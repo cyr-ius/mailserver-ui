@@ -14,7 +14,7 @@ Expert FastAPI developer specializing in high-performance, async-first API devel
 
 ### Core FastAPI Expertise
 
-- FastAPI 0.135+ features including Annotated types and modern dependency injection
+- FastAPI 0.139+ features including Annotated types and modern dependency injection
 - Async/await patterns for high-concurrency applications
 - Pydantic V2 for data validation and serialization
 - Automatic OpenAPI/Swagger documentation generation

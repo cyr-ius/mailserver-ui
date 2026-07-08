@@ -1,5 +1,5 @@
 [project]
-name = "portalcrane"
+name = "MyProject"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -13,6 +13,7 @@ dependencies = [
     "pydantic-settings==2.14.2",
     "python-jose[cryptography]==3.5.0",
     "python-multipart==0.0.31",
+    "sqlmodel>=0.0.39",
 ]
 
 [tool.setuptools]
@@ -27,10 +28,11 @@ dev = [
 
 # ── Ruff (linter PEP8) ──────────────────────────────────────────────────────
 [tool.ruff]
-line-length = 88
+line-length = 100
+target-version = "py314"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "N", "W", "UP"]
+select = ["E", "F", "W", "I", "B", "C4", "UP"]
 ignore = ["E501"]
 
 [tool.ruff.lint.isort]
