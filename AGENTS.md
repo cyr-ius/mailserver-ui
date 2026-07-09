@@ -61,6 +61,7 @@ Any implementation, modification, or code review performed in this repository mu
 - Python `>= 3.14`
 - FastAPI
 - Pydantic 2
+- SQLModel
 - Managed with `uv`
 
 ### Frontend
@@ -80,15 +81,6 @@ Any implementation, modification, or code review performed in this repository mu
 ├── scripts/          # Automation and deployment scripts
 └── AGENTS.md         # AI agent instructions
 ```
-
-## System requirements
-
-The development environment requires:
-
-- Python `>= 3.14`
-- `uv` installed: https://docs.astral.sh/uv/
-- Node.js `>= 22`
-- npm
 
 ## Dependency installation
 
