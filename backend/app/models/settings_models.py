@@ -36,10 +36,13 @@ class OidcSettingsBase(SQLModel):
     # Disable local username/password login and force SSO.
     oidc_only: bool = False
 
+    # Claim/value pairs mapping an identity-provider group onto an application
+    # role. A user in neither group signs in as ``guest`` unless
+    # ``restrict_to_groups`` is set, in which case access is denied outright.
     admin_group_claim: str = ""
     admin_group: str = ""
-    user_group_claim: str = ""
-    user_group: str = ""
+    manager_group_claim: str = ""
+    manager_group: str = ""
     restrict_to_groups: bool = False
 
 

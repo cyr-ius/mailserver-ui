@@ -6,12 +6,10 @@ are provisioned/updated automatically on each successful sign-in.
 """
 
 from datetime import UTC, datetime
-from typing import Literal
 
 from sqlmodel import Field, SQLModel
 
-Role = Literal["admin", "user"]
-AuthProvider = Literal["local", "oidc"]
+from ..auth import Role
 
 
 def _utcnow() -> datetime:
@@ -26,7 +24,10 @@ class UserBase(SQLModel):
 
     username: str = Field(index=True, unique=True, min_length=1, max_length=255)
     display_name: str = Field(default="", max_length=255)
-    role: str = Field(default="user")
+    # Role assigned to the account itself. OIDC rewrites it from the group claims
+    # on every sign-in; local group memberships can only raise it further (see
+    # ``user_service.resolve_role``).
+    role: str = Field(default="guest")
     provider: str = Field(default="local")
 
 
@@ -53,6 +54,21 @@ class UserPublic(UserBase):
     id: int
     created_at: datetime
     last_login_at: datetime | None
+    # Role actually enforced at request time: the account role raised by the
+    # roles of every local group the user belongs to.
+    effective_role: Role
+
+
+class UserCreate(SQLModel):
+    """Request schema for creating a local user.
+
+    No role is accepted: a new account starts as ``guest`` and is promoted
+    solely through membership in a local group (see ``group_models.Group``).
+    """
+
+    username: str = Field(min_length=1, max_length=255)
+    display_name: str = Field(default="", max_length=255)
+    password: str = Field(min_length=8, max_length=1024)
 
 
 class PasswordChangeRequest(SQLModel):
