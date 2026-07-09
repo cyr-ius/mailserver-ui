@@ -1,5 +1,26 @@
-export type Role = 'admin' | 'user';
+/** Application roles, ordered from least to most privileged. */
+export const ROLES = ['guest', 'mailbox_manager', 'admin'] as const;
+export type Role = (typeof ROLES)[number];
 export type AuthProvider = 'local' | 'oidc';
+
+const ROLE_LABELS: Record<Role, string> = {
+  guest: 'Guest',
+  mailbox_manager: 'Mailbox manager',
+  admin: 'Administrator',
+};
+
+/** Human-readable name of a role, for badges and selects. */
+export function roleLabel(role: Role): string {
+  return ROLE_LABELS[role] ?? role;
+}
+
+/** True when `role` is at least as privileged as `required`. */
+export function roleGrants(role: Role | undefined, required: Role): boolean {
+  if (!role) {
+    return false;
+  }
+  return ROLES.indexOf(role) >= ROLES.indexOf(required);
+}
 
 export interface SessionUser {
   username: string;
@@ -23,7 +44,10 @@ export interface User {
   id: number;
   username: string;
   display_name: string;
+  /** Role assigned to the account itself (rewritten by OIDC on each sign-in). */
   role: Role;
+  /** Role actually enforced, raised by the roles of the user's local groups. */
+  effective_role: Role;
   provider: AuthProvider;
   created_at: string;
   last_login_at: string | null;
@@ -31,4 +55,11 @@ export interface User {
 
 export interface PasswordChangeRequest {
   new_password: string;
+}
+
+/** Payload creating a local account. The role comes from group membership only. */
+export interface UserCreateRequest {
+  username: string;
+  display_name: string;
+  password: string;
 }

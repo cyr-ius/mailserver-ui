@@ -1,0 +1,231 @@
+<main class="container py-4">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h1 class="h4 mb-0">
+      <i class="bi bi-shield-lock text-primary me-2" aria-hidden="true"></i>
+      Fail2ban
+    </h1>
+    <button
+      type="button"
+      class="btn btn-sm btn-outline-secondary"
+      (click)="refresh()"
+      [disabled]="statusLoading() || logLoading() || policyLoading()"
+    >
+      <i class="bi bi-arrow-clockwise me-1" aria-hidden="true"></i>
+      Refresh
+    </button>
+  </div>
+
+  <ul class="nav nav-tabs mb-3">
+    <li class="nav-item">
+      <button type="button" class="nav-link" [class.active]="activeTab() === 'overview'" (click)="setTab('overview')">
+        <i class="bi bi-slash-circle me-1" aria-hidden="true"></i>
+        Bans &amp; jails
+      </button>
+    </li>
+    <li class="nav-item">
+      <button type="button" class="nav-link" [class.active]="activeTab() === 'policy'" (click)="setTab('policy')">
+        <i class="bi bi-sliders me-1" aria-hidden="true"></i>
+        Policy
+      </button>
+    </li>
+    <li class="nav-item">
+      <button type="button" class="nav-link" [class.active]="activeTab() === 'log'" (click)="setTab('log')">
+        <i class="bi bi-journal-text me-1" aria-hidden="true"></i>
+        Log
+      </button>
+    </li>
+  </ul>
+
+  <!-- ── Ban policy ───────────────────────────────────────────────────────────── -->
+  @if (activeTab() === 'policy') {
+  <p class="text-body-secondary small">
+    How aggressively fail2ban bans (<code>fail2ban-jail.cf</code>, section
+    <code>[DEFAULT]</code>). The mailserver reads this file when it starts, so a change only takes effect after the
+    container restarts. Saving rewrites the file: any jail-specific section added by hand is dropped.
+  </p>
+
+  @if (policySuccess(); as msg) {
+  <div class="alert alert-success py-2" role="alert">{{ msg }}</div>
+  } @if (policyError(); as msg) {
+  <div class="alert alert-danger py-2" role="alert">{{ msg }}</div>
+  } @if (policyLoading()) {
+  <div class="text-center text-body-secondary py-5">
+    <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+    Loading the policy…
+  </div>
+  } @else { @if (!policyConfigured()) {
+  <div class="alert alert-light border small" role="note">
+    No policy file yet — the values below are the defaults docker-mailserver ships with. Save to make them explicit.
+  </div>
+  }
+
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <form (submit)="onSavePolicy(); $event.preventDefault()" novalidate>
+        <div class="row g-3">
+          <div class="col-12 col-lg-4">
+            <label for="policy-bantime" class="form-label">Ban duration (seconds)</label>
+            <input id="policy-bantime" type="number" class="form-control" [formField]="policyForm.bantime" />
+            <div class="form-text">How long a banned IP stays banned. 604800 = one week.</div>
+          </div>
+          <div class="col-12 col-lg-4">
+            <label for="policy-findtime" class="form-label">Detection window (seconds)</label>
+            <input id="policy-findtime" type="number" class="form-control" [formField]="policyForm.findtime" />
+            <div class="form-text">Failures are counted over this rolling window.</div>
+          </div>
+          <div class="col-12 col-lg-4">
+            <label for="policy-maxretry" class="form-label">Failures before ban</label>
+            <input id="policy-maxretry" type="number" class="form-control" [formField]="policyForm.maxretry" />
+            <div class="form-text">Attempts allowed within the window.</div>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary mt-3" [disabled]="savingPolicy()">
+          @if (savingPolicy()) {
+          <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+          } Save policy
+        </button>
+      </form>
+    </div>
+  </div>
+  } }
+
+  <!-- ── Bans & jails ─────────────────────────────────────────────────────────── -->
+  @if (activeTab() === 'overview') {
+  <p class="text-body-secondary small">
+    Fail2ban bans hosts after repeated failed logins. Actions run
+    <code>docker exec</code> against the mailserver container.
+  </p>
+
+  @if (actionSuccess(); as msg) {
+  <div class="alert alert-success py-2" role="alert">{{ msg }}</div>
+  } @if (actionError(); as msg) {
+  <div class="alert alert-danger py-2" role="alert">{{ msg }}</div>
+  }
+
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <h2 class="h6 text-uppercase text-body-secondary mb-3">Ban an IP</h2>
+      <form (submit)="onBan(); $event.preventDefault()" novalidate>
+        <div class="row g-3">
+          <div class="col-12 col-lg-9">
+            <label for="ban-ip" class="form-label">IP address</label>
+            <input
+              id="ban-ip"
+              type="text"
+              class="form-control font-monospace"
+              placeholder="203.0.113.42"
+              autocomplete="off"
+              [formField]="banForm.ip"
+            />
+            <div class="form-text">An IPv4 or IPv6 address.</div>
+          </div>
+          <div class="col-12 col-lg-3 d-flex align-items-end">
+            <button type="submit" class="btn btn-danger w-100" [disabled]="banning()">
+              @if (banning()) {
+              <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+              } Ban
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  @if (statusLoading()) {
+  <div class="text-center text-body-secondary py-5">
+    <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+    Loading fail2ban status…
+  </div>
+  } @else if (statusError(); as msg) {
+  <div class="alert alert-danger py-2" role="alert">{{ msg }}</div>
+  } @else {
+  <!-- Banned IPs -->
+  <h2 class="h6 text-uppercase text-body-secondary mb-2">
+    Banned IPs <span class="badge text-bg-secondary">{{ totalBanned() }}</span>
+  </h2>
+  @if (totalBanned() === 0) {
+  <div class="text-center text-body-secondary py-4">No IP is currently banned.</div>
+  } @else {
+  <div class="table-responsive mb-4">
+    <table class="table align-middle">
+      <thead>
+        <tr>
+          <th scope="col">IP address</th>
+          <th scope="col">Jail</th>
+          <th scope="col" class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (banned of bannedIps(); track banned.jail + '|' + banned.ip) {
+        <tr>
+          <td class="font-monospace">{{ banned.ip }}</td>
+          <td>
+            <span class="badge text-bg-light">{{ banned.jail }}</span>
+          </td>
+          <td class="text-end">
+            <button
+              type="button"
+              class="btn btn-sm btn-outline-danger"
+              (click)="onUnban(banned.ip)"
+              [disabled]="unbanningIp() === banned.ip"
+            >
+              @if (unbanningIp() === banned.ip) {
+              <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+              } Unban
+            </button>
+          </td>
+        </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  }
+
+  <!-- Jails status -->
+  <h2 class="h6 text-uppercase text-body-secondary mb-2">Jails</h2>
+  @if (jails().length === 0) {
+  <div class="text-center text-body-secondary py-4">No fail2ban jail is active.</div>
+  } @else {
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead>
+        <tr>
+          <th scope="col">Jail</th>
+          <th scope="col" class="text-end">Currently banned</th>
+          <th scope="col" class="text-end">Total banned</th>
+          <th scope="col" class="text-end">Currently failed</th>
+          <th scope="col" class="text-end">Total failed</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (jail of jails(); track jail.name) {
+        <tr>
+          <td class="font-monospace">{{ jail.name }}</td>
+          <td class="text-end">{{ jail.currently_banned }}</td>
+          <td class="text-end">{{ jail.total_banned }}</td>
+          <td class="text-end">{{ jail.currently_failed }}</td>
+          <td class="text-end">{{ jail.total_failed }}</td>
+        </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  } } }
+
+  <!-- ── Log ──────────────────────────────────────────────────────────────────── -->
+  @if (activeTab() === 'log') {
+  <p class="text-body-secondary small">Trailing lines of the fail2ban log file.</p>
+  @if (logLoading()) {
+  <div class="text-center text-body-secondary py-5">
+    <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+    Loading log…
+  </div>
+  } @else if (logError(); as msg) {
+  <div class="alert alert-danger py-2" role="alert">{{ msg }}</div>
+  } @else if (logLines().length === 0) {
+  <div class="text-center text-body-secondary py-4">The fail2ban log is empty.</div>
+  } @else {
+  <pre class="fail2ban-log border rounded p-3 mb-0"><code>@for (line of logLines(); track $index) {{{ line }}
+}</code></pre>
+  } }
+</main>

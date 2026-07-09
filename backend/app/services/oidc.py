@@ -14,9 +14,9 @@ from typing import Any
 
 import httpx
 
-from app.auth import SessionUser
-from app.config import DEFAULT_TIMEOUT
-from app.settings_models import OidcSettings
+from ..auth import Role, SessionUser, highest_role
+from ..config import DEFAULT_TIMEOUT
+from ..models.settings_models import OidcSettings
 
 logger = logging.getLogger(__name__)
 
@@ -114,35 +114,39 @@ def _claim_groups(claims: dict[str, Any], claim_name: str) -> list[str]:
     return []
 
 
-def map_claims_to_user(config: OidcSettings, claims: dict[str, Any]) -> SessionUser | None:
-    """Map OIDC claims to a SessionUser, applying group-based restrictions.
+def _in_group(claims: dict[str, Any], claim_name: str, expected: str) -> bool:
+    """Return True when ``claim_name`` lists ``expected``, and both are configured."""
+    if not (claim_name and expected):
+        return False
+    return expected in _claim_groups(claims, claim_name)
 
-    Returns ``None`` when group restrictions are enabled and the user is in
-    neither the admin nor the user group (access denied).
+
+def map_claims_to_user(config: OidcSettings, claims: dict[str, Any]) -> SessionUser | None:
+    """Map OIDC claims to a SessionUser, applying group-based role mapping.
+
+    The admin group maps to ``admin`` and the manager group to
+    ``mailbox_manager``; a user in neither group is a ``guest``, whom an
+    administrator can later promote through a local group.
+
+    Returns ``None`` when ``restrict_to_groups`` is set and the user belongs to
+    neither group (access denied).
     """
     username = claims.get("preferred_username") or claims.get("email") or claims.get("sub", "")
     display_name = claims.get("name") or username
 
-    is_admin = False
-    is_user = True
+    matched: list[Role] = []
+    if _in_group(claims, config.admin_group_claim, config.admin_group):
+        matched.append("admin")
+    if _in_group(claims, config.manager_group_claim, config.manager_group):
+        matched.append("mailbox_manager")
 
-    if config.admin_group_claim and config.admin_group:
-        groups = _claim_groups(claims, config.admin_group_claim)
-        is_admin = config.admin_group in groups
-
-    if config.user_group_claim and config.user_group:
-        groups = _claim_groups(claims, config.user_group_claim)
-        is_user = config.user_group in groups
-
-    role = "admin" if is_admin else "user"
-
-    if config.restrict_to_groups and not (is_admin or is_user):
+    if not matched and config.restrict_to_groups:
         logger.info("OIDC user %s denied: not in any authorized group", username)
         return None
 
     return SessionUser(
         username=str(username),
         display_name=str(display_name),
-        role=role,  # type: ignore[arg-type]
+        role=highest_role(matched),
         provider="oidc",
     )

@@ -1,36 +1,8 @@
-<nav class="navbar navbar-expand bg-body-tertiary border-bottom px-3">
-  <span class="navbar-brand d-flex align-items-center gap-2">
-    <i class="bi bi-envelope-paper-fill text-primary" aria-hidden="true"></i>
-    Mailserver UI
-  </span>
-  <div class="ms-auto d-flex align-items-center gap-3">
-    <a class="btn btn-sm btn-outline-secondary" routerLink="/welcome">
-      <i class="bi bi-house me-1" aria-hidden="true"></i>
-      Home
-    </a>
-    <a class="btn btn-sm btn-outline-secondary" routerLink="/settings">
-      <i class="bi bi-gear me-1" aria-hidden="true"></i>
-      Settings
-    </a>
-    @if (currentUser(); as u) {
-    <span class="text-body-secondary small d-none d-sm-inline">
-      <i class="bi bi-person-circle me-1" aria-hidden="true"></i>
-      {{ u.display_name }}
-    </span>
-    }
-    <button type="button" class="btn btn-sm btn-outline-secondary" (click)="onLogout()" [disabled]="loggingOut()">
-      @if (loggingOut()) {
-      <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
-      } Sign out
-    </button>
-  </div>
-</nav>
-
 <main class="container py-4">
   <div class="d-flex align-items-center justify-content-between mb-3">
     <h1 class="h4 mb-0">
       <i class="bi bi-people-fill text-primary me-2" aria-hidden="true"></i>
-      Users
+      Users & Groups
     </h1>
   </div>
 
@@ -41,9 +13,118 @@
   } @if (loading()) {
   <div class="text-center text-body-secondary py-5">
     <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
-    Loading users…
+    Loading…
   </div>
   } @else {
+  <!-- Tabs Navigation -->
+  <ul class="nav nav-tabs mb-4" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button
+        class="nav-link"
+        [class.active]="activeTab() === 'users'"
+        (click)="activeTab.set('users')"
+        type="button"
+        role="tab"
+        aria-selected="activeTab() === 'users'"
+      >
+        <i class="bi bi-person-fill me-1" aria-hidden="true"></i>
+        Users
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button
+        class="nav-link"
+        [class.active]="activeTab() === 'groups'"
+        (click)="activeTab.set('groups')"
+        type="button"
+        role="tab"
+        aria-selected="activeTab() === 'groups'"
+      >
+        <i class="bi bi-people-fill me-1" aria-hidden="true"></i>
+        Groups
+      </button>
+    </li>
+  </ul>
+
+  <!-- Users Tab -->
+  @if (activeTab() === 'users') {
+  <div class="mb-3">
+    @if (!showUserForm()) {
+    <button type="button" class="btn btn-primary" (click)="showUserForm.set(true)">
+      <i class="bi bi-person-plus me-1" aria-hidden="true"></i>
+      Create local account
+    </button>
+    } @else {
+    <div class="card shadow-sm mb-3">
+      <div class="card-body">
+        <h5 class="card-title">Create local account</h5>
+        <form class="row g-3" (submit)="createUser(); $event.preventDefault()" novalidate>
+          <div class="col-12 col-md-6">
+            <label for="newUsername" class="form-label">Username *</label>
+            <input
+              id="newUsername"
+              type="text"
+              autocomplete="off"
+              class="form-control"
+              placeholder="e.g., alice"
+              [formField]="userForm.username"
+            />
+          </div>
+          <div class="col-12 col-md-6">
+            <label for="newDisplayName" class="form-label">Display name</label>
+            <input
+              id="newDisplayName"
+              type="text"
+              autocomplete="off"
+              class="form-control"
+              placeholder="Optional"
+              [formField]="userForm.display_name"
+            />
+          </div>
+          <div class="col-12 col-md-6">
+            <label for="newUserPassword" class="form-label">Password *</label>
+            <input
+              id="newUserPassword"
+              type="password"
+              autocomplete="new-password"
+              class="form-control"
+              [formField]="userForm.password"
+            />
+            <div class="form-text">Minimum {{ minLength }} characters.</div>
+          </div>
+          <div class="col-12 col-md-6">
+            <label for="newUserConfirm" class="form-label">Confirm password *</label>
+            <input
+              id="newUserConfirm"
+              type="password"
+              autocomplete="new-password"
+              class="form-control"
+              [formField]="userForm.confirm"
+            />
+          </div>
+          <div class="col-12">
+            <div class="form-text mb-2">
+              <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+              The account starts as a guest. Add it to a group to grant it a role.
+            </div>
+            <button type="submit" class="btn btn-primary" [disabled]="creatingUser() || userForm().invalid()">
+              @if (creatingUser()) {
+              <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+              } Create
+            </button>
+            <button type="button" class="btn btn-outline-secondary ms-2" (click)="cancelCreateUser()">Cancel</button>
+          </div>
+          @if (userCreationError(); as msg) {
+          <div class="col-12">
+            <div class="text-danger small">{{ msg }}</div>
+          </div>
+          }
+        </form>
+      </div>
+    </div>
+    }
+  </div>
+
   <div class="card shadow-sm">
     <div class="table-responsive">
       <table class="table table-hover align-middle mb-0">
@@ -63,7 +144,10 @@
             <td class="fw-medium">{{ u.username }}</td>
             <td class="d-none d-md-table-cell text-body-secondary">{{ u.display_name || '—' }}</td>
             <td>
-              <span class="badge text-bg-secondary text-capitalize">{{ u.role }}</span>
+              <span class="badge" [class]="roleBadge(u.effective_role)"> {{ roleLabel(u.effective_role) }} </span>
+              @if (u.effective_role !== u.role) {
+              <div class="form-text mt-1">granted by a group</div>
+              }
             </td>
             <td>
               <span class="badge text-bg-light text-uppercase">{{ u.provider }}</span>
@@ -73,15 +157,28 @@
             </td>
             <td class="text-end">
               @if (u.provider === 'local') {
-              <button type="button" class="btn btn-sm btn-outline-primary" (click)="startEdit(u)">
+              <button type="button" class="btn btn-sm btn-outline-primary me-2" (click)="startEdit(u)">
                 <i class="bi bi-key me-1" aria-hidden="true"></i>
                 Change password
               </button>
               } @else {
-              <span class="text-body-secondary small">
+              <span class="text-body-secondary small me-2">
                 <i class="bi bi-shield-lock me-1" aria-hidden="true"></i>
                 Managed by SSO
               </span>
+              } @if (u.username !== currentUser()?.username) {
+              <button
+                type="button"
+                class="btn btn-sm btn-outline-danger"
+                (click)="deleteUser(u)"
+                [disabled]="deletingUserId() !== null"
+              >
+                @if (deletingUserId() === u.id) {
+                <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+                } @else {
+                <i class="bi bi-trash me-1" aria-hidden="true"></i>
+                } Delete
+              </button>
               }
             </td>
           </tr>
@@ -142,4 +239,189 @@
     </div>
   </div>
   }
+
+  <!-- Groups Tab -->
+  @if (activeTab() === 'groups') {
+  <div class="mb-3">
+    @if (!showGroupForm()) {
+    <button type="button" class="btn btn-primary" (click)="startCreateGroup()">
+      <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>
+      Create Group
+    </button>
+    } @else {
+    <div class="card shadow-sm mb-3">
+      <div class="card-body">
+        <h5 class="card-title">{{ editedGroupId() === null ? 'Create New Group' : 'Edit Group' }}</h5>
+        <form class="row g-3" (submit)="submitGroup(); $event.preventDefault()" novalidate>
+          <div class="col-12 col-md-4">
+            <label for="groupName" class="form-label">Group name *</label>
+            <input
+              id="groupName"
+              type="text"
+              class="form-control"
+              placeholder="e.g., Sales Team"
+              [formField]="groupForm.name"
+            />
+          </div>
+          <div class="col-12 col-md-5">
+            <label for="groupDesc" class="form-label">Description</label>
+            <input
+              id="groupDesc"
+              type="text"
+              class="form-control"
+              placeholder="Optional description"
+              [formField]="groupForm.description"
+            />
+          </div>
+          <div class="col-12 col-md-3">
+            <label for="groupRole" class="form-label">Granted role</label>
+            <select id="groupRole" class="form-select" [formField]="groupForm.role">
+              @for (role of roleOptions; track role) {
+              <option [value]="role">{{ roleLabel(role) }}</option>
+              }
+            </select>
+            <div class="form-text">Every member gets at least this role.</div>
+          </div>
+          <div class="col-12">
+            <button type="submit" class="btn btn-primary" [disabled]="savingGroup() || groupForm().invalid()">
+              @if (savingGroup()) {
+              <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+              } {{ editedGroupId() === null ? 'Create' : 'Save' }}
+            </button>
+            <button type="button" class="btn btn-outline-secondary ms-2" (click)="closeGroupForm()">Cancel</button>
+          </div>
+          @if (groupFormError(); as msg) {
+          <div class="col-12">
+            <div class="text-danger small">{{ msg }}</div>
+          </div>
+          }
+        </form>
+      </div>
+    </div>
+    }
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th scope="col">Group Name</th>
+            <th scope="col">Description</th>
+            <th scope="col">Granted role</th>
+            <th scope="col" class="text-center">Members</th>
+            <th scope="col" class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (g of groups(); track g.id) {
+          <tr>
+            <td class="fw-medium">{{ g.name }}</td>
+            <td class="text-body-secondary">{{ g.description || '—' }}</td>
+            <td>
+              <span class="badge" [class]="roleBadge(g.role)">{{ roleLabel(g.role) }}</span>
+            </td>
+            <td class="text-center">
+              <span class="badge text-bg-info">{{ g.member_count }}</span>
+            </td>
+            <td class="text-end">
+              <button type="button" class="btn btn-sm btn-outline-secondary me-2" (click)="startEditGroup(g)">
+                <i class="bi bi-pencil me-1" aria-hidden="true"></i>
+                Edit
+              </button>
+              <button type="button" class="btn btn-sm btn-outline-primary me-2" (click)="startEditingGroup(g.id)">
+                <i class="bi bi-person-plus me-1" aria-hidden="true"></i>
+                Manage Members
+              </button>
+              <button
+                type="button"
+                class="btn btn-sm btn-outline-danger"
+                (click)="deleteGroup(g)"
+                [disabled]="saving()"
+              >
+                <i class="bi bi-trash me-1" aria-hidden="true"></i>
+                Delete
+              </button>
+            </td>
+          </tr>
+          @if (editingGroupId() === g.id) {
+          <tr class="table-active">
+            <td colspan="5">
+              <div class="py-3">
+                <h6 class="mb-3">Manage members of {{ g.name }}</h6>
+
+                @if (membersError(); as msg) {
+                <div class="alert alert-danger py-2 small" role="alert">{{ msg }}</div>
+                }
+
+                <div class="form-label small">Add members</div>
+                <div class="row g-2 align-items-start">
+                  <div class="col-12 col-lg-8">
+                    <app-user-multi-select
+                      [users]="assignableUsers()"
+                      [(selectedIds)]="selectedUserIds"
+                      [disabled]="addingMembers()"
+                      placeholder="Search a user by name…"
+                      emptyLabel="Every user is already a member"
+                      [ariaLabel]="'Search and select users to add to ' + g.name"
+                    />
+                  </div>
+                  <div class="col-12 col-lg-4 d-flex gap-2">
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-primary"
+                      (click)="addSelectedUsersToGroup()"
+                      [disabled]="addingMembers() || selectedUserIds().length === 0"
+                    >
+                      @if (addingMembers()) {
+                      <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+                      } Add {{ selectedUserIds().length || '' }} selected
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" (click)="cancelEditingGroup()">
+                      Close
+                    </button>
+                  </div>
+                </div>
+
+                <hr class="my-3" />
+
+                <h6 class="small text-body-secondary text-uppercase mb-2">
+                  Current members ({{ groupMembers().length }})
+                </h6>
+                @if (loadingMembers()) {
+                <div class="text-body-secondary small">
+                  <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+                  Loading members…
+                </div>
+                } @else {
+                <div class="d-flex flex-wrap gap-2">
+                  @for (m of groupMembers(); track m.id) {
+                  <span class="badge text-bg-secondary d-inline-flex align-items-center gap-2 py-2">
+                    {{ m.username }}
+                    <button
+                      type="button"
+                      class="btn-close btn-close-white"
+                      [attr.aria-label]="'Remove ' + m.username + ' from ' + g.name"
+                      [disabled]="removingMemberId() !== null"
+                      (click)="removeMember(m)"
+                    ></button>
+                  </span>
+                  } @empty {
+                  <span class="text-body-secondary small">This group has no member yet.</span>
+                  }
+                </div>
+                }
+              </div>
+            </td>
+          </tr>
+          } } @empty {
+          <tr>
+            <td colspan="5" class="text-center text-body-secondary py-4">No groups found.</td>
+          </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+  } }
 </main>

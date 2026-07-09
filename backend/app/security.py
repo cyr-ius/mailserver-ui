@@ -8,8 +8,8 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 from starlette.responses import JSONResponse, Response
 from starlette.types import ASGIApp
 
-from app.client_ip import get_client_ip
-from app.config import settings
+from .client_ip import get_client_ip
+from .config import settings
 
 logger = logging.getLogger(__name__)
 

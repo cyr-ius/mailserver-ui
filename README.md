@@ -21,12 +21,15 @@ OIDC/SSO authentication.
   change the SSO configuration.
 - **User management** — list local & OIDC accounts, reset local passwords
   (admin only).
+- **Mailbox management** — create, reset the password of, and delete
+  docker-mailserver accounts. Mailboxes live in the shared `postfix-accounts.cf`
+  file (see `MAILSERVER_CONFIG_DIR`), not in the application database.
 - Group-based role mapping and optional group-restricted access for OIDC users.
 
 ## Quick start (Docker)
 
 ```bash
-cp .env.example .env      # then edit SECRET_KEY (at minimum)
+cp backend/.env.example .env   # then edit SECRET_KEY (at minimum)
 docker compose up -d --build
 ```
 
@@ -40,15 +43,16 @@ docker compose logs mailserver-ui | grep "Generated password"
 ## Configuration
 
 All settings are provided through environment variables (see
-[`.env.example`](.env.example) for the full list). The essentials:
+[`backend/.env.example`](backend/.env.example) for the full list). The essentials:
 
-| Variable          | Default                  | Description                                       |
-| ----------------- | ------------------------ | ------------------------------------------------- |
-| `SECRET_KEY`      | _(change me)_            | Signs session cookies — **must** be set in prod.  |
-| `ADMIN_USERNAME`  | `admin`                  | Default admin account seeded on first boot.       |
-| `DATA_DIR`        | `/var/lib/mailserver-ui` | Persistent directory for the SQLite database.     |
-| `TRUSTED_PROXIES` | _(empty)_                | Trusted proxy IPs/CIDRs; enables `X-Forwarded-*`. |
-| `LOG_LEVEL`       | `INFO`                   | `DEBUG` \| `INFO` \| `WARNING` \| `ERROR`         |
+| Variable                | Default                      | Description                                       |
+| ----------------------- | ---------------------------- | ------------------------------------------------- |
+| `SECRET_KEY`            | _(change me)_                | Signs session cookies — **must** be set in prod.  |
+| `ADMIN_USERNAME`        | `admin`                      | Default admin account seeded on first boot.       |
+| `DATA_DIR`              | `/var/lib/mailserver-ui`     | Persistent directory for the SQLite database.     |
+| `MAILSERVER_CONFIG_DIR` | `/var/lib/mailserver-config` | docker-mailserver config dir (shared volume).     |
+| `TRUSTED_PROXIES`       | _(empty)_                    | Trusted proxy IPs/CIDRs; enables `X-Forwarded-*`. |
+| `LOG_LEVEL`             | `INFO`                       | `DEBUG` \| `INFO` \| `WARNING` \| `ERROR`         |
 
 > The auth cookie `Secure` flag is detected automatically from the request
 > scheme (HTTPS), honouring `X-Forwarded-Proto` when the request comes through a

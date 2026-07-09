@@ -11,10 +11,10 @@ from typing import Annotated
 from fastapi import Depends, Request
 from sqlmodel import Session
 
-from app.auth import SessionUser, decode_session_token
-from app.config import settings
-from app.database import engine
-from app.exceptions import ForbiddenException, UnauthorizedException
+from .auth import SessionUser, decode_session_token, role_grants
+from .config import settings
+from .database import engine
+from .exceptions import ForbiddenException, UnauthorizedException
 
 logger = logging.getLogger(__name__)
 
@@ -42,10 +42,19 @@ def require_user(
     return user
 
 
+def require_mailbox_manager(
+    user: Annotated[SessionUser, Depends(require_user)],
+) -> SessionUser:
+    """Dependency enforcing mailbox-management privileges (managers and admins)."""
+    if not role_grants(user.role, "mailbox_manager"):
+        raise ForbiddenException("Mailbox manager privileges required")
+    return user
+
+
 def require_admin(
     user: Annotated[SessionUser, Depends(require_user)],
 ) -> SessionUser:
     """Dependency enforcing an authenticated session with the admin role."""
-    if user.role != "admin":
+    if not role_grants(user.role, "admin"):
         raise ForbiddenException("Administrator privileges required")
     return user

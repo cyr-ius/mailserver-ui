@@ -17,7 +17,7 @@ from sqlmodel import Session
 from .config import settings
 from .database import create_db_and_tables, engine
 from .exceptions import BaseAPIException
-from .routers import auth, users
+from .routers import auth, fail2ban, groups, mailboxes, mailserver, users
 from .routers import settings as settings_router
 from .security import RateLimitMiddleware, SecurityHeadersMiddleware
 from .services import user_service
@@ -77,6 +77,10 @@ if settings.rate_limit_enabled:
 # ── API routers ───────────────────────────────────────────────────────────────
 app.include_router(auth.router)
 app.include_router(users.router)
+app.include_router(groups.router)
+app.include_router(mailboxes.router)
+app.include_router(mailserver.router)
+app.include_router(fail2ban.router)
 app.include_router(settings_router.router)
 
 # ── Self-hosted static assets (Swagger UI, no Internet dependency) ─────────────

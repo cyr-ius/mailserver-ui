@@ -11,9 +11,18 @@ from datetime import UTC, datetime
 
 from sqlmodel import Session, select
 
-from app.auth import SessionUser, hash_password, verify_password
-from app.config import settings
-from app.user_models import User
+from ..auth import (
+    Role,
+    SessionUser,
+    hash_password,
+    highest_role,
+    normalize_role,
+    verify_password,
+)
+from ..config import settings
+from ..exceptions import BadRequestException, ConflictException
+from ..models.user_models import User, UserPublic
+from ..services import group_service
 
 logger = logging.getLogger(__name__)
 
@@ -21,14 +30,47 @@ logger = logging.getLogger(__name__)
 _GENERATED_PASSWORD_BYTES = 24
 
 
-def to_session_user(user: User) -> SessionUser:
+# ── Role resolution ──────────────────────────────────────────────────────────
+
+
+def resolve_role(session: Session, user: User) -> Role:
+    """Return the effective role of ``user``.
+
+    An account carries a role of its own (set by the OIDC group claims, or
+    ``admin`` for the seeded administrator). Membership in a local group can only
+    raise it: the effective role is the most privileged of the two sources.
+    """
+    granted = group_service.get_granted_roles(session, [user.id] if user.id else [])
+    return highest_role([user.role, *granted.get(user.id or 0, [])])
+
+
+def to_session_user(session: Session, user: User) -> SessionUser:
     """Map a persisted user to the session principal carried by the cookie."""
     return SessionUser(
         username=user.username,
         display_name=user.display_name or user.username,
-        role="admin" if user.role == "admin" else "user",
+        role=resolve_role(session, user),
         provider="oidc" if user.provider == "oidc" else "local",
     )
+
+
+def _to_public(user: User, effective_role: Role) -> UserPublic:
+    data = user.model_dump(exclude={"password_hash", "updated_at", "role"})
+    return UserPublic(**data, role=normalize_role(user.role), effective_role=effective_role)
+
+
+def to_public(session: Session, user: User) -> UserPublic:
+    """Map a persisted user to its API representation, effective role included."""
+    return _to_public(user, resolve_role(session, user))
+
+
+def to_public_many(session: Session, users: list[User]) -> list[UserPublic]:
+    """Map several users at once, resolving every group membership in one query."""
+    granted = group_service.get_granted_roles(session, [u.id for u in users if u.id])
+    return [
+        _to_public(user, highest_role([user.role, *granted.get(user.id or 0, [])]))
+        for user in users
+    ]
 
 
 # ── Queries ──────────────────────────────────────────────────────────────────
@@ -62,11 +104,17 @@ def authenticate_local(session: Session, username: str, password: str) -> Sessio
     if not verify_password(password, user.password_hash):
         return None
     _touch_login(session, user)
-    return to_session_user(user)
+    return to_session_user(session, user)
 
 
-def upsert_oidc_user(session: Session, principal: SessionUser) -> User:
-    """Create or refresh the local record mirroring an OIDC principal."""
+def upsert_oidc_user(session: Session, principal: SessionUser) -> SessionUser:
+    """Create or refresh the local record mirroring an OIDC principal.
+
+    ``principal.role`` is the role derived from the provider's group claims; it
+    overwrites the account role on every sign-in. The returned principal carries
+    the effective role, so a guest promoted through a local group keeps the
+    privileges the administrator granted them.
+    """
     user = get_by_username(session, principal.username)
     if user is None:
         user = User(
@@ -85,10 +133,67 @@ def upsert_oidc_user(session: Session, principal: SessionUser) -> User:
     session.add(user)
     session.commit()
     session.refresh(user)
-    return user
+    return to_session_user(session, user)
 
 
 # ── Mutations ────────────────────────────────────────────────────────────────
+
+
+def create_local_user(
+    session: Session,
+    username: str,
+    display_name: str,
+    password: str,
+) -> User:
+    """Create a local account authenticating against a stored bcrypt hash.
+
+    The account starts as ``guest``; privileges are granted by adding it to a
+    local group (see :func:`resolve_role`).
+    """
+    username = username.strip()
+    if not username:
+        raise BadRequestException("A username is required")
+    if get_by_username(session, username) is not None:
+        raise ConflictException(f"User {username} already exists")
+
+    user = User(
+        username=username,
+        display_name=display_name.strip(),
+        role="guest",
+        provider="local",
+        password_hash=hash_password(password),
+    )
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    logger.info("Created local user %s (id=%s)", user.username, user.id)
+    return user
+
+
+def is_last_admin(session: Session, user: User) -> bool:
+    """Return True when ``user`` is the only account with an effective admin role.
+
+    Deleting it would leave the instance with no way to administer itself, so
+    callers reject the operation.
+    """
+    if resolve_role(session, user) != "admin":
+        return False
+    admins = [
+        public
+        for public in to_public_many(session, list_users(session))
+        if public.effective_role == "admin"
+    ]
+    return len(admins) <= 1
+
+
+def delete_user(session: Session, user: User) -> None:
+    """Delete a user along with every group membership it holds."""
+    if user.id is not None:
+        group_service.remove_user_memberships(session, user.id)
+    username = user.username
+    session.delete(user)
+    session.commit()
+    logger.info("Deleted user %s", username)
 
 
 def set_password(session: Session, user: User, new_password: str) -> User:

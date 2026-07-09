@@ -11,10 +11,10 @@ from datetime import UTC, datetime
 
 from sqlmodel import Session
 
-from app.config import settings
-from app.exceptions import BadRequestException
-from app.services import oidc
-from app.settings_models import OIDC_SETTINGS_ID, OidcSettings, OidcSettingsUpdate
+from ..config import settings
+from ..exceptions import BadRequestException
+from ..models.settings_models import OIDC_SETTINGS_ID, OidcSettings, OidcSettingsUpdate
+from ..services import oidc
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +83,7 @@ def _seed_from_env() -> OidcSettings:
         oidc_only=settings.oidc_only,
         admin_group_claim=settings.oidc_admin_group_claim,
         admin_group=settings.oidc_admin_group,
-        user_group_claim=settings.oidc_user_group_claim,
-        user_group=settings.oidc_user_group,
+        manager_group_claim=settings.oidc_manager_group_claim,
+        manager_group=settings.oidc_manager_group,
         restrict_to_groups=settings.oidc_restrict_to_groups,
     )

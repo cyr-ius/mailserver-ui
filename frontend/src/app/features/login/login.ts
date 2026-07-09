@@ -2,12 +2,14 @@ import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/cor
 import { Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { form, FormField, required, submit } from '@angular/forms/signals';
+import { CommonModule } from '@angular/common';
 
 import { AuthService } from '../../core/auth.service';
+import { ThemeService, ThemeMode } from '../../core/theme.service';
 
 @Component({
   selector: 'app-login',
-  imports: [FormField],
+  imports: [FormField, CommonModule],
   templateUrl: './login.html',
   styleUrl: './login.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -15,6 +17,7 @@ import { AuthService } from '../../core/auth.service';
 export class Login {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  protected readonly theme = inject(ThemeService);
 
   /** Which login methods the backend exposes. */
   protected readonly config = this.auth.config;
@@ -27,6 +30,8 @@ export class Login {
     required(path.username, { message: 'Username is required' });
     required(path.password, { message: 'Password is required' });
   });
+
+  protected readonly themeModes: ThemeMode[] = ['light', 'dark', 'auto'];
 
   constructor() {
     this.readOidcError();
@@ -63,7 +68,7 @@ export class Login {
       this.submitting.set(true);
       try {
         await this.auth.login(this.model());
-        await this.router.navigate(['/welcome']);
+        await this.router.navigate(['/dashboard']);
       } catch (err) {
         this.error.set(this.messageFor(err));
       } finally {
@@ -74,6 +79,10 @@ export class Login {
 
   protected onOidcLogin(): void {
     this.auth.loginWithOidc();
+  }
+
+  protected onThemeChange(mode: ThemeMode): void {
+    this.theme.setThemeMode(mode);
   }
 
   private messageFor(err: unknown): string {

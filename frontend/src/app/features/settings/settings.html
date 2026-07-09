@@ -1,62 +1,52 @@
-<nav class="navbar navbar-expand bg-body-tertiary border-bottom px-3">
-  <span class="navbar-brand d-flex align-items-center gap-2">
-    <i class="bi bi-envelope-paper-fill text-primary" aria-hidden="true"></i>
-    Mailserver UI
-  </span>
-  <div class="ms-auto d-flex align-items-center gap-3">
-    <a class="btn btn-sm btn-outline-secondary" routerLink="/welcome">
-      <i class="bi bi-house me-1" aria-hidden="true"></i>
-      Home
-    </a>
-    @if (user(); as u) {
-    <span class="text-body-secondary small d-none d-sm-inline">
-      <i class="bi bi-person-circle me-1" aria-hidden="true"></i>
-      {{ u.display_name }}
-    </span>
-    }
-    <button type="button" class="btn btn-sm btn-outline-secondary" (click)="onLogout()" [disabled]="loggingOut()">
-      @if (loggingOut()) {
-      <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
-      } Sign out
-    </button>
-  </div>
-</nav>
-
 <main class="container py-4">
   <div class="d-flex align-items-center justify-content-between mb-3">
     <h1 class="h4 mb-0">
       <i class="bi bi-gear-fill text-primary me-2" aria-hidden="true"></i>
-      Settings
+      {{ pageTitle() }}
     </h1>
   </div>
-
-  <ul class="nav nav-tabs mb-3">
-    <li class="nav-item">
-      <button type="button" class="nav-link" [class.active]="activeTab() === 'oidc'" (click)="setTab('oidc')">
-        <i class="bi bi-shield-lock me-1" aria-hidden="true"></i>
-        OIDC / SSO
-      </button>
-    </li>
-    <li class="nav-item">
-      <button type="button" class="nav-link disabled" disabled>
-        <i class="bi bi-hdd-network me-1" aria-hidden="true"></i>
-        Syslog
-        <span class="badge text-bg-light ms-1">soon</span>
-      </button>
-    </li>
-    <li class="nav-item">
-      <button type="button" class="nav-link disabled" disabled>
-        <i class="bi bi-envelope me-1" aria-hidden="true"></i>
-        Email
-        <span class="badge text-bg-light ms-1">soon</span>
-      </button>
-    </li>
-  </ul>
 
   @if (successMessage(); as msg) {
   <div class="alert alert-success py-2" role="alert">{{ msg }}</div>
   } @if (loadError(); as msg) {
   <div class="alert alert-danger py-2" role="alert">{{ msg }}</div>
+  } @if (activeTab() === 'appearance') {
+  <div class="card shadow-sm settings-card">
+    <div class="card-body">
+      <h2 class="h6 text-uppercase text-body-secondary mb-4">Theme</h2>
+
+      <div class="row g-3">
+        <div class="col-12">
+          <label class="form-label">Theme preference</label>
+          <div class="d-flex gap-2 flex-wrap">
+            @for (mode of themeModes; track mode) {
+            <div class="form-check">
+              <input
+                type="radio"
+                class="form-check-input"
+                name="theme"
+                [id]="'theme-' + mode"
+                [value]="mode"
+                [checked]="theme.themeMode() === mode"
+                (change)="onThemeChange(mode)"
+              />
+              <label class="form-check-label" [for]="'theme-' + mode">
+                @switch (mode) { @case ('light') {
+                <i class="bi bi-sun-fill me-1" aria-hidden="true"></i>
+                Light } @case ('dark') {
+                <i class="bi bi-moon-fill me-1" aria-hidden="true"></i>
+                Dark } @case ('auto') {
+                <i class="bi bi-circle-half me-1" aria-hidden="true"></i>
+                Auto } }
+              </label>
+            </div>
+            }
+          </div>
+          <div class="form-text mt-2">Choose your preferred theme. "Auto" will use your system settings.</div>
+        </div>
+      </div>
+    </div>
+  </div>
   } @if (activeTab() === 'oidc') { @if (loading()) {
   <div class="text-center text-body-secondary py-5">
     <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
@@ -131,7 +121,12 @@
           </div>
         </div>
 
-        <h2 class="h6 text-uppercase text-body-secondary mb-3">Group mapping</h2>
+        <h2 class="h6 text-uppercase text-body-secondary mb-3">Role mapping</h2>
+        <p class="text-body-secondary small mb-3">
+          Members of the admin group sign in as administrators, members of the mailbox manager group as mailbox
+          managers. Anyone in neither group signs in as a guest, and can be promoted later by adding them to a local
+          group.
+        </p>
         <div class="row g-3 mb-3">
           <div class="col-12 col-lg-6">
             <label for="oidc-admin-claim" class="form-label">Admin group claim</label>
@@ -148,18 +143,18 @@
             <input id="oidc-admin-group" type="text" class="form-control" [formField]="oidcForm.admin_group" />
           </div>
           <div class="col-12 col-lg-6">
-            <label for="oidc-user-claim" class="form-label">User group claim</label>
+            <label for="oidc-manager-claim" class="form-label">Mailbox manager group claim</label>
             <input
-              id="oidc-user-claim"
+              id="oidc-manager-claim"
               type="text"
               class="form-control"
               placeholder="groups"
-              [formField]="oidcForm.user_group_claim"
+              [formField]="oidcForm.manager_group_claim"
             />
           </div>
           <div class="col-12 col-lg-6">
-            <label for="oidc-user-group" class="form-label">User group value</label>
-            <input id="oidc-user-group" type="text" class="form-control" [formField]="oidcForm.user_group" />
+            <label for="oidc-manager-group" class="form-label">Mailbox manager group value</label>
+            <input id="oidc-manager-group" type="text" class="form-control" [formField]="oidcForm.manager_group" />
           </div>
         </div>
 
@@ -171,7 +166,7 @@
             [formField]="oidcForm.restrict_to_groups"
           />
           <label for="oidc-restrict" class="form-check-label">
-            Restrict access to members of the configured groups
+            Deny sign-in to users who belong to neither group
           </label>
         </div>
         <div class="form-check form-switch mb-4">

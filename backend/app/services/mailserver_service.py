@@ -1,0 +1,1078 @@
+"""Mailserver service: manage docker-mailserver global config inside the container.
+
+docker-mailserver reads part of its configuration from flat files inside its
+configuration directory. This app does not bind-mount that directory: the files
+are read and written *inside* the mailserver container over the Docker socket
+(see :mod:`app.services.container`). This service edits the files that are not
+mailbox-specific:
+
+* ``postfix-relaymap.cf`` — maps a sender domain to a relay ``[host]:port``, or
+  excludes it from the global relay when no target follows the sender;
+* ``postfix-sasl-password.cf`` — SASL credentials for those relays;
+* ``postfix-main.cf`` — extra Postfix ``main.cf`` parameters (key/value);
+* ``postfix-master.cf`` — extra Postfix ``master.cf`` service parameters;
+* ``dovecot.cf`` — extra Dovecot configuration (copied to ``local.conf``);
+* ``postfix-aliases.cf`` / ``postfix-regexp.cf`` — system and PCRE aliases;
+* ``before.dovecot.sieve`` / ``after.dovecot.sieve`` — global Sieve scripts;
+* ``opendkim/keys/<domain>/<selector>.txt`` or ``rspamd/dkim/*.public.txt`` —
+  generated DKIM records (read-only; generation runs in the container).
+
+It also exposes runtime-only views that no config file backs: the Postfix mail
+queue, the TLS certificate, the mail log and the container's own environment.
+
+Writes are atomic (temp file + ``mv`` in the container) so the mailserver's file
+watcher never observes a half-written file. Files managed here are rewritten
+wholesale and prefixed with a header noting they are owned by the UI; the header
+is a comment in every format involved, so it is inert.
+
+Only ``postfix-accounts.cf``, ``postfix-virtual.cf``, ``postfix-regexp.cf``,
+``postfix-aliases.cf``, ``postfix-relaymap.cf``, ``postfix-sasl-password.cf``,
+``dovecot-quotas.cf`` and ``dovecot-masters.cf`` are watched live. ``postfix-main.cf``,
+``postfix-master.cf``, ``dovecot.cf`` and the global Sieve scripts are read only when
+the mailserver starts, so changing them has no effect until the container is
+restarted; the schemas that carry a single such file set ``restart_required``.
+"""
+
+import json
+import logging
+import re
+from datetime import UTC, datetime
+
+from ..config import settings
+from ..exceptions import BadRequestException, ConflictException, NotFoundException
+from ..models.mailserver_models import (
+    DkimGenerateRequest,
+    DkimKey,
+    DnsRecord,
+    DomainDnsRecords,
+    DovecotConfig,
+    DovecotMaster,
+    MailLog,
+    MailserverEnvironment,
+    PostfixMasterOverride,
+    PostfixOverride,
+    QueueActionResult,
+    QueueMessage,
+    QueueSummary,
+    RegexAlias,
+    RelayExclusion,
+    RelayHost,
+    RelayHostCreate,
+    Restriction,
+    SieveScope,
+    SieveScript,
+    SystemAlias,
+    TlsCertificate,
+)
+from . import container
+from .passwords import hash_dovecot_password
+
+logger = logging.getLogger(__name__)
+
+# docker-mailserver flat files inside the shared config directory.
+_RELAYMAP_FILENAME = "postfix-relaymap.cf"
+_SASL_FILENAME = "postfix-sasl-password.cf"
+_POSTFIX_MAIN_FILENAME = "postfix-main.cf"
+_POSTFIX_MASTER_FILENAME = "postfix-master.cf"
+_DOVECOT_CONFIG_FILENAME = "dovecot.cf"
+_SYSTEM_ALIASES_FILENAME = "postfix-aliases.cf"
+_REGEX_ALIASES_FILENAME = "postfix-regexp.cf"
+_OPENDKIM_KEYS_DIR = "opendkim/keys"
+_RSPAMD_DKIM_DIR = "rspamd/dkim"
+_ACCOUNTS_FILENAME = "postfix-accounts.cf"
+_DOVECOT_MASTERS_FILENAME = "dovecot-masters.cf"
+_SIEVE_FILENAMES: dict[str, str] = {
+    "before": "before.dovecot.sieve",
+    "after": "after.dovecot.sieve",
+}
+
+# The mailserver dumps its effective environment here when it starts.
+_DMS_SETTINGS_PATH = "/etc/dms-settings"
+
+# Access maps backing ``setup email restrict <send|receive>``.
+_RESTRICTION_FILENAMES = {
+    "send": "postfix-send-access.cf",
+    "receive": "postfix-receive-access.cf",
+}
+# Action stored next to each restricted address (docker-mailserver rejects them).
+_RESTRICTION_ACTION = "REJECT"
+
+# Header written at the top of every file this service owns.
+_MANAGED_HEADER = "# Managed by Mailserver UI — manual edits may be overwritten.\n"
+
+# Postfix parameter names are lower_snake identifiers (letters, digits, "_").
+_POSTFIX_KEY_RE = re.compile(r"^[A-Za-z0-9_]+$")
+
+# A ``postfix-master.cf`` key: the service, its type and the parameter, as
+# ``postconf -P`` expects, e.g. ``submission/inet/smtpd_sasl_security_options``.
+_POSTFIX_MASTER_KEY_RE = re.compile(r"^[A-Za-z0-9_.-]+/[a-z]+/[A-Za-z0-9_]+$")
+
+# A DKIM selector / domain label: letters, digits, dots and hyphens.
+_DKIM_TOKEN_RE = re.compile(r"^[A-Za-z0-9.-]+$")
+
+# A local alias name in ``/etc/aliases``: no "@", no whitespace, no ":".
+_SYSTEM_ALIAS_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+
+# A Postfix PCRE pattern, delimiters included, with optional trailing flags.
+_REGEX_ALIAS_PATTERN_RE = re.compile(r"^/.+/[imxs]*$")
+
+# A Postfix queue ID as printed by ``postqueue``; ``postsuper`` also accepts
+# ``ALL``, which is why only alphanumerics are allowed through here.
+_QUEUE_ID_RE = re.compile(r"^[A-Za-z0-9]{1,32}$")
+
+
+# ── Generic file access ───────────────────────────────────────────────────────
+
+
+def _read_config_lines(filename: str) -> list[str]:
+    """Return the meaningful lines of ``filename`` (no blanks, no comments)."""
+    content = container.read_config(filename)
+    return [
+        line.strip()
+        for line in content.splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
+
+
+def _write_managed(filename: str, lines: list[str]) -> None:
+    """Atomically (re)write ``filename`` with the managed header and ``lines``."""
+    payload = _MANAGED_HEADER + "".join(f"{line}\n" for line in lines)
+    container.write_config(filename, payload)
+
+
+def _read_managed_body(filename: str) -> str:
+    """Return ``filename`` without the managed header, for free-form contents."""
+    content = container.read_config(filename)
+    if content.startswith(_MANAGED_HEADER):
+        content = content[len(_MANAGED_HEADER) :]
+    return content.strip()
+
+
+def _write_managed_body(filename: str, content: str) -> None:
+    """Atomically (re)write ``filename`` with the managed header and free-form text."""
+    body = content.strip()
+    container.write_config(filename, f"{_MANAGED_HEADER}{body}\n" if body else _MANAGED_HEADER)
+
+
+def _normalise_sender(sender: str) -> str:
+    """Lower-case and strip a relay sender key for consistent comparison."""
+    return sender.strip().lower()
+
+
+# ── SMTP relay (smarthost) ────────────────────────────────────────────────────
+
+
+def _parse_relay_target(token: str) -> tuple[str, int]:
+    """Split a relay target ``[host]:port`` / ``host:port`` / ``host`` into parts."""
+    token = token.strip()
+    port = 587
+    if token.startswith("["):
+        host, _, after = token[1:].partition("]")
+        suffix = after.lstrip(":")
+        if suffix.isdigit():
+            port = int(suffix)
+    elif ":" in token:
+        host, _, raw_port = token.rpartition(":")
+        if raw_port.isdigit():
+            port = int(raw_port)
+    else:
+        host = token
+    return host.strip(), port
+
+
+def _parse_relaymap() -> dict[str, tuple[str, int] | None]:
+    """Return a mapping of ``sender -> (host, port)`` from ``postfix-relaymap.cf``.
+
+    A sender with no relay target maps to ``None``: that is how
+    ``setup relay exclude-domain`` opts a domain out of the global relay host.
+    Such lines are kept so rewriting the file never drops an exclusion.
+    """
+    relays: dict[str, tuple[str, int] | None] = {}
+    for line in _read_config_lines(_RELAYMAP_FILENAME):
+        parts = line.split()
+        sender = parts[0].lower()
+        if len(parts) < 2:
+            relays[sender] = None
+            continue
+        host, port = _parse_relay_target(parts[1])
+        if host:
+            relays[sender] = (host, port)
+    return relays
+
+
+def _parse_sasl() -> dict[str, tuple[str, str]]:
+    """Return a mapping of ``sender -> (username, password)`` from the SASL file."""
+    creds: dict[str, tuple[str, str]] = {}
+    for line in _read_config_lines(_SASL_FILENAME):
+        parts = line.split(None, 1)
+        if len(parts) < 2:
+            continue
+        username, _, password = parts[1].partition(":")
+        creds[parts[0].lower()] = (username.strip(), password.strip())
+    return creds
+
+
+def _write_relaymap(relays: dict[str, tuple[str, int] | None]) -> None:
+    """Persist the relay map, one ``sender\t[host]:port`` line per entry.
+
+    Senders mapped to ``None`` are written as a lone sender key, preserving the
+    global-relay exclusions ``setup relay exclude-domain`` creates.
+    """
+    lines = [
+        sender if target is None else f"{sender}\t[{target[0]}]:{target[1]}"
+        for sender, target in sorted(relays.items())
+    ]
+    _write_managed(_RELAYMAP_FILENAME, lines)
+
+
+def _write_sasl(creds: dict[str, tuple[str, str]]) -> None:
+    """Persist the SASL credentials, dropping entries without a username."""
+    lines = [
+        f"{sender}\t{username}:{password}"
+        for sender, (username, password) in sorted(creds.items())
+        if username
+    ]
+    _write_managed(_SASL_FILENAME, lines)
+
+
+def _require_relay_sender(sender: str) -> str:
+    """Return the normalised sender key, rejecting anything that is not a sender."""
+    key = _normalise_sender(sender)
+    if "@" not in key:
+        raise BadRequestException(
+            "A relay sender must be a domain (e.g. @example.com) or a full address"
+        )
+    return key
+
+
+def list_relays() -> list[RelayHost]:
+    """Return every configured SMTP relay, ordered by sender (no passwords).
+
+    Global-relay exclusions are not relays; see :func:`list_relay_exclusions`.
+    """
+    creds = _parse_sasl()
+    relays: list[RelayHost] = []
+    for sender, target in sorted(_parse_relaymap().items()):
+        if target is None:
+            continue
+        host, port = target
+        username, _password = creds.get(sender, ("", ""))
+        relays.append(
+            RelayHost(
+                sender=sender,
+                host=host,
+                port=port,
+                username=username or None,
+                has_credentials=bool(username),
+            )
+        )
+    return relays
+
+
+def create_relay(payload: RelayHostCreate) -> RelayHost:
+    """Add an SMTP relay for a sender domain, rejecting duplicates."""
+    sender = _require_relay_sender(payload.sender)
+
+    relays = _parse_relaymap()
+    if sender in relays:
+        raise ConflictException(f"A relay or exclusion already exists for {sender}")
+
+    relays[sender] = (payload.host.strip(), payload.port)
+    _write_relaymap(relays)
+
+    username = (payload.username or "").strip()
+    if username:
+        creds = _parse_sasl()
+        creds[sender] = (username, payload.password or "")
+        _write_sasl(creds)
+
+    logger.info("Added SMTP relay for %s -> %s:%s", sender, payload.host, payload.port)
+    return RelayHost(
+        sender=sender,
+        host=payload.host.strip(),
+        port=payload.port,
+        username=username or None,
+        has_credentials=bool(username),
+    )
+
+
+def delete_relay(sender: str) -> None:
+    """Remove the SMTP relay (and any credentials) for ``sender``."""
+    key = _normalise_sender(sender)
+    relays = _parse_relaymap()
+    if relays.get(key) is None:
+        raise NotFoundException("Relay", key)
+    del relays[key]
+    _write_relaymap(relays)
+
+    creds = _parse_sasl()
+    if creds.pop(key, None) is not None:
+        _write_sasl(creds)
+    logger.info("Removed SMTP relay for %s", key)
+
+
+# ── Global relay exclusions ───────────────────────────────────────────────────
+
+
+def list_relay_exclusions() -> list[RelayExclusion]:
+    """Return the senders opted out of the global relay, ordered by sender."""
+    return [
+        RelayExclusion(sender=sender)
+        for sender, target in sorted(_parse_relaymap().items())
+        if target is None
+    ]
+
+
+def create_relay_exclusion(sender: str) -> RelayExclusion:
+    """Opt a sender domain out of the global relay, rejecting duplicates."""
+    key = _require_relay_sender(sender)
+    relays = _parse_relaymap()
+    if key in relays:
+        raise ConflictException(f"A relay or exclusion already exists for {key}")
+
+    relays[key] = None
+    _write_relaymap(relays)
+    logger.info("Excluded %s from the global relay host", key)
+    return RelayExclusion(sender=key)
+
+
+def delete_relay_exclusion(sender: str) -> None:
+    """Send ``sender``'s mail through the global relay again."""
+    key = _normalise_sender(sender)
+    relays = _parse_relaymap()
+    if key not in relays or relays[key] is not None:
+        raise NotFoundException("Relay exclusion", key)
+    del relays[key]
+    _write_relaymap(relays)
+    logger.info("Removed the global relay exclusion for %s", key)
+
+
+# ── Postfix overrides (main.cf) ───────────────────────────────────────────────
+
+
+def list_postfix_overrides() -> list[PostfixOverride]:
+    """Return the ``key = value`` overrides stored in ``postfix-main.cf``."""
+    overrides: list[PostfixOverride] = []
+    for line in _read_config_lines(_POSTFIX_MAIN_FILENAME):
+        key, sep, value = line.partition("=")
+        key = key.strip()
+        if key and sep:
+            overrides.append(PostfixOverride(key=key, value=value.strip()))
+    return overrides
+
+
+def set_postfix_overrides(overrides: list[PostfixOverride]) -> list[PostfixOverride]:
+    """Replace the full set of Postfix overrides, validating parameter names.
+
+    Insertion order is preserved; duplicate keys keep their last value.
+    """
+    cleaned: dict[str, str] = {}
+    for override in overrides:
+        key = override.key.strip()
+        if not key:
+            continue
+        if not _POSTFIX_KEY_RE.match(key):
+            raise BadRequestException(f"Invalid Postfix parameter name: {key!r}")
+        cleaned[key] = override.value.strip()
+
+    _write_managed(_POSTFIX_MAIN_FILENAME, [f"{key} = {value}" for key, value in cleaned.items()])
+    logger.info("Updated %d Postfix override(s)", len(cleaned))
+    return [PostfixOverride(key=key, value=value) for key, value in cleaned.items()]
+
+
+# ── Postfix master overrides (master.cf) ──────────────────────────────────────
+
+
+def list_postfix_master_overrides() -> list[PostfixMasterOverride]:
+    """Return the ``service/type/parameter = value`` lines of ``postfix-master.cf``."""
+    overrides: list[PostfixMasterOverride] = []
+    for line in _read_config_lines(_POSTFIX_MASTER_FILENAME):
+        key, sep, value = line.partition("=")
+        key = key.strip()
+        if key and sep:
+            overrides.append(PostfixMasterOverride(key=key, value=value.strip()))
+    return overrides
+
+
+def set_postfix_master_overrides(
+    overrides: list[PostfixMasterOverride],
+) -> list[PostfixMasterOverride]:
+    """Replace the full set of Postfix master overrides, validating each key.
+
+    Lines are written without spaces around ``=`` because docker-mailserver
+    passes each one straight to ``postconf -P``, which expects that form.
+    """
+    cleaned: dict[str, str] = {}
+    for override in overrides:
+        key = override.key.strip()
+        if not key:
+            continue
+        if not _POSTFIX_MASTER_KEY_RE.match(key):
+            raise BadRequestException(
+                f"Invalid Postfix master parameter: {key!r}. Expected "
+                "service/type/parameter, e.g. submission/inet/smtpd_tls_security_level"
+            )
+        cleaned[key] = override.value.strip()
+
+    _write_managed(_POSTFIX_MASTER_FILENAME, [f"{key}={value}" for key, value in cleaned.items()])
+    logger.info("Updated %d Postfix master override(s)", len(cleaned))
+    return [PostfixMasterOverride(key=key, value=value) for key, value in cleaned.items()]
+
+
+# ── Dovecot configuration override (dovecot.cf) ───────────────────────────────
+
+
+def get_dovecot_config() -> DovecotConfig:
+    """Return the raw ``dovecot.cf`` override (empty when the file is absent)."""
+    return DovecotConfig(content=_read_managed_body(_DOVECOT_CONFIG_FILENAME))
+
+
+def set_dovecot_config(content: str) -> DovecotConfig:
+    """Replace ``dovecot.cf`` wholesale; docker-mailserver copies it at startup.
+
+    The contents are Dovecot's own configuration syntax and are not validated
+    here: a bad file only surfaces when the mailserver restarts.
+    """
+    payload = content.strip()
+    _write_managed_body(_DOVECOT_CONFIG_FILENAME, payload)
+    logger.info("Updated the Dovecot configuration override (%d bytes)", len(payload))
+    return DovecotConfig(content=payload)
+
+
+# ── DKIM (read-only) ──────────────────────────────────────────────────────────
+
+
+def _parse_dkim_txt(raw: str) -> tuple[str, str]:
+    """Return ``(txt_value, public_key)`` from a BIND-format DKIM ``.txt`` file."""
+    txt_value = "".join(re.findall(r'"([^"]*)"', raw))
+    match = re.search(r"p=([A-Za-z0-9+/=]+)", txt_value)
+    return txt_value, (match.group(1) if match else "")
+
+
+def _opendkim_keys() -> list[DkimKey]:
+    """Return the DKIM records under ``opendkim/keys/<domain>/<selector>.txt``."""
+    keys: list[DkimKey] = []
+    for rel in container.list_config_files(_OPENDKIM_KEYS_DIR, ".txt"):
+        domain, sep, filename = rel.partition("/")
+        if not sep or "/" in filename:
+            continue
+        selector = filename[: -len(".txt")]
+        txt_value, public_key = _parse_dkim_txt(
+            container.read_config(f"{_OPENDKIM_KEYS_DIR}/{rel}")
+        )
+        keys.append(
+            DkimKey(
+                domain=domain,
+                selector=selector,
+                record_name=f"{selector}._domainkey.{domain}.",
+                public_key=public_key,
+                txt_value=txt_value,
+            )
+        )
+    return keys
+
+
+def _rspamd_keys() -> list[DkimKey]:
+    """Return the DKIM records under ``rspamd/dkim/*.public.txt``.
+
+    ``rspamd-dkim`` names each file ``<keytype>[-<keysize>]-<selector>-<domain>``,
+    which cannot be split reliably since a selector may itself contain hyphens.
+    The selector is therefore read from the record (``<selector>._domainkey``)
+    and the domain is whatever follows it in the file name.
+    """
+    keys: list[DkimKey] = []
+    for rel in container.list_config_files(_RSPAMD_DKIM_DIR, ".public.txt"):
+        raw = container.read_config(f"{_RSPAMD_DKIM_DIR}/{rel}")
+        match = re.search(r"^(\S+)\._domainkey", raw)
+        if not match:
+            continue
+        selector = match.group(1)
+        _, marker, domain = rel[: -len(".public.txt")].partition(f"-{selector}-")
+        if not marker or not domain:
+            continue
+        txt_value, public_key = _parse_dkim_txt(raw)
+        keys.append(
+            DkimKey(
+                domain=domain,
+                selector=selector,
+                record_name=f"{selector}._domainkey.{domain}.",
+                public_key=public_key,
+                txt_value=txt_value,
+            )
+        )
+    return keys
+
+
+def list_dkim_keys() -> list[DkimKey]:
+    """Return the generated DKIM public records, from whichever backend signs mail.
+
+    OpenDKIM and Rspamd store their keys in different directories, and only the
+    one selected by ``ENABLE_RSPAMD`` is authoritative: reading the other would
+    advertise records the mailserver does not actually sign with.
+    """
+    keys = _rspamd_keys() if dkim_backend() == "rspamd" else _opendkim_keys()
+    return sorted(keys, key=lambda key: (key.domain, key.selector))
+
+
+def generate_dkim(payload: DkimGenerateRequest) -> list[DkimKey]:
+    """Generate DKIM keys via ``setup config dkim`` inside the container.
+
+    When no domain is given, keys are generated for every configured domain.
+    Returns the refreshed key list.
+    """
+    selector = payload.selector.strip()
+    if not _DKIM_TOKEN_RE.match(selector):
+        raise BadRequestException(f"Invalid DKIM selector: {selector!r}")
+
+    args = ["setup", "config", "dkim", "keysize", str(payload.key_size), "selector", selector]
+    if payload.domain:
+        domain = payload.domain.strip().lower()
+        if not _DKIM_TOKEN_RE.match(domain):
+            raise BadRequestException(f"Invalid domain: {domain!r}")
+        args += ["domain", domain]
+
+    container.run_in_container(args, timeout=settings.mailserver_command_timeout)
+    logger.info("Generated DKIM keys (selector=%s, domain=%s)", selector, payload.domain or "all")
+    return list_dkim_keys()
+
+
+# ── Send/receive restrictions ─────────────────────────────────────────────────
+
+
+def _restriction_filename(kind: str) -> str:
+    """Return the access-map filename for ``kind`` (``send`` or ``receive``)."""
+    filename = _RESTRICTION_FILENAMES.get(kind)
+    if filename is None:
+        raise BadRequestException("Restriction kind must be 'send' or 'receive'")
+    return filename
+
+
+def _restriction_addresses(kind: str) -> list[str]:
+    """Return the restricted addresses stored in the access map for ``kind``."""
+    addresses: list[str] = []
+    for line in _read_config_lines(_restriction_filename(kind)):
+        address = line.split()[0].strip().lower()
+        if address:
+            addresses.append(address)
+    return addresses
+
+
+def list_restrictions(kind: str) -> list[Restriction]:
+    """Return every restricted address for ``kind``, ordered alphabetically."""
+    return [
+        Restriction(kind=kind, address=address)
+        for address in sorted(set(_restriction_addresses(kind)))
+    ]
+
+
+def add_restriction(kind: str, address: str) -> Restriction:
+    """Restrict ``address`` from sending/receiving, rejecting duplicates."""
+    filename = _restriction_filename(kind)
+    entry = address.strip().lower()
+    if "@" not in entry:
+        raise BadRequestException("A restriction must target an address or a domain (@example.com)")
+
+    addresses = _restriction_addresses(kind)
+    if entry in addresses:
+        raise ConflictException(f"{entry} is already restricted")
+
+    addresses.append(entry)
+    _write_managed(filename, [f"{addr}\t{_RESTRICTION_ACTION}" for addr in sorted(set(addresses))])
+    logger.info("Added %s restriction for %s", kind, entry)
+    return Restriction(kind=kind, address=entry)
+
+
+def delete_restriction(kind: str, address: str) -> None:
+    """Remove the ``kind`` restriction for ``address``."""
+    filename = _restriction_filename(kind)
+    entry = address.strip().lower()
+    addresses = _restriction_addresses(kind)
+    if entry not in addresses:
+        raise NotFoundException("Restriction", entry)
+    remaining = [addr for addr in addresses if addr != entry]
+    _write_managed(filename, [f"{addr}\t{_RESTRICTION_ACTION}" for addr in sorted(set(remaining))])
+    logger.info("Removed %s restriction for %s", kind, entry)
+
+
+# ── Mail log (read-only) ──────────────────────────────────────────────────────
+
+
+def get_mail_logs() -> MailLog:
+    """Return the trailing lines of the mailserver mail log via ``docker exec``."""
+    output = container.run_in_container(
+        ["tail", "-n", str(settings.mailserver_log_lines), "/var/log/mail/mail.log"],
+        timeout=settings.mailserver_command_timeout,
+    )
+    return MailLog(lines=output.splitlines())
+
+
+# ── Dovecot master accounts ───────────────────────────────────────────────────
+
+
+def _split_master(line: str) -> str:
+    """Return the master account name from a ``name|hash`` line."""
+    return line.partition("|")[0].strip().lower()
+
+
+def _master_names() -> list[str]:
+    """Return every existing Dovecot master account name."""
+    return [
+        name for name in map(_split_master, _read_config_lines(_DOVECOT_MASTERS_FILENAME)) if name
+    ]
+
+
+def list_dovecot_masters() -> list[DovecotMaster]:
+    """Return every Dovecot master account, ordered by name (no passwords)."""
+    return [DovecotMaster(name=name) for name in sorted(set(_master_names()))]
+
+
+def create_dovecot_master(name: str, password: str) -> DovecotMaster:
+    """Add a Dovecot master account, rejecting duplicates."""
+    username = name.strip().lower()
+    if not username or "@" in username:
+        raise BadRequestException("A Dovecot master name must not contain '@'")
+
+    lines = _read_config_lines(_DOVECOT_MASTERS_FILENAME)
+    if any(_split_master(line) == username for line in lines):
+        raise ConflictException(f"Dovecot master {username} already exists")
+
+    lines.append(f"{username}|{hash_dovecot_password(password)}")
+    _write_managed(_DOVECOT_MASTERS_FILENAME, lines)
+    logger.info("Created Dovecot master account %s", username)
+    return DovecotMaster(name=username)
+
+
+def delete_dovecot_master(name: str) -> None:
+    """Remove a Dovecot master account."""
+    username = name.strip().lower()
+    lines = _read_config_lines(_DOVECOT_MASTERS_FILENAME)
+    remaining = [line for line in lines if _split_master(line) != username]
+    if len(remaining) == len(lines):
+        raise NotFoundException("Dovecot master", username)
+    _write_managed(_DOVECOT_MASTERS_FILENAME, remaining)
+    logger.info("Deleted Dovecot master account %s", username)
+
+
+# ── System aliases (postfix-aliases.cf) ───────────────────────────────────────
+
+
+def _parse_system_alias(line: str) -> tuple[str, list[str]]:
+    """Split a ``name: target1, target2`` line into its name and destinations."""
+    name, _, raw_targets = line.partition(":")
+    targets = [target.strip() for target in raw_targets.split(",") if target.strip()]
+    return name.strip().lower(), targets
+
+
+def list_system_aliases() -> list[SystemAlias]:
+    """Return the local aliases appended to ``/etc/aliases``, ordered by name."""
+    aliases = [
+        SystemAlias(name=name, targets=targets)
+        for name, targets in map(_parse_system_alias, _read_config_lines(_SYSTEM_ALIASES_FILENAME))
+        if name and targets
+    ]
+    return sorted(aliases, key=lambda alias: alias.name)
+
+
+def _write_system_aliases(aliases: list[SystemAlias]) -> None:
+    """Persist the system aliases, one ``name: t1, t2`` line per entry."""
+    _write_managed(
+        _SYSTEM_ALIASES_FILENAME,
+        [
+            f"{alias.name}: {', '.join(alias.targets)}"
+            for alias in sorted(aliases, key=lambda alias: alias.name)
+        ],
+    )
+
+
+def create_system_alias(name: str, targets: list[str]) -> SystemAlias:
+    """Add a local system alias, rejecting duplicates.
+
+    ``name`` is a local name such as ``root`` or ``abuse``: ``/etc/aliases`` maps
+    local names only, so an address with a domain would never be matched.
+    """
+    alias_name = name.strip().lower()
+    if not _SYSTEM_ALIAS_NAME_RE.match(alias_name):
+        raise BadRequestException(
+            f"Invalid alias name: {alias_name!r}. A system alias is a local name "
+            "without a domain, e.g. 'root'"
+        )
+    cleaned = [target.strip() for target in targets if target.strip()]
+    if not cleaned:
+        raise BadRequestException("A system alias needs at least one destination")
+
+    aliases = list_system_aliases()
+    if any(alias.name == alias_name for alias in aliases):
+        raise ConflictException(f"The system alias {alias_name} already exists")
+
+    alias = SystemAlias(name=alias_name, targets=cleaned)
+    aliases.append(alias)
+    _write_system_aliases(aliases)
+    logger.info("Added system alias %s -> %s", alias_name, ", ".join(cleaned))
+    return alias
+
+
+def delete_system_alias(name: str) -> None:
+    """Remove a local system alias."""
+    alias_name = name.strip().lower()
+    aliases = list_system_aliases()
+    remaining = [alias for alias in aliases if alias.name != alias_name]
+    if len(remaining) == len(aliases):
+        raise NotFoundException("System alias", alias_name)
+    _write_system_aliases(remaining)
+    logger.info("Deleted system alias %s", alias_name)
+
+
+# ── Regex aliases (postfix-regexp.cf) ─────────────────────────────────────────
+
+
+def _parse_regex_alias(line: str) -> tuple[str, list[str]]:
+    """Split a ``/pattern/ target1,target2`` line into its pattern and targets."""
+    parts = line.split(None, 1)
+    pattern = parts[0].strip()
+    targets = (
+        [target.strip().lower() for target in parts[1].split(",") if target.strip()]
+        if len(parts) > 1
+        else []
+    )
+    return pattern, targets
+
+
+def list_regex_aliases() -> list[RegexAlias]:
+    """Return the PCRE aliases of ``postfix-regexp.cf``, ordered by pattern."""
+    aliases = [
+        RegexAlias(pattern=pattern, targets=targets)
+        for pattern, targets in map(_parse_regex_alias, _read_config_lines(_REGEX_ALIASES_FILENAME))
+        if pattern and targets
+    ]
+    return sorted(aliases, key=lambda alias: alias.pattern)
+
+
+def _write_regex_aliases(aliases: list[RegexAlias]) -> None:
+    """Persist the regex aliases, one ``/pattern/\ttarget`` line per entry."""
+    _write_managed(
+        _REGEX_ALIASES_FILENAME,
+        [f"{alias.pattern}\t{','.join(alias.targets)}" for alias in aliases],
+    )
+
+
+def _validate_regex_pattern(pattern: str) -> str:
+    """Return the trimmed PCRE pattern, rejecting anything Postfix would not map."""
+    cleaned = pattern.strip()
+    if not _REGEX_ALIAS_PATTERN_RE.match(cleaned):
+        raise BadRequestException(
+            f"Invalid pattern: {cleaned!r}. A regex alias is delimited by slashes, "
+            "e.g. /^info@example\\.com$/"
+        )
+    body = cleaned[1 : cleaned.rindex("/")]
+    try:
+        re.compile(body)
+    except re.error as exc:
+        raise BadRequestException(f"Invalid regular expression: {exc}") from exc
+    return cleaned
+
+
+def create_regex_alias(pattern: str, targets: list[str]) -> RegexAlias:
+    """Add a PCRE alias, rejecting duplicate patterns."""
+    cleaned_pattern = _validate_regex_pattern(pattern)
+    cleaned_targets = [target.strip().lower() for target in targets if target.strip()]
+    if not cleaned_targets:
+        raise BadRequestException("A regex alias needs at least one destination")
+
+    aliases = list_regex_aliases()
+    if any(alias.pattern == cleaned_pattern for alias in aliases):
+        raise ConflictException(f"A regex alias already exists for {cleaned_pattern}")
+
+    alias = RegexAlias(pattern=cleaned_pattern, targets=cleaned_targets)
+    aliases.append(alias)
+    _write_regex_aliases(aliases)
+    logger.info("Added regex alias %s -> %s", cleaned_pattern, ", ".join(cleaned_targets))
+    return alias
+
+
+def delete_regex_alias(pattern: str) -> None:
+    """Remove a PCRE alias."""
+    cleaned = pattern.strip()
+    aliases = list_regex_aliases()
+    remaining = [alias for alias in aliases if alias.pattern != cleaned]
+    if len(remaining) == len(aliases):
+        raise NotFoundException("Regex alias", cleaned)
+    _write_regex_aliases(remaining)
+    logger.info("Deleted regex alias %s", cleaned)
+
+
+# ── Global Sieve scripts ──────────────────────────────────────────────────────
+
+
+def _sieve_filename(scope: str) -> str:
+    """Return the Sieve script filename for ``scope`` (``before`` or ``after``)."""
+    filename = _SIEVE_FILENAMES.get(scope)
+    if filename is None:
+        raise BadRequestException("A Sieve scope must be 'before' or 'after'")
+    return filename
+
+
+def get_sieve_script(scope: SieveScope) -> SieveScript:
+    """Return the global Sieve script for ``scope`` (empty when absent)."""
+    return SieveScript(scope=scope, content=_read_managed_body(_sieve_filename(scope)))
+
+
+def set_sieve_script(scope: SieveScope, content: str) -> SieveScript:
+    """Replace the global Sieve script for ``scope``.
+
+    The script is compiled by ``sievec`` when the mailserver starts, so a syntax
+    error surfaces there rather than here.
+    """
+    body = content.strip()
+    _write_managed_body(_sieve_filename(scope), body)
+    logger.info("Updated the global '%s' Sieve script (%d bytes)", scope, len(body))
+    return SieveScript(scope=scope, content=body)
+
+
+# ── Postfix mail queue ────────────────────────────────────────────────────────
+
+
+def _parse_queue_message(entry: dict) -> QueueMessage:
+    """Build a :class:`QueueMessage` from one ``postqueue -j`` JSON object."""
+    recipients = entry.get("recipients") or []
+    arrival = entry.get("arrival_time")
+    delay_reason = next(
+        (r.get("delay_reason", "") for r in recipients if r.get("delay_reason")),
+        "",
+    )
+    return QueueMessage(
+        queue_id=str(entry.get("queue_id", "")),
+        queue_name=str(entry.get("queue_name", "")),
+        sender=str(entry.get("sender", "")),
+        recipients=[str(r.get("address", "")) for r in recipients if r.get("address")],
+        message_size=int(entry.get("message_size", 0)),
+        arrival_time=datetime.fromtimestamp(arrival, tz=UTC) if arrival else None,
+        delay_reason=delay_reason,
+    )
+
+
+def get_queue() -> QueueSummary:
+    """Return every message in the Postfix queue, with a count per queue name.
+
+    ``postqueue -j`` prints one JSON object per message and nothing at all when
+    the queue is empty.
+    """
+    output = container.run_in_container(
+        ["postqueue", "-j"], timeout=settings.mailserver_command_timeout
+    )
+    messages: list[QueueMessage] = []
+    for line in output.splitlines():
+        if not line.strip():
+            continue
+        try:
+            messages.append(_parse_queue_message(json.loads(line)))
+        except ValueError, TypeError:
+            logger.warning("Skipping an unparsable postqueue entry")
+
+    counts: dict[str, int] = {}
+    for message in messages:
+        counts[message.queue_name] = counts.get(message.queue_name, 0) + 1
+    return QueueSummary(messages=messages, counts=counts)
+
+
+def _validate_queue_id(queue_id: str) -> str:
+    """Return the queue ID, rejecting anything ``postsuper`` could misread.
+
+    ``postsuper`` treats ``ALL`` as "every message", so only alphanumeric IDs are
+    accepted here and deleting everything goes through :func:`delete_all_queued`.
+    """
+    cleaned = queue_id.strip()
+    if not _QUEUE_ID_RE.match(cleaned) or cleaned == "ALL":
+        raise BadRequestException(f"Invalid queue ID: {queue_id!r}")
+    return cleaned
+
+
+def flush_queue() -> QueueActionResult:
+    """Ask Postfix to attempt delivery of every deferred message now."""
+    output = container.run_in_container(
+        ["postqueue", "-f"], timeout=settings.mailserver_command_timeout
+    )
+    logger.info("Flushed the Postfix queue")
+    return QueueActionResult(output=output.strip())
+
+
+def delete_queued_message(queue_id: str) -> QueueActionResult:
+    """Delete a single message from the Postfix queue."""
+    cleaned = _validate_queue_id(queue_id)
+    output = container.run_in_container(
+        ["postsuper", "-d", cleaned], timeout=settings.mailserver_command_timeout
+    )
+    logger.info("Deleted queued message %s", cleaned)
+    return QueueActionResult(output=output.strip())
+
+
+def delete_all_queued() -> QueueActionResult:
+    """Delete every message currently in the Postfix queue."""
+    output = container.run_in_container(
+        ["postsuper", "-d", "ALL"], timeout=settings.mailserver_command_timeout
+    )
+    logger.info("Deleted every queued message")
+    return QueueActionResult(output=output.strip())
+
+
+# ── TLS certificate (read-only) ───────────────────────────────────────────────
+
+
+def _postconf(parameter: str) -> str:
+    """Return the effective value of a Postfix ``main.cf`` parameter."""
+    return container.run_in_container(
+        ["postconf", "-h", parameter], timeout=settings.mailserver_command_timeout
+    ).strip()
+
+
+def _parse_openssl_date(value: str) -> datetime | None:
+    """Parse an ``openssl -dateopt iso_8601`` timestamp (``2026-07-09 10:50:07Z``)."""
+    try:
+        return datetime.strptime(value.strip(), "%Y-%m-%d %H:%M:%SZ").replace(tzinfo=UTC)
+    except ValueError:
+        logger.warning("Unparsable certificate date: %r", value)
+        return None
+
+
+def _parse_certificate(raw: str) -> dict[str, str]:
+    """Return the ``label=value`` pairs printed by ``openssl x509 -noout``."""
+    fields: dict[str, str] = {}
+    for line in raw.splitlines():
+        label, sep, value = line.partition("=")
+        if sep:
+            fields[label.strip()] = value.strip()
+    return fields
+
+
+def _parse_certificate_domains(raw: str) -> list[str]:
+    """Return the DNS names of the certificate's subjectAltName extension."""
+    return sorted(
+        {
+            entry.removeprefix("DNS:").strip()
+            for entry in re.findall(r"DNS:[^,\s]+", raw)
+            if entry.strip()
+        }
+    )
+
+
+def get_tls_certificate() -> TlsCertificate:
+    """Return the certificate Postfix serves, or an unconfigured placeholder.
+
+    The path comes from Postfix itself rather than ``SSL_TYPE`` so that whatever
+    the mailserver actually presents is what gets reported.
+    """
+    ssl_type = _dms_settings().get("SSL_TYPE", "")
+    cert_path = _postconf("smtpd_tls_cert_file")
+    if not cert_path:
+        return TlsCertificate(ssl_type=ssl_type, configured=False)
+
+    raw = container.run_in_container(
+        [
+            "openssl",
+            "x509",
+            "-in",
+            cert_path,
+            "-noout",
+            "-dateopt",
+            "iso_8601",
+            "-subject",
+            "-issuer",
+            "-startdate",
+            "-enddate",
+            "-ext",
+            "subjectAltName",
+        ],
+        timeout=settings.mailserver_command_timeout,
+    )
+    fields = _parse_certificate(raw)
+    not_after = _parse_openssl_date(fields.get("notAfter", ""))
+    return TlsCertificate(
+        ssl_type=ssl_type,
+        configured=True,
+        subject=fields.get("subject", ""),
+        issuer=fields.get("issuer", ""),
+        not_before=_parse_openssl_date(fields.get("notBefore", "")),
+        not_after=not_after,
+        days_remaining=(not_after - datetime.now(tz=UTC)).days if not_after else None,
+        domains=_parse_certificate_domains(raw),
+    )
+
+
+# ── DNS records ───────────────────────────────────────────────────────────────
+
+
+def _hosted_domains() -> list[str]:
+    """Return every domain the mailserver hosts, from its accounts and DKIM keys."""
+    domains = {
+        line.partition("|")[0].strip().lower().rpartition("@")[2]
+        for line in _read_config_lines(_ACCOUNTS_FILENAME)
+    }
+    domains.update(key.domain for key in list_dkim_keys())
+    return sorted(domain for domain in domains if domain)
+
+
+def list_dns_records() -> list[DomainDnsRecords]:
+    """Return the DNS records to publish for every hosted domain.
+
+    DKIM records are read from the mailserver's generated keys; MX, SPF and DMARC
+    are suggestions built from its hostname, and are flagged as such.
+    """
+    hostname = _postconf("myhostname")
+    dkim_by_domain: dict[str, list[DkimKey]] = {}
+    for key in list_dkim_keys():
+        dkim_by_domain.setdefault(key.domain, []).append(key)
+
+    entries: list[DomainDnsRecords] = []
+    for domain in _hosted_domains():
+        records = [
+            DnsRecord(name=f"{domain}.", type="MX", value=f"10 {hostname}."),
+            DnsRecord(name=f"{domain}.", type="TXT", value="v=spf1 mx -all"),
+            DnsRecord(
+                name=f"_dmarc.{domain}.",
+                type="TXT",
+                value=f"v=DMARC1; p=none; rua=mailto:postmaster@{domain}; adkim=s; aspf=s",
+            ),
+        ]
+        records += [
+            DnsRecord(name=key.record_name, type="TXT", value=key.txt_value, suggested=False)
+            for key in dkim_by_domain.get(domain, [])
+        ]
+        entries.append(DomainDnsRecords(domain=domain, records=records))
+    return entries
+
+
+# ── Mailserver environment (read-only) ────────────────────────────────────────
+
+
+def _dms_settings() -> dict[str, str]:
+    """Return the ``KEY='value'`` pairs the mailserver wrote to ``/etc/dms-settings``."""
+    variables: dict[str, str] = {}
+    for line in container.read_file(_DMS_SETTINGS_PATH).splitlines():
+        key, sep, value = line.partition("=")
+        key = key.strip()
+        if key and sep and not key.startswith("#"):
+            variables[key] = value.strip().strip("'\"")
+    return variables
+
+
+def dkim_backend() -> str:
+    """Return which implementation signs outgoing mail: ``rspamd`` or ``opendkim``.
+
+    The two store their generated keys in different directories, so every DKIM
+    read has to pick a side.
+    """
+    return "rspamd" if _dms_settings().get("ENABLE_RSPAMD") == "1" else "opendkim"
+
+
+def get_environment() -> MailserverEnvironment:
+    """Return the mailserver's effective environment (read-only, set at startup)."""
+    variables = _dms_settings()
+    return MailserverEnvironment(
+        variables=variables,
+        dkim_backend="rspamd" if variables.get("ENABLE_RSPAMD") == "1" else "opendkim",
+        global_relay_host=variables.get("DEFAULT_RELAY_HOST") or variables.get("RELAY_HOST", ""),
+        postmaster_address=variables.get("POSTMASTER_ADDRESS", ""),
+        ssl_type=variables.get("SSL_TYPE", ""),
+        account_provisioner=variables.get("ACCOUNT_PROVISIONER", ""),
+        managesieve_enabled=variables.get("ENABLE_MANAGESIEVE") == "1",
+        quotas_enabled=variables.get("ENABLE_QUOTAS") == "1",
+    )

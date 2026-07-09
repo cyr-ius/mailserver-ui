@@ -10,10 +10,10 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 from sqlmodel import Session
 
-from app.auth import SessionUser
-from app.depends import get_session, require_admin
-from app.services import settings_service
-from app.settings_models import OidcSettings, OidcSettingsPublic, OidcSettingsUpdate
+from ..auth import SessionUser
+from ..depends import get_session, require_admin
+from ..models.settings_models import OidcSettings, OidcSettingsPublic, OidcSettingsUpdate
+from ..services import settings_service
 
 logger = logging.getLogger(__name__)
 

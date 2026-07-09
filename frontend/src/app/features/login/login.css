@@ -15,3 +15,29 @@
   font-size: 2.75rem;
   line-height: 1;
 }
+
+.theme-selector {
+  margin-top: 0.25rem;
+}
+
+.theme-selector .btn-group-sm .btn {
+  padding: 0.35rem 0.5rem;
+  font-size: 0.85rem;
+}
+
+.theme-selector .btn-check:checked + .btn {
+  background-color: var(--bs-primary);
+  border-color: var(--bs-primary);
+  color: white;
+}
+
+@media (max-width: 576px) {
+  .theme-selector {
+    margin-top: 0;
+  }
+
+  .theme-selector .btn-group-sm .btn {
+    padding: 0.25rem 0.4rem;
+    font-size: 0.75rem;
+  }
+}

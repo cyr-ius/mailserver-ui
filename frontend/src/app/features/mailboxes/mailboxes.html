@@ -1,0 +1,302 @@
+<main class="container py-4">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h1 class="h4 mb-0">
+      <i class="bi bi-inbox-fill text-primary me-2" aria-hidden="true"></i>
+      Mailboxes
+    </h1>
+  </div>
+
+  @if (successMessage(); as msg) {
+  <div class="alert alert-success py-2" role="alert">{{ msg }}</div>
+  } @if (loadError(); as msg) {
+  <div class="alert alert-danger py-2" role="alert">{{ msg }}</div>
+  }
+
+  <!-- Create mailbox -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <h2 class="h6 text-uppercase text-body-secondary mb-3">
+        <i class="bi bi-plus-circle me-1" aria-hidden="true"></i>
+        New mailbox
+      </h2>
+      <form class="row g-2 align-items-start" (submit)="onCreate(); $event.preventDefault()" novalidate>
+        <div class="col-12 col-lg-4">
+          <label for="mb-email" class="form-label small mb-1">Email address</label>
+          <input
+            id="mb-email"
+            type="email"
+            autocomplete="off"
+            placeholder="user@example.com"
+            class="form-control form-control-sm"
+            [formField]="createForm.email"
+          />
+        </div>
+        <div class="col-6 col-lg-3">
+          <label for="mb-pw" class="form-label small mb-1">Password</label>
+          <input
+            id="mb-pw"
+            type="password"
+            autocomplete="new-password"
+            class="form-control form-control-sm"
+            [formField]="createForm.password"
+          />
+        </div>
+        <div class="col-6 col-lg-3">
+          <label for="mb-pwc" class="form-label small mb-1">Confirm password</label>
+          <input
+            id="mb-pwc"
+            type="password"
+            autocomplete="new-password"
+            class="form-control form-control-sm"
+            [formField]="createForm.confirm"
+          />
+        </div>
+        <div class="col-6 col-lg-1">
+          <label for="mb-quota" class="form-label small mb-1">Quota</label>
+          <input
+            id="mb-quota"
+            type="text"
+            autocomplete="off"
+            placeholder="5G"
+            class="form-control form-control-sm"
+            [formField]="createForm.quota"
+          />
+        </div>
+        <div class="col-6 col-lg-1 d-flex align-items-end pt-lg-4">
+          <button type="submit" class="btn btn-sm btn-primary w-100" [disabled]="creating() || createForm().invalid()">
+            @if (creating()) {
+            <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+            } Create
+          </button>
+        </div>
+        @if (createError(); as msg) {
+        <div class="col-12">
+          <div class="text-danger small">{{ msg }}</div>
+        </div>
+        }
+        <div class="col-12">
+          <div class="form-text">Password: minimum {{ minLength }} characters. Quota (optional): e.g. 512M, 5G.</div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Mailbox list -->
+  @if (loading()) {
+  <div class="text-center text-body-secondary py-5">
+    <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+    Loading mailboxes…
+  </div>
+  } @else {
+  <div class="card shadow-sm">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th scope="col">Email</th>
+            <th scope="col" class="d-none d-md-table-cell">Domain</th>
+            <th scope="col">Quota</th>
+            <th scope="col" class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (m of mailboxes(); track m.email) {
+          <tr>
+            <td class="fw-medium">{{ m.email }}</td>
+            <td class="d-none d-md-table-cell text-body-secondary">{{ m.domain }}</td>
+            <td>
+              @if (m.quota) {
+              <span class="badge text-bg-light">{{ m.quota }}</span>
+              } @else {
+              <span class="text-body-secondary small">Unlimited</span>
+              }
+            </td>
+            <td class="text-end">
+              <button
+                type="button"
+                class="btn btn-sm btn-outline-primary me-1"
+                (click)="toggleManage(m)"
+                [class.active]="managingEmail() === m.email"
+              >
+                <i class="bi bi-sliders me-1" aria-hidden="true"></i>
+                Manage
+              </button>
+              <button
+                type="button"
+                class="btn btn-sm btn-outline-danger"
+                (click)="onDelete(m)"
+                [disabled]="deletingEmail() === m.email"
+              >
+                @if (deletingEmail() === m.email) {
+                <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+                } @else {
+                <i class="bi bi-trash me-1" aria-hidden="true"></i>
+                } Delete
+              </button>
+            </td>
+          </tr>
+          @if (managingEmail() === m.email) {
+          <tr class="table-active">
+            <td colspan="4">
+              <div class="row g-4 py-2">
+                <!-- Password -->
+                <div class="col-12 col-lg-6">
+                  <h3 class="h6 text-uppercase text-body-secondary mb-2">
+                    <i class="bi bi-key me-1" aria-hidden="true"></i>
+                    Reset password
+                  </h3>
+                  <form class="row g-2" (submit)="onResetPassword(); $event.preventDefault()" novalidate>
+                    <div class="col-12 col-sm-6">
+                      <label [attr.for]="'rpw-' + m.email" class="form-label small mb-1">New password</label>
+                      <input
+                        [id]="'rpw-' + m.email"
+                        type="password"
+                        autocomplete="new-password"
+                        class="form-control form-control-sm"
+                        [formField]="passwordForm.password"
+                      />
+                    </div>
+                    <div class="col-12 col-sm-6">
+                      <label [attr.for]="'rpwc-' + m.email" class="form-label small mb-1">Confirm</label>
+                      <input
+                        [id]="'rpwc-' + m.email"
+                        type="password"
+                        autocomplete="new-password"
+                        class="form-control form-control-sm"
+                        [formField]="passwordForm.confirm"
+                      />
+                    </div>
+                    <div class="col-12">
+                      <button
+                        type="submit"
+                        class="btn btn-sm btn-primary"
+                        [disabled]="saving() || passwordForm().invalid()"
+                      >
+                        @if (saving()) {
+                        <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+                        } Save password
+                      </button>
+                      @if (formError(); as msg) {
+                      <span class="text-danger small ms-2">{{ msg }}</span>
+                      }
+                    </div>
+                  </form>
+
+                  <!-- Quota -->
+                  <h3 class="h6 text-uppercase text-body-secondary mb-2 mt-4">
+                    <i class="bi bi-hdd me-1" aria-hidden="true"></i>
+                    Quota
+                  </h3>
+                  <div class="row g-2 align-items-end">
+                    <div class="col-12 col-sm-6">
+                      <label [attr.for]="'q-' + m.email" class="form-label small mb-1">Limit (empty = unlimited)</label>
+                      <input
+                        [id]="'q-' + m.email"
+                        type="text"
+                        autocomplete="off"
+                        placeholder="5G"
+                        class="form-control form-control-sm"
+                        [value]="quotaValue()"
+                        (input)="onQuotaInput($event)"
+                      />
+                    </div>
+                    <div class="col-12 col-sm-6">
+                      <button
+                        type="button"
+                        class="btn btn-sm btn-primary"
+                        (click)="onSaveQuota()"
+                        [disabled]="savingQuota()"
+                      >
+                        @if (savingQuota()) {
+                        <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+                        } Save quota
+                      </button>
+                    </div>
+                    @if (quotaError(); as msg) {
+                    <div class="col-12"><span class="text-danger small">{{ msg }}</span></div>
+                    }
+                    <div class="col-12"><div class="form-text">Units: K, M, G, T — e.g. 512M, 5G.</div></div>
+                  </div>
+                </div>
+
+                <!-- Aliases -->
+                <div class="col-12 col-lg-6">
+                  <h3 class="h6 text-uppercase text-body-secondary mb-2">
+                    <i class="bi bi-signpost-split me-1" aria-hidden="true"></i>
+                    Aliases
+                  </h3>
+                  @if (aliasesLoading()) {
+                  <div class="text-body-secondary small py-2">
+                    <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+                    Loading aliases…
+                  </div>
+                  } @else {
+                  <ul class="list-group list-group-flush mb-2">
+                    @for (a of aliases(); track a.alias) {
+                    <li
+                      class="list-group-item d-flex justify-content-between align-items-center px-0 py-1 bg-transparent"
+                    >
+                      <span
+                        >{{ a.alias }} <i class="bi bi-arrow-right mx-1 text-body-secondary" aria-hidden="true"></i> {{
+                        m.email }}</span
+                      >
+                      <button
+                        type="button"
+                        class="btn btn-sm btn-outline-danger"
+                        (click)="onRemoveAlias(a.alias)"
+                        [disabled]="removingAlias() === a.alias"
+                      >
+                        @if (removingAlias() === a.alias) {
+                        <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                        } @else {
+                        <i class="bi bi-x-lg" aria-hidden="true"></i>
+                        }
+                      </button>
+                    </li>
+                    } @empty {
+                    <li class="list-group-item px-0 py-1 text-body-secondary small bg-transparent">No aliases.</li>
+                    }
+                  </ul>
+                  }
+                  <form class="row g-2 align-items-end" (submit)="onAddAlias(); $event.preventDefault()" novalidate>
+                    <div class="col-12 col-sm-8">
+                      <label [attr.for]="'al-' + m.email" class="form-label small mb-1">New alias address</label>
+                      <input
+                        [id]="'al-' + m.email"
+                        type="email"
+                        autocomplete="off"
+                        placeholder="info@example.com"
+                        class="form-control form-control-sm"
+                        [formField]="aliasForm.alias"
+                      />
+                    </div>
+                    <div class="col-12 col-sm-4">
+                      <button
+                        type="submit"
+                        class="btn btn-sm btn-primary w-100"
+                        [disabled]="addingAlias() || aliasForm().invalid()"
+                      >
+                        @if (addingAlias()) {
+                        <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+                        } Add alias
+                      </button>
+                    </div>
+                    @if (aliasError(); as msg) {
+                    <div class="col-12"><span class="text-danger small">{{ msg }}</span></div>
+                    }
+                  </form>
+                </div>
+              </div>
+            </td>
+          </tr>
+          } } @empty {
+          <tr>
+            <td colspan="4" class="text-center text-body-secondary py-4">No mailboxes yet.</td>
+          </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+  }
+</main>

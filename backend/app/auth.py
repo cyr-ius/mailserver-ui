@@ -11,13 +11,14 @@ enforcement, database session) live in :mod:`app.depends`.
 
 import logging
 import time
-from typing import Literal
+from collections.abc import Iterable
+from typing import Literal, get_args
 
 import bcrypt
 from jose import JWTError, jwt
 from pydantic import BaseModel
 
-from app.config import settings
+from .config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -26,16 +27,49 @@ _ALGORITHM = "HS256"
 # bcrypt >= 5, so truncate defensively on both hash and verify.
 _BCRYPT_MAX_BYTES = 72
 
-Role = Literal["admin", "user"]
+Role = Literal["guest", "mailbox_manager", "admin"]
+AuthProvider = Literal["local", "oidc"]
+
+#: Roles ordered from least to most privileged; a role implies every role before it.
+ROLE_PRECEDENCE: tuple[Role, ...] = get_args(Role)
+
+#: Role stored by releases that only knew ``admin``/``user``. The old ``user``
+#: role granted nothing beyond the dashboard, which is exactly ``guest`` today —
+#: mapping it to ``mailbox_manager`` would silently widen existing accounts.
+_LEGACY_ROLES: dict[str, Role] = {"user": "guest"}
+
+
+def normalize_role(value: str) -> Role:
+    """Coerce a stored role string into a known role, defaulting to ``guest``."""
+    role = _LEGACY_ROLES.get(value, value)
+    return role if role in ROLE_PRECEDENCE else "guest"  # type: ignore[return-value]
+
+
+def highest_role(roles: Iterable[str]) -> Role:
+    """Return the most privileged of ``roles``, or ``guest`` when empty."""
+    return max(
+        (normalize_role(role) for role in roles),
+        key=ROLE_PRECEDENCE.index,
+        default="guest",
+    )
+
+
+def role_grants(role: Role, required: Role) -> bool:
+    """Return True when ``role`` is at least as privileged as ``required``."""
+    return ROLE_PRECEDENCE.index(role) >= ROLE_PRECEDENCE.index(required)
 
 
 class SessionUser(BaseModel):
-    """The authenticated principal carried by the session cookie."""
+    """The authenticated principal carried by the session cookie.
+
+    ``role`` is the *effective* role: the most privileged of the role stored on
+    the account and the roles granted by its local group memberships.
+    """
 
     username: str
     display_name: str
     role: Role
-    provider: Literal["local", "oidc"]
+    provider: AuthProvider
 
 
 # ── Password hashing ─────────────────────────────────────────────────────────
@@ -86,7 +120,7 @@ def decode_session_token(token: str) -> SessionUser | None:
         return SessionUser(
             username=payload["sub"],
             display_name=payload.get("name", payload["sub"]),
-            role=payload.get("role", "user"),
+            role=normalize_role(payload.get("role", "")),
             provider=payload.get("provider", "local"),
         )
     except KeyError, ValueError:

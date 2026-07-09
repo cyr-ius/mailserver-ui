@@ -1,0 +1,97 @@
+<main class="container-fluid p-4">
+  <div class="row mb-4">
+    <div class="col">
+      <h1 class="mb-0">
+        <i class="bi bi-speedometer2 me-2" aria-hidden="true"></i>
+        Dashboard
+      </h1>
+    </div>
+  </div>
+
+  @if (loading()) {
+  <div class="alert alert-info" role="alert">
+    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+    Loading statistics...
+  </div>
+  } @else if (error()) {
+  <div class="alert alert-danger" role="alert">
+    <i class="bi bi-exclamation-triangle me-2" aria-hidden="true"></i>
+    {{ error() }}
+  </div>
+  } @else {
+  <div class="row g-4">
+    @if (canManageMailboxes()) {
+    <!-- Mailbox Count Card -->
+    <div class="col-md-6 col-lg-3">
+      <div class="card h-100 shadow-sm">
+        <div class="card-body d-flex align-items-center justify-content-between">
+          <div>
+            <h6 class="card-title text-muted mb-2">Mailboxes</h6>
+            <h3 class="mb-0 text-primary">{{ mailboxCount() }}</h3>
+          </div>
+          <div class="text-primary fs-1 opacity-25">
+            <i class="bi bi-inbox-fill" aria-hidden="true"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Largest Mailbox Card -->
+    <div class="col-md-6 col-lg-3">
+      <div class="card h-100 shadow-sm">
+        <div class="card-body">
+          <h6 class="card-title text-muted mb-2">Largest Mailbox</h6>
+          <p class="mb-2 text-truncate">
+            <small class="text-body-secondary">{{ largestMailbox()?.email || 'N/A' }}</small>
+          </p>
+          @if (largestMailbox()?.quota) {
+          <h4 class="mb-0 text-success">{{ largestMailbox()?.quota }}</h4>
+          } @else {
+          <h4 class="mb-0 text-muted">Unlimited</h4>
+          }
+        </div>
+      </div>
+    </div>
+
+    <!-- Largest Quota Card -->
+    <div class="col-md-6 col-lg-3">
+      <div class="card h-100 shadow-sm">
+        <div class="card-body">
+          <h6 class="card-title text-muted mb-2">Largest Quota</h6>
+          <p class="mb-2 text-truncate">
+            <small class="text-body-secondary">{{ largestQuota()?.email || 'N/A' }}</small>
+          </p>
+          @if (largestQuota()?.quota) {
+          <h4 class="mb-0 text-info">{{ largestQuota()?.quota }}</h4>
+          } @else {
+          <h4 class="mb-0 text-muted">N/A</h4>
+          }
+        </div>
+      </div>
+    </div>
+    } @if (isAdmin()) {
+    <!-- Banned IPs Card -->
+    <div class="col-md-6 col-lg-3">
+      <div class="card h-100 shadow-sm">
+        <div class="card-body d-flex align-items-center justify-content-between">
+          <div>
+            <h6 class="card-title text-muted mb-2">Banned IPs</h6>
+            <h3 class="mb-0 text-danger">{{ bannedIpsCount() }}</h3>
+          </div>
+          <div class="text-danger fs-1 opacity-25">
+            <i class="bi bi-shield-exclamation-fill" aria-hidden="true"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+    } @if (!canManageMailboxes() && !isAdmin()) {
+    <div class="col-12">
+      <div class="alert alert-secondary mb-0" role="alert">
+        <i class="bi bi-info-circle me-2" aria-hidden="true"></i>
+        Your account has no management privileges yet. Ask an administrator to add you to a group.
+      </div>
+    </div>
+    }
+  </div>
+  }
+</main>

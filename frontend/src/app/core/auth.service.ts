@@ -2,7 +2,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 
-import { AuthConfig, LoginRequest, SessionUser } from './auth.models';
+import { AuthConfig, LoginRequest, SessionUser, roleGrants } from './auth.models';
 
 /**
  * Central authentication state. Sessions are cookie-based (HttpOnly), so this
@@ -23,6 +23,10 @@ export class AuthService {
   /** True once the initial session probe has completed. */
   readonly loaded = this._loaded.asReadonly();
   readonly isAuthenticated = computed(() => this._user() !== null);
+  /** Administrators reach every section of the application. */
+  readonly isAdmin = computed(() => roleGrants(this._user()?.role, 'admin'));
+  /** Mailbox managers reach the Mailbox section; administrators do too. */
+  readonly canManageMailboxes = computed(() => roleGrants(this._user()?.role, 'mailbox_manager'));
 
   /** Load the public auth configuration (which methods are enabled). */
   async loadConfig(): Promise<AuthConfig> {

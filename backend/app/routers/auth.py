@@ -11,17 +11,17 @@ from jose import JWTError, jwt
 from pydantic import BaseModel, Field
 from sqlmodel import Session
 
-from app.auth import SessionUser, create_session_token
-from app.client_ip import is_secure_request
-from app.config import settings
-from app.depends import get_session, require_user
-from app.exceptions import (
+from ..auth import SessionUser, create_session_token
+from ..client_ip import is_secure_request
+from ..config import settings
+from ..depends import get_session, require_user
+from ..exceptions import (
     BadGatewayException,
     ForbiddenException,
     NotFoundException,
     UnauthorizedException,
 )
-from app.services import oidc, settings_service, user_service
+from ..services import oidc, settings_service, user_service
 
 SessionDep = Annotated[Session, Depends(get_session)]
 
@@ -189,12 +189,13 @@ async def oidc_callback(
         logger.error("OIDC token/userinfo failure: %s", exc)
         return RedirectResponse("/login?error=oidc", status_code=status.HTTP_302_FOUND)
 
-    user = oidc.map_claims_to_user(cfg, claims)
-    if user is None:
+    principal = oidc.map_claims_to_user(cfg, claims)
+    if principal is None:
         return RedirectResponse("/login?error=forbidden", status_code=status.HTTP_302_FOUND)
 
-    # Persist/refresh the OIDC account so it appears in the users list.
-    user_service.upsert_oidc_user(session, user)
+    # Persist/refresh the OIDC account so it appears in the users list, and pick
+    # up any role granted by the local groups it belongs to.
+    user = user_service.upsert_oidc_user(session, principal)
 
     response = RedirectResponse("/welcome", status_code=status.HTTP_302_FOUND)
     _set_session_cookie(response, create_session_token(user), secure=is_secure_request(request))

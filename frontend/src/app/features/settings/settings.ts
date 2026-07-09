@@ -1,16 +1,18 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
+import { CommonModule } from '@angular/common';
 import { form, FormField } from '@angular/forms/signals';
 
 import { AuthService } from '../../core/auth.service';
 import { SettingsService } from '../../core/settings.service';
+import { ThemeService, ThemeMode } from '../../core/theme.service';
 import { OidcSettings, OidcSettingsUpdate } from '../../core/settings.models';
 
-/** Editable settings tabs. Only OIDC is implemented for now. */
-type Tab = 'oidc' | 'syslog' | 'email';
+/** Settings pages. Only OIDC is implemented for now. */
+type Tab = 'oidc' | 'appearance' | 'syslog' | 'email';
 
-/** Form shape for the OIDC tab (mirrors OidcSettingsUpdate). */
+/** Form shape for the OIDC page (mirrors OidcSettingsUpdate). */
 interface OidcForm {
   enabled: boolean;
   issuer: string;
@@ -24,8 +26,8 @@ interface OidcForm {
   oidc_only: boolean;
   admin_group_claim: string;
   admin_group: string;
-  user_group_claim: string;
-  user_group: string;
+  manager_group_claim: string;
+  manager_group: string;
   restrict_to_groups: boolean;
 }
 
@@ -41,14 +43,14 @@ const EMPTY_OIDC: OidcForm = {
   oidc_only: false,
   admin_group_claim: '',
   admin_group: '',
-  user_group_claim: '',
-  user_group: '',
+  manager_group_claim: '',
+  manager_group: '',
   restrict_to_groups: false,
 };
 
 @Component({
   selector: 'app-settings',
-  imports: [FormField, RouterLink],
+  imports: [FormField, CommonModule],
   templateUrl: './settings.html',
   styleUrl: './settings.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -57,11 +59,25 @@ export class Settings {
   private readonly auth = inject(AuthService);
   private readonly settings = inject(SettingsService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
+  protected readonly theme = inject(ThemeService);
 
   protected readonly user = this.auth.user;
   protected readonly loggingOut = signal(false);
 
   protected readonly activeTab = signal<Tab>('oidc');
+  protected readonly pageTitle = computed(() => {
+    switch (this.activeTab()) {
+      case 'appearance':
+        return 'Appearance settings';
+      case 'syslog':
+        return 'Syslog settings';
+      case 'email':
+        return 'Email settings';
+      default:
+        return 'OIDC / SSO settings';
+    }
+  });
 
   protected readonly loading = signal(true);
   protected readonly loadError = signal<string | null>(null);
@@ -75,12 +91,24 @@ export class Settings {
   protected readonly model = signal<OidcForm>({ ...EMPTY_OIDC });
   protected readonly oidcForm = form(this.model);
 
+  protected readonly themeModes: ThemeMode[] = ['light', 'dark', 'auto'];
+
   constructor() {
+    this.route.url.subscribe((segments) => {
+      const requestedPage = (segments[0]?.path || 'oidc') as Tab;
+      const validPages: Tab[] = ['oidc', 'appearance', 'syslog', 'email'];
+      if (validPages.includes(requestedPage)) {
+        this.activeTab.set(requestedPage);
+      } else {
+        void this.router.navigate(['/settings/oidc']);
+      }
+    });
+
     void this.loadOidc();
   }
 
-  protected setTab(tab: Tab): void {
-    this.activeTab.set(tab);
+  protected onThemeChange(mode: ThemeMode): void {
+    this.theme.setThemeMode(mode);
   }
 
   private async loadOidc(): Promise<void> {
@@ -143,8 +171,8 @@ export class Settings {
       oidc_only: cfg.oidc_only,
       admin_group_claim: cfg.admin_group_claim,
       admin_group: cfg.admin_group,
-      user_group_claim: cfg.user_group_claim,
-      user_group: cfg.user_group,
+      manager_group_claim: cfg.manager_group_claim,
+      manager_group: cfg.manager_group,
       restrict_to_groups: cfg.restrict_to_groups,
     };
   }

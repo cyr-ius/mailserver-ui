@@ -1,0 +1,8 @@
+.fail2ban-log {
+  max-height: 60vh;
+  overflow: auto;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  white-space: pre;
+  background-color: var(--bs-tertiary-bg);
+}

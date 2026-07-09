@@ -10,8 +10,8 @@ export interface OidcSettings {
   oidc_only: boolean;
   admin_group_claim: string;
   admin_group: string;
-  user_group_claim: string;
-  user_group: string;
+  manager_group_claim: string;
+  manager_group: string;
   restrict_to_groups: boolean;
   /** Whether a client secret is stored; the value itself is never returned. */
   client_secret_set: boolean;
@@ -32,8 +32,8 @@ export interface OidcSettingsUpdate {
   oidc_only: boolean;
   admin_group_claim: string;
   admin_group: string;
-  user_group_claim: string;
-  user_group: string;
+  manager_group_claim: string;
+  manager_group: string;
   restrict_to_groups: boolean;
   client_secret?: string;
 }
