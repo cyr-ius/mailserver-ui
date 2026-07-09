@@ -1,0 +1,53 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# docker-mailserver — dev instance for the devcontainer
+#
+# Runs a real docker-mailserver next to the (locally-run) backend so the UI can
+# be tested end to end. Everything is driven with `docker exec mailserver ...`:
+#   * mailboxes / aliases / relays  → config files edited inside the container;
+#   * fail2ban / DKIM / mail log     → runtime commands inside the container.
+# No config directory is bind-mounted — it lives in the named volume below.
+#
+# The container is deliberately named `mailserver` to match the backend's
+# `MAILSERVER_CONTAINER` setting. Started by scripts/mailserver-up.sh.
+# ─────────────────────────────────────────────────────────────────────────────
+name: mailserver-dev
+
+services:
+  mailserver:
+    image: mailserver/docker-mailserver:latest
+    container_name: mailserver
+    hostname: mail.example.com
+    environment:
+      - SSL_TYPE=
+      - POSTMASTER_ADDRESS=postmaster@example.com
+      - PERMIT_DOCKER=connected-networks
+      - LOG_LEVEL=info
+      # Mirrors docker-compose.yml: the backend edits postfix-accounts.cf and
+      # dovecot-quotas.cf directly, and reads DKIM records from opendkim/keys.
+      - ACCOUNT_PROVISIONER=FILE
+      - ENABLE_QUOTAS=1
+      - ENABLE_OPENDKIM=1
+      - ENABLE_RSPAMD=0
+      - ENABLE_MANAGESIEVE=1
+      - ENABLE_FAIL2BAN=1
+    cap_add:
+      - NET_ADMIN
+    ports:
+      - "25:25" # SMTP
+      - "143:143" # IMAP
+      - "465:465" # SMTPS
+      - "587:587" # Submission
+      - "993:993" # IMAPS
+      - "4190:4190" # ManageSieve
+    volumes:
+      - mailserver-config:/tmp/docker-mailserver/
+      - mailserver-mail:/var/mail
+      - mailserver-state:/var/mail-state
+      - mailserver-logs:/var/log/mail
+    restart: unless-stopped
+
+volumes:
+  mailserver-config:
+  mailserver-mail:
+  mailserver-state:
+  mailserver-logs:

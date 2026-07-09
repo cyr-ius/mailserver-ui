@@ -5,7 +5,12 @@
     "ghcr.io/devcontainers/features/python:1": {},
     "ghcr.io/devcontainers-extra/features/prek:1": {},
     "ghcr.io/devcontainers-extra/features/uv:1": {},
-    "ghcr.io/devcontainers/features/node:2": {}
+    "ghcr.io/devcontainers/features/node:2.1.0": {},
+    // Runs a Docker daemon inside the container so we can start a real
+    // docker-mailserver next to the app (and drive fail2ban via `docker exec`).
+    "ghcr.io/devcontainers/features/docker-in-docker:4.0.0": {
+      "moby": false
+    }
   },
   "mounts": [
     "source=${env:HOME}/.claude,target=/home/vscode/.claude,type=bind,consistency=cached",
@@ -25,7 +30,8 @@
         "streetsidesoftware.code-spell-checker",
         "editorconfig.editorconfig",
         "anthropic.claude-code",
-        "alexcvzz.vscode-sqlite"
+        "alexcvzz.vscode-sqlite",
+        "bowlerr.sqlite-intelliview-vscode"
       ],
       "settings": {
         // ── Python ──────────────────────────────────────────────────────
@@ -90,11 +96,21 @@
 
   // ─── Environment varaibles ──────────────────────────────────────────────
   "containerEnv": {
-    "DATA_DIR": "${containerWorkspaceFolder}/.data_env" // (db, configuration files, etc...)
+    "DATA_DIR": "${containerWorkspaceFolder}/.data_env", // (db, configuration files, etc...)
+    // The dev mailserver runs on the in-container Docker daemon, so the backend
+    // drives everything through `docker exec mailserver ...`: mailboxes, aliases,
+    // relays, DKIM, fail2ban and the config files (no bind-mount).
+    "MAILSERVER_EXEC_ENABLED": "true",
+    "FAIL2BAN_ENABLED": "true",
+    "MAILSERVER_CONTAINER": "mailserver",
+    // docker-mailserver config dir *inside* the container (image default).
+    "MAILSERVER_CONFIG_DIR": "/tmp/docker-mailserver"
   },
 
   // ─── Cycle de vie ──────────────────────────────────────────────────────
   "postCreateCommand": "bash .devcontainer/scripts/post-create.sh ${containerWorkspaceFolder}",
+  // Start (idempotently) the dev mailserver on every container start.
+  "postStartCommand": "bash .devcontainer/scripts/mailserver-up.sh ${containerWorkspaceFolder}",
 
   // ─── Utilisateur non-root ──────────────────────────────────────────────
   "remoteUser": "vscode"

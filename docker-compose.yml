@@ -2,6 +2,25 @@
 services:
   mailserver:
     image: mailserver/docker-mailserver:latest
+    container_name: mailserver
+    hostname: mail.example.com
+    environment:
+      # The UI writes postfix-accounts.cf / dovecot-quotas.cf directly, which
+      # only docker-mailserver's FILE provisioner reads. Quotas require it too.
+      - ACCOUNT_PROVISIONER=FILE
+      - ENABLE_QUOTAS=1
+      # The UI reads DKIM records from opendkim/keys; Rspamd stores them
+      # elsewhere, so the two toggles must stay as they are here.
+      - ENABLE_OPENDKIM=1
+      - ENABLE_RSPAMD=0
+      # Required by the published 4190 port, otherwise nothing listens on it.
+      - ENABLE_MANAGESIEVE=1
+      - ENABLE_FAIL2BAN=1
+      - POSTMASTER_ADDRESS=${POSTMASTER_ADDRESS:-postmaster@example.com}
+      - SSL_TYPE=${SSL_TYPE:-}
+      - LOG_LEVEL=${MAILSERVER_LOG_LEVEL:-info}
+    cap_add:
+      - NET_ADMIN
     ports:
       - "25:25"
       - "465:465"
@@ -12,25 +31,39 @@ services:
     volumes:
       - mailserver-mail:/var/mail
       - mailserver-config:/tmp/docker-mailserver/
+      # Postfix/Dovecot runtime state, including the fail2ban ban database the
+      # UI manages: without it every ban is lost when the container is recreated.
+      - mailserver-state:/var/mail-state
+      # The UI tails /var/log/mail/mail.log.
+      - mailserver-logs:/var/log/mail
+    restart: unless-stopped
 
   mailserver-ui:
     build:
       context: .
       dockerfile: Dockerfile
+    depends_on:
+      - mailserver
     environment:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - MAILSERVER_EXEC_ENABLED=${MAILSERVER_EXEC_ENABLED:-true}
+      - FAIL2BAN_ENABLED=${FAIL2BAN_ENABLED:-true}
+      - MAILSERVER_CONTAINER=${MAILSERVER_CONTAINER:-mailserver}
     ports:
       - "8000:8000"
     volumes:
       - mailserver-ui:/var/lib/mailserver-ui
-      - mailserver-config:/var/lib/mailserver-config
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+    restart: unless-stopped
 
 volumes:
   mailserver-mail:
   mailserver-config:
+  mailserver-state:
+  mailserver-logs:
   mailserver-ui:
