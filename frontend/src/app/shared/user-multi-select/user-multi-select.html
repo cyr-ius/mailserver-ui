@@ -1,0 +1,85 @@
+<div
+  class="form-control d-flex flex-wrap align-items-center gap-1 control"
+  [class.disabled]="disabled()"
+  [class.focused]="open()"
+  (click)="focusSearch()"
+>
+  @for (u of selectedUsers(); track u.id) {
+  <span class="badge text-bg-primary d-inline-flex align-items-center gap-1">
+    {{ u.username }}
+    <button
+      type="button"
+      class="btn-close btn-close-white chip-close"
+      [attr.aria-label]="'Remove ' + u.username"
+      [disabled]="disabled()"
+      (click)="remove(u.id); $event.stopPropagation()"
+    ></button>
+  </span>
+  }
+
+  <input
+    #searchInput
+    type="text"
+    class="search"
+    role="combobox"
+    autocomplete="off"
+    [attr.aria-label]="ariaLabel()"
+    [attr.aria-controls]="listboxId"
+    [attr.aria-expanded]="open()"
+    aria-autocomplete="list"
+    aria-haspopup="listbox"
+    [attr.aria-activedescendant]="activeOptionId()"
+    [placeholder]="selectedUsers().length ? '' : placeholder()"
+    [value]="query()"
+    [disabled]="disabled()"
+    (input)="onQueryInput($any($event.target).value)"
+    (focus)="openDropdown()"
+    (keydown)="onKeydown($event)"
+  />
+
+  @if (selectedUsers().length > 0) {
+  <button
+    type="button"
+    class="btn btn-sm btn-link text-body-secondary p-0 ms-auto"
+    aria-label="Clear selection"
+    [disabled]="disabled()"
+    (click)="clear(); $event.stopPropagation()"
+  >
+    <i class="bi bi-x-circle" aria-hidden="true"></i>
+  </button>
+  }
+</div>
+
+@if (open()) {
+<ul class="dropdown-menu show w-100 options" [id]="listboxId" role="listbox" aria-multiselectable="true">
+  @for (u of filtered(); track u.id; let i = $index) {
+  <li #optionEl role="none">
+    <button
+      type="button"
+      class="dropdown-item d-flex align-items-center gap-2"
+      [id]="optionId(i)"
+      role="option"
+      [attr.aria-selected]="isSelected(u.id)"
+      [class.active]="i === activeIndex()"
+      (click)="toggle(u.id)"
+    >
+      <i
+        class="bi"
+        [class.bi-check-square-fill]="isSelected(u.id)"
+        [class.bi-square]="!isSelected(u.id)"
+        aria-hidden="true"
+      ></i>
+      <span class="fw-medium">{{ u.username }}</span>
+      @if (u.display_name && u.display_name !== u.username) {
+      <span class="text-body-secondary small">{{ u.display_name }}</span>
+      }
+      <span class="badge text-bg-light text-uppercase ms-auto">{{ u.provider }}</span>
+    </button>
+  </li>
+  } @empty {
+  <li class="px-3 py-2 text-body-secondary small">
+    {{ query() ? 'No user matches “' + query() + '”' : emptyLabel() }}
+  </li>
+  }
+</ul>
+}
