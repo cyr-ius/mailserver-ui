@@ -30,6 +30,10 @@ ENV UV_PROJECT_ENVIRONMENT=/app/.venv
 ENV PYTHONUNBUFFERED=1
 ENV PATH="$UV_PROJECT_ENVIRONMENT/bin:$PATH"
 
+RUN apk add --no-cache docker && \
+    update-ca-certificates && \
+    rm -rf /var/cache/apk/*
+
 WORKDIR /app
 
 # Install Python dependencies from requirements
@@ -50,10 +54,6 @@ ENV APP_VERSION=${VERSION}
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
     CMD curl -f http://localhost:8000/api/health || exit 1
-
-# Entrypoint generates registry config from env vars then starts supervisord
-COPY ./docker/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
 
 # For staging pipeline (if needed)
 EXPOSE 8000
