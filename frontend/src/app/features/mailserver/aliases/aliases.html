@@ -1,0 +1,160 @@
+<main class="container py-4">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h1 class="h4 mb-0">
+      <i class="bi bi-signpost-split text-primary me-2" aria-hidden="true"></i>
+      Aliases
+    </h1>
+  </div>
+
+  <p class="text-body-secondary small">
+    Aliases that mailbox-level forwarding cannot express: local system names (<code>postfix-aliases.cf</code>, appended
+    to <code>/etc/aliases</code>) and pattern matches (<code>postfix-regexp.cf</code>).
+  </p>
+
+  @if (success(); as msg) {
+  <div class="alert alert-success py-2" role="alert">{{ msg }}</div>
+  } @if (error(); as msg) {
+  <div class="alert alert-danger py-2" role="alert">{{ msg }}</div>
+  } @if (loading()) {
+  <div class="text-center text-body-secondary py-5">
+    <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+    Loading aliases…
+  </div>
+  } @else {
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <h2 class="h6 text-uppercase text-body-secondary mb-3">System aliases</h2>
+      <p class="text-body-secondary small">
+        A local name such as <code>root</code> or <code>abuse</code>, redirected to real addresses. These names have no
+        domain: they match mail Postfix generates locally.
+      </p>
+
+      <form (submit)="onAddSystemAlias(); $event.preventDefault()" novalidate class="mb-3">
+        <div class="row g-2">
+          <div class="col-12 col-lg-4">
+            <label for="system-alias-name" class="form-label small mb-1">Name</label>
+            <input
+              id="system-alias-name"
+              type="text"
+              class="form-control form-control-sm"
+              placeholder="root"
+              [formField]="systemAliasForm.name"
+            />
+          </div>
+          <div class="col-12 col-lg-6">
+            <label for="system-alias-targets" class="form-label small mb-1">Destinations</label>
+            <input
+              id="system-alias-targets"
+              type="text"
+              class="form-control form-control-sm"
+              placeholder="admin@example.com, ops@example.com"
+              [formField]="systemAliasForm.targets"
+            />
+            <div class="form-text">Comma-separated.</div>
+          </div>
+          <div class="col-12 col-lg-2">
+            <label class="form-label small mb-1 d-none d-lg-inline-block" aria-hidden="true">&nbsp;</label>
+            <button type="submit" class="btn btn-sm btn-primary w-100" [disabled]="addingSystemAlias()">
+              @if (addingSystemAlias()) {
+              <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+              } Add
+            </button>
+          </div>
+        </div>
+      </form>
+
+      @if (systemAliases().length === 0) {
+      <p class="text-body-secondary small mb-0">No system alias defined.</p>
+      } @else {
+      <ul class="list-group list-group-flush">
+        @for (alias of systemAliases(); track alias.name) {
+        <li class="list-group-item d-flex align-items-center justify-content-between px-0">
+          <span class="font-monospace">{{ alias.name }}: {{ alias.targets.join(', ') }}</span>
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-danger"
+            (click)="onDeleteSystemAlias(alias)"
+            [disabled]="deletingAlias() === alias.name"
+          >
+            @if (deletingAlias() === alias.name) {
+            <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+            } @else {
+            <i class="bi bi-trash" aria-hidden="true"></i>
+            }
+          </button>
+        </li>
+        }
+      </ul>
+      }
+    </div>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <h2 class="h6 text-uppercase text-body-secondary mb-3">Regex aliases</h2>
+      <p class="text-body-secondary small">
+        A PCRE pattern matched against the recipient address, delimited by slashes. Postfix evaluates them in order, so
+        the first match wins.
+      </p>
+
+      <form (submit)="onAddRegexAlias(); $event.preventDefault()" novalidate class="mb-3">
+        <div class="row g-2">
+          <div class="col-12 col-lg-4">
+            <label for="regex-alias-pattern" class="form-label small mb-1">Pattern</label>
+            <input
+              id="regex-alias-pattern"
+              type="text"
+              class="form-control form-control-sm font-monospace"
+              placeholder="/^info@example\.com$/"
+              [formField]="regexAliasForm.pattern"
+            />
+          </div>
+          <div class="col-12 col-lg-6">
+            <label for="regex-alias-targets" class="form-label small mb-1">Destinations</label>
+            <input
+              id="regex-alias-targets"
+              type="text"
+              class="form-control form-control-sm"
+              placeholder="contact@example.com"
+              [formField]="regexAliasForm.targets"
+            />
+            <div class="form-text">Comma-separated.</div>
+          </div>
+          <div class="col-12 col-lg-2">
+            <label class="form-label small mb-1 d-none d-lg-inline-block" aria-hidden="true">&nbsp;</label>
+            <button type="submit" class="btn btn-sm btn-primary w-100" [disabled]="addingRegexAlias()">
+              @if (addingRegexAlias()) {
+              <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+              } Add
+            </button>
+          </div>
+        </div>
+      </form>
+
+      @if (regexAliases().length === 0) {
+      <p class="text-body-secondary small mb-0">No regex alias defined.</p>
+      } @else {
+      <ul class="list-group list-group-flush">
+        @for (alias of regexAliases(); track alias.pattern) {
+        <li class="list-group-item d-flex align-items-center justify-content-between px-0">
+          <span class="font-monospace">{{ alias.pattern }} → {{ alias.targets.join(', ') }}</span>
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-danger"
+            (click)="onDeleteRegexAlias(alias)"
+            [disabled]="deletingAlias() === alias.pattern"
+          >
+            @if (deletingAlias() === alias.pattern) {
+            <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+            } @else {
+            <i class="bi bi-trash" aria-hidden="true"></i>
+            }
+          </button>
+        </li>
+        }
+      </ul>
+      }
+    </div>
+  </div>
+  }
+</main>

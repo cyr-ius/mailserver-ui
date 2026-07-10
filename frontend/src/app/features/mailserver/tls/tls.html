@@ -1,0 +1,60 @@
+<main class="container py-4">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h1 class="h4 mb-0">
+      <i class="bi bi-shield-check text-primary me-2" aria-hidden="true"></i>
+      TLS certificate
+    </h1>
+    <button type="button" class="btn btn-sm btn-outline-secondary" (click)="refresh()" [disabled]="loading()">
+      <i class="bi bi-arrow-clockwise me-1" aria-hidden="true"></i>
+      Refresh
+    </button>
+  </div>
+
+  <p class="text-body-secondary small">The certificate Postfix serves, read from the path it actually uses.</p>
+
+  @if (error(); as msg) {
+  <div class="alert alert-danger py-2" role="alert">{{ msg }}</div>
+  } @if (loading()) {
+  <div class="text-center text-body-secondary py-5">
+    <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+    Loading the certificate…
+  </div>
+  } @else if (certificate(); as cert) { @if (!cert.configured) {
+  <div class="alert alert-warning" role="alert">
+    No TLS certificate is configured: the mailserver started with
+    <code>SSL_TYPE</code> empty, so mail is exchanged in clear text. Set <code>SSL_TYPE</code> on the container to
+    enable TLS.
+  </div>
+  } @else {
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <dl class="row mb-0">
+        <dt class="col-12 col-sm-3 text-body-secondary fw-normal">Expires</dt>
+        <dd class="col-12 col-sm-9">
+          <span class="badge" [class]="expiryClass()">
+            @if (cert.days_remaining !== null && cert.days_remaining < 0) { Expired } @else { {{ cert.days_remaining }}
+            days left }
+          </span>
+          <span class="font-monospace ms-2">{{ cert.not_after }}</span>
+        </dd>
+        <dt class="col-12 col-sm-3 text-body-secondary fw-normal">Provisioning</dt>
+        <dd class="col-12 col-sm-9 font-monospace">{{ cert.ssl_type || 'unknown' }}</dd>
+        <dt class="col-12 col-sm-3 text-body-secondary fw-normal">Subject</dt>
+        <dd class="col-12 col-sm-9 font-monospace">{{ cert.subject }}</dd>
+        <dt class="col-12 col-sm-3 text-body-secondary fw-normal">Issuer</dt>
+        <dd class="col-12 col-sm-9 font-monospace">{{ cert.issuer }}</dd>
+        <dt class="col-12 col-sm-3 text-body-secondary fw-normal">Valid from</dt>
+        <dd class="col-12 col-sm-9 font-monospace">{{ cert.not_before }}</dd>
+        <dt class="col-12 col-sm-3 text-body-secondary fw-normal">Domains</dt>
+        <dd class="col-12 col-sm-9 mb-0">
+          @if (cert.domains.length === 0) {
+          <span class="text-body-secondary">None listed.</span>
+          } @else { @for (domain of cert.domains; track domain) {
+          <span class="badge text-bg-light me-1 font-monospace">{{ domain }}</span>
+          } }
+        </dd>
+      </dl>
+    </div>
+  </div>
+  } }
+</main>

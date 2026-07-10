@@ -1,0 +1,154 @@
+<main class="container py-4">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h1 class="h4 mb-0">
+      <i class="bi bi-sliders text-primary me-2" aria-hidden="true"></i>
+      Postfix overrides
+    </h1>
+  </div>
+
+  <p class="text-body-secondary small">
+    Extra Postfix parameters. <code>postfix-main.cf</code> appends to <code>main.cf</code>, and
+    <code>postfix-master.cf</code> adjusts the services of <code>master.cf</code>. Both are read only when the
+    mailserver starts: restart the container to apply a change.
+  </p>
+
+  @if (success(); as msg) {
+  <div class="alert alert-success py-2" role="alert">{{ msg }}</div>
+  } @if (error(); as msg) {
+  <div class="alert alert-danger py-2" role="alert">{{ msg }}</div>
+  } @if (loading()) {
+  <div class="text-center text-body-secondary py-5">
+    <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+    Loading overrides…
+  </div>
+  } @else {
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <h2 class="h6 text-uppercase text-body-secondary mb-3">main.cf parameters</h2>
+      @if (!hasOverrides()) {
+      <p class="text-body-secondary mb-3">No override defined yet.</p>
+      } @else {
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead>
+            <tr>
+              <th scope="col" style="width: 40%">Parameter</th>
+              <th scope="col">Value</th>
+              <th scope="col" class="text-end" style="width: 1%"></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (override of overrides(); track $index) {
+            <tr>
+              <td>
+                <input
+                  type="text"
+                  class="form-control form-control-sm font-monospace"
+                  placeholder="message_size_limit"
+                  [value]="override.key"
+                  (input)="onOverrideKey($index, $event)"
+                />
+              </td>
+              <td>
+                <input
+                  type="text"
+                  class="form-control form-control-sm font-monospace"
+                  placeholder="10240000"
+                  [value]="override.value"
+                  (input)="onOverrideValue($index, $event)"
+                />
+              </td>
+              <td class="text-end">
+                <button type="button" class="btn btn-sm btn-outline-danger" (click)="removeOverride($index)">
+                  <i class="bi bi-trash" aria-hidden="true"></i>
+                </button>
+              </td>
+            </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      }
+
+      <div class="d-flex justify-content-between gap-2 mt-2">
+        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="addOverride()">
+          <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>
+          Add parameter
+        </button>
+        <button type="button" class="btn btn-sm btn-primary" (click)="onSave()" [disabled]="saving()">
+          @if (saving()) {
+          <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+          } Save changes
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm mt-4">
+    <div class="card-body">
+      <h2 class="h6 text-uppercase text-body-secondary mb-3">master.cf service parameters</h2>
+      <p class="text-body-secondary small">
+        Each parameter targets one service of <code>master.cf</code> and is written as
+        <code>service/type/parameter</code>, for instance <code>submission/inet/smtpd_tls_security_level</code>.
+      </p>
+
+      @if (masterOverrides().length === 0) {
+      <p class="text-body-secondary mb-3">No service override defined yet.</p>
+      } @else {
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead>
+            <tr>
+              <th scope="col" style="width: 40%">Service parameter</th>
+              <th scope="col">Value</th>
+              <th scope="col" class="text-end" style="width: 1%"></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (override of masterOverrides(); track $index) {
+            <tr>
+              <td>
+                <input
+                  type="text"
+                  class="form-control form-control-sm font-monospace"
+                  placeholder="submission/inet/smtpd_tls_security_level"
+                  [value]="override.key"
+                  (input)="onMasterOverrideKey($index, $event)"
+                />
+              </td>
+              <td>
+                <input
+                  type="text"
+                  class="form-control form-control-sm font-monospace"
+                  placeholder="encrypt"
+                  [value]="override.value"
+                  (input)="onMasterOverrideValue($index, $event)"
+                />
+              </td>
+              <td class="text-end">
+                <button type="button" class="btn btn-sm btn-outline-danger" (click)="removeMasterOverride($index)">
+                  <i class="bi bi-trash" aria-hidden="true"></i>
+                </button>
+              </td>
+            </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      }
+
+      <div class="d-flex justify-content-between gap-2 mt-2">
+        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="addMasterOverride()">
+          <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>
+          Add parameter
+        </button>
+        <button type="button" class="btn btn-sm btn-primary" (click)="onSaveMaster()" [disabled]="savingMaster()">
+          @if (savingMaster()) {
+          <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+          } Save changes
+        </button>
+      </div>
+    </div>
+  </div>
+  }
+</main>

@@ -5,11 +5,11 @@ import { form, FormField, required, submit } from '@angular/forms/signals';
 import { CommonModule } from '@angular/common';
 
 import { AuthService } from '../../core/auth.service';
-import { ThemeService, ThemeMode } from '../../core/theme.service';
+import { ThemeToggle } from '../../shared/theme-toggle/theme-toggle';
 
 @Component({
   selector: 'app-login',
-  imports: [FormField, CommonModule],
+  imports: [FormField, CommonModule, ThemeToggle],
   templateUrl: './login.html',
   styleUrl: './login.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -17,7 +17,6 @@ import { ThemeService, ThemeMode } from '../../core/theme.service';
 export class Login {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
-  protected readonly theme = inject(ThemeService);
 
   /** Which login methods the backend exposes. */
   protected readonly config = this.auth.config;
@@ -30,8 +29,6 @@ export class Login {
     required(path.username, { message: 'Username is required' });
     required(path.password, { message: 'Password is required' });
   });
-
-  protected readonly themeModes: ThemeMode[] = ['light', 'dark', 'auto'];
 
   constructor() {
     this.readOidcError();
@@ -79,10 +76,6 @@ export class Login {
 
   protected onOidcLogin(): void {
     this.auth.loginWithOidc();
-  }
-
-  protected onThemeChange(mode: ThemeMode): void {
-    this.theme.setThemeMode(mode);
   }
 
   private messageFor(err: unknown): string {

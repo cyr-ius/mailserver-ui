@@ -1,0 +1,198 @@
+<main class="container py-4">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h1 class="h4 mb-0">
+      <i class="bi bi-arrow-left-right text-primary me-2" aria-hidden="true"></i>
+      SMTP relay
+    </h1>
+  </div>
+
+  <p class="text-body-secondary small">
+    Route outgoing mail from a sender domain through an external smarthost (<code>postfix-relaymap.cf</code> and
+    <code>postfix-sasl-password.cf</code>).
+  </p>
+
+  @if (success(); as msg) {
+  <div class="alert alert-success py-2" role="alert">{{ msg }}</div>
+  } @if (error(); as msg) {
+  <div class="alert alert-danger py-2" role="alert">{{ msg }}</div>
+  }
+
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <h2 class="h6 text-uppercase text-body-secondary mb-3">Add a relay</h2>
+      <form (submit)="onCreateRelay(); $event.preventDefault()" novalidate>
+        <div class="row g-3">
+          <div class="col-12 col-lg-4">
+            <label for="relay-sender" class="form-label small mb-1">Sender domain</label>
+            <input
+              id="relay-sender"
+              type="text"
+              class="form-control form-control-sm"
+              placeholder="@example.com"
+              [formField]="relayForm.sender"
+            />
+            <div class="form-text">Domain (<code>@example.com</code>) or a full address.</div>
+          </div>
+          <div class="col-12 col-lg-4">
+            <label for="relay-host" class="form-label small mb-1">Relay host</label>
+            <input
+              id="relay-host"
+              type="text"
+              class="form-control form-control-sm"
+              placeholder="smtp.provider.com"
+              [formField]="relayForm.host"
+            />
+          </div>
+          <div class="col-6 col-lg-2">
+            <label for="relay-port" class="form-label small mb-1">Port</label>
+            <input id="relay-port" type="number" class="form-control form-control-sm" [formField]="relayForm.port" />
+          </div>
+          <div class="col-6 col-lg-2">
+            <label class="form-label small mb-1 d-none d-lg-inline-block" aria-hidden="true">&nbsp;</label>
+            <button type="submit" class="btn btn-sm btn-primary w-100" [disabled]="creatingRelay()">
+              @if (creatingRelay()) {
+              <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+              } Add
+            </button>
+          </div>
+          <div class="col-12 col-lg-6">
+            <label for="relay-username" class="form-label small mb-1"
+              >Username <span class="text-body-secondary">(optional)</span></label
+            >
+            <input
+              id="relay-username"
+              type="text"
+              autocomplete="off"
+              class="form-control form-control-sm"
+              [formField]="relayForm.username"
+            />
+          </div>
+          <div class="col-12 col-lg-6">
+            <label for="relay-password" class="form-label small mb-1"
+              >Password <span class="text-body-secondary">(optional)</span></label
+            >
+            <input
+              id="relay-password"
+              type="password"
+              autocomplete="new-password"
+              class="form-control form-control-sm"
+              [formField]="relayForm.password"
+            />
+          </div>
+        </div>
+        @if (createRelayError(); as msg) {
+        <div class="alert alert-danger py-2 mt-3 mb-0" role="alert">{{ msg }}</div>
+        }
+      </form>
+    </div>
+  </div>
+
+  @if (loading()) {
+  <div class="text-center text-body-secondary py-5">
+    <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+    Loading relays…
+  </div>
+  } @else if (relays().length === 0) {
+  <div class="text-center text-body-secondary py-4">No SMTP relay configured.</div>
+  } @else {
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead>
+        <tr>
+          <th scope="col">Sender</th>
+          <th scope="col">Relay</th>
+          <th scope="col">Auth</th>
+          <th scope="col" class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (relay of relays(); track relay.sender) {
+        <tr>
+          <td class="font-monospace">{{ relay.sender }}</td>
+          <td class="font-monospace">{{ relay.host }}:{{ relay.port }}</td>
+          <td>
+            @if (relay.has_credentials) {
+            <span class="badge text-bg-success">{{ relay.username }}</span>
+            } @else {
+            <span class="badge text-bg-light">none</span>
+            }
+          </td>
+          <td class="text-end">
+            <button
+              type="button"
+              class="btn btn-sm btn-outline-danger"
+              (click)="onDeleteRelay(relay)"
+              [disabled]="deletingSender() === relay.sender"
+            >
+              @if (deletingSender() === relay.sender) {
+              <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+              } @else {
+              <i class="bi bi-trash" aria-hidden="true"></i>
+              }
+            </button>
+          </td>
+        </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  }
+
+  <div class="card shadow-sm mt-4">
+    <div class="card-body">
+      <h2 class="h6 text-uppercase text-body-secondary mb-3">Global relay exclusions</h2>
+      <p class="text-body-secondary small">
+        When the mailserver is started with a global relay host (<code>DEFAULT_RELAY_HOST</code>), every outgoing
+        message goes through it. Exclude a sender domain here to deliver its mail directly instead. The global relay
+        itself is set on the mailserver container and is shown, read-only, under
+        <strong>Environment</strong>.
+      </p>
+
+      <form (submit)="onAddExclusion(); $event.preventDefault()" novalidate class="mb-3">
+        <div class="row g-2">
+          <div class="col-12 col-lg-6">
+            <label for="exclusion-sender" class="form-label small mb-1">Sender domain</label>
+            <input
+              id="exclusion-sender"
+              type="text"
+              class="form-control form-control-sm"
+              placeholder="@example.com"
+              [formField]="exclusionForm.sender"
+            />
+          </div>
+          <div class="col-12 col-lg-3 d-flex align-items-end">
+            <button type="submit" class="btn btn-sm btn-outline-primary w-100" [disabled]="addingExclusion()">
+              @if (addingExclusion()) {
+              <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+              } Exclude
+            </button>
+          </div>
+        </div>
+      </form>
+
+      @if (exclusions().length === 0) {
+      <p class="text-body-secondary small mb-0">No domain is excluded from the global relay.</p>
+      } @else {
+      <ul class="list-group list-group-flush">
+        @for (exclusion of exclusions(); track exclusion.sender) {
+        <li class="list-group-item d-flex align-items-center justify-content-between px-0">
+          <span class="font-monospace">{{ exclusion.sender }}</span>
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-danger"
+            (click)="onDeleteExclusion(exclusion)"
+            [disabled]="deletingExclusion() === exclusion.sender"
+          >
+            @if (deletingExclusion() === exclusion.sender) {
+            <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+            } @else {
+            <i class="bi bi-trash" aria-hidden="true"></i>
+            }
+          </button>
+        </li>
+        }
+      </ul>
+      }
+    </div>
+  </div>
+</main>

@@ -1,0 +1,71 @@
+<main class="container py-4">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h1 class="h4 mb-0">
+      <i class="bi bi-funnel text-primary me-2" aria-hidden="true"></i>
+      Sieve filters
+    </h1>
+  </div>
+
+  <p class="text-body-secondary small">
+    Global Sieve scripts applied to every mailbox, before or after the user's own filters (<code
+      >before.dovecot.sieve</code
+    >
+    and <code>after.dovecot.sieve</code>). They are compiled when the mailserver starts: restart the container to apply
+    a change.
+  </p>
+
+  @if (success(); as msg) {
+  <div class="alert alert-success py-2" role="alert">{{ msg }}</div>
+  } @if (error(); as msg) {
+  <div class="alert alert-danger py-2" role="alert">{{ msg }}</div>
+  }
+
+  <div class="btn-group btn-group-sm mb-3" role="group" aria-label="Sieve scope">
+    <button
+      type="button"
+      class="btn"
+      [class.btn-primary]="scope() === 'before'"
+      [class.btn-outline-primary]="scope() !== 'before'"
+      (click)="setScope('before')"
+    >
+      Before user scripts
+    </button>
+    <button
+      type="button"
+      class="btn"
+      [class.btn-primary]="scope() === 'after'"
+      [class.btn-outline-primary]="scope() !== 'after'"
+      (click)="setScope('after')"
+    >
+      After user scripts
+    </button>
+  </div>
+
+  @if (loading()) {
+  <div class="text-center text-body-secondary py-5">
+    <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+    Loading the Sieve script…
+  </div>
+  } @else {
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <textarea
+        class="form-control font-monospace"
+        rows="14"
+        spellcheck="false"
+        aria-label="Global Sieve script"
+        placeholder='require ["fileinto"];&#10;if header :contains "X-Spam-Flag" "YES" {&#10;  fileinto "Junk";&#10;}'
+        [value]="content()"
+        (input)="onContent($event)"
+      ></textarea>
+      <div class="d-flex justify-content-end mt-3">
+        <button type="button" class="btn btn-sm btn-primary" (click)="onSave()" [disabled]="saving()">
+          @if (saving()) {
+          <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+          } Save script
+        </button>
+      </div>
+    </div>
+  </div>
+  }
+</main>

@@ -1,14 +1,15 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import { Router } from '@angular/router';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { Router, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
 
 import { AuthService } from '../../core/auth.service';
 import { MailboxesService } from '../../core/mailboxes.service';
 import { Fail2banService } from '../../core/fail2ban.service';
+import { MailserverService } from '../../core/mailserver.service';
 
 @Component({
   selector: 'app-dashboard',
-  imports: [CommonModule],
+  imports: [CommonModule, RouterLink],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -18,6 +19,7 @@ export class Dashboard {
   private readonly router = inject(Router);
   private readonly mailboxesService = inject(MailboxesService);
   private readonly fail2banService = inject(Fail2banService);
+  private readonly mailserverService = inject(MailserverService);
 
   protected readonly user = this.auth.user;
   protected readonly isAdmin = this.auth.isAdmin;
@@ -29,6 +31,9 @@ export class Dashboard {
   protected readonly largestMailbox = signal<{ email: string; quota: string | null } | null>(null);
   protected readonly largestQuota = signal<{ email: string; quota: string | null } | null>(null);
   protected readonly bannedIpsCount = signal<number | null>(null);
+  protected readonly queuedCount = signal<number | null>(null);
+  protected readonly queueCounts = signal<Record<string, number>>({});
+  protected readonly queueCountEntries = computed(() => Object.entries(this.queueCounts()));
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
 
@@ -50,8 +55,13 @@ export class Dashboard {
         await this.loadMailboxStatistics();
       }
       if (this.isAdmin()) {
-        const bannedIps = await this.fail2banService.listBanned();
+        const [bannedIps, queue] = await Promise.all([
+          this.fail2banService.listBanned(),
+          this.mailserverService.getQueue(),
+        ]);
         this.bannedIpsCount.set(bannedIps.length);
+        this.queuedCount.set(queue.messages.length);
+        this.queueCounts.set(queue.counts);
       }
     } catch (err) {
       console.error('Error loading dashboard statistics:', err);

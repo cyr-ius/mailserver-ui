@@ -50,55 +50,58 @@
   @if (activeTab() === 'users') {
   <div class="mb-3">
     @if (!showUserForm()) {
-    <button type="button" class="btn btn-primary" (click)="showUserForm.set(true)">
-      <i class="bi bi-person-plus me-1" aria-hidden="true"></i>
-      Create local account
-    </button>
+    <div class="d-flex justify-content-end">
+      <button type="button" class="btn btn-sm btn-primary" (click)="startCreateUser()">
+        <i class="bi bi-person-plus me-1" aria-hidden="true"></i>
+        Create local account
+      </button>
+    </div>
     } @else {
     <div class="card shadow-sm mb-3">
       <div class="card-body">
         <h5 class="card-title">Create local account</h5>
         <form class="row g-3" (submit)="createUser(); $event.preventDefault()" novalidate>
           <div class="col-12 col-md-6">
-            <label for="newUsername" class="form-label">Username *</label>
+            <label for="newUsername" class="form-label small mb-1">Username *</label>
             <input
+              #usernameInput
               id="newUsername"
               type="text"
               autocomplete="off"
-              class="form-control"
+              class="form-control form-control-sm"
               placeholder="e.g., alice"
               [formField]="userForm.username"
             />
           </div>
           <div class="col-12 col-md-6">
-            <label for="newDisplayName" class="form-label">Display name</label>
+            <label for="newDisplayName" class="form-label small mb-1">Display name</label>
             <input
               id="newDisplayName"
               type="text"
               autocomplete="off"
-              class="form-control"
+              class="form-control form-control-sm"
               placeholder="Optional"
               [formField]="userForm.display_name"
             />
           </div>
           <div class="col-12 col-md-6">
-            <label for="newUserPassword" class="form-label">Password *</label>
+            <label for="newUserPassword" class="form-label small mb-1">Password *</label>
             <input
               id="newUserPassword"
               type="password"
               autocomplete="new-password"
-              class="form-control"
+              class="form-control form-control-sm"
               [formField]="userForm.password"
             />
             <div class="form-text">Minimum {{ minLength }} characters.</div>
           </div>
           <div class="col-12 col-md-6">
-            <label for="newUserConfirm" class="form-label">Confirm password *</label>
+            <label for="newUserConfirm" class="form-label small mb-1">Confirm password *</label>
             <input
               id="newUserConfirm"
               type="password"
               autocomplete="new-password"
-              class="form-control"
+              class="form-control form-control-sm"
               [formField]="userForm.confirm"
             />
           </div>
@@ -107,12 +110,16 @@
               <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
               The account starts as a guest. Add it to a group to grant it a role.
             </div>
-            <button type="submit" class="btn btn-primary" [disabled]="creatingUser() || userForm().invalid()">
-              @if (creatingUser()) {
-              <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
-              } Create
-            </button>
-            <button type="button" class="btn btn-outline-secondary ms-2" (click)="cancelCreateUser()">Cancel</button>
+            <div class="d-flex justify-content-end gap-2">
+              <button type="button" class="btn btn-sm btn-outline-secondary" (click)="cancelCreateUser()">
+                Cancel
+              </button>
+              <button type="submit" class="btn btn-sm btn-primary" [disabled]="creatingUser() || userForm().invalid()">
+                @if (creatingUser()) {
+                <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+                } Create
+              </button>
+            </div>
           </div>
           @if (userCreationError(); as msg) {
           <div class="col-12">
@@ -185,7 +192,7 @@
           @if (editingId() === u.id) {
           <tr class="table-active">
             <td colspan="6">
-              <form class="row g-2 align-items-start py-2" (submit)="onSubmit(); $event.preventDefault()" novalidate>
+              <form class="row g-2 py-2" (submit)="onSubmit(); $event.preventDefault()" novalidate>
                 <div class="col-12 col-sm-4">
                   <label [attr.for]="'pw-' + u.id" class="form-label small mb-1"> New password </label>
                   <input
@@ -206,7 +213,8 @@
                     [formField]="passwordForm.confirm"
                   />
                 </div>
-                <div class="col-12 col-sm-4 d-flex align-items-end gap-2 pt-sm-4">
+                <div class="col-12 col-sm-4 d-flex align-items-end justify-content-end gap-2">
+                  <button type="button" class="btn btn-sm btn-outline-secondary" (click)="cancelEdit()">Cancel</button>
                   <button
                     type="submit"
                     class="btn btn-sm btn-primary"
@@ -216,7 +224,6 @@
                     <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
                     } Save
                   </button>
-                  <button type="button" class="btn btn-sm btn-outline-secondary" (click)="cancelEdit()">Cancel</button>
                 </div>
                 @if (formError(); as msg) {
                 <div class="col-12">
@@ -244,51 +251,54 @@
   @if (activeTab() === 'groups') {
   <div class="mb-3">
     @if (!showGroupForm()) {
-    <button type="button" class="btn btn-primary" (click)="startCreateGroup()">
-      <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>
-      Create Group
-    </button>
+    <div class="d-flex justify-content-end">
+      <button type="button" class="btn btn-sm btn-primary" (click)="startCreateGroup()">
+        <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>
+        Create Group
+      </button>
+    </div>
     } @else {
     <div class="card shadow-sm mb-3">
       <div class="card-body">
         <h5 class="card-title">{{ editedGroupId() === null ? 'Create New Group' : 'Edit Group' }}</h5>
         <form class="row g-3" (submit)="submitGroup(); $event.preventDefault()" novalidate>
           <div class="col-12 col-md-4">
-            <label for="groupName" class="form-label">Group name *</label>
+            <label for="groupName" class="form-label small mb-1">Group name *</label>
             <input
+              #groupNameInput
               id="groupName"
               type="text"
-              class="form-control"
+              class="form-control form-control-sm"
               placeholder="e.g., Sales Team"
               [formField]="groupForm.name"
             />
           </div>
           <div class="col-12 col-md-5">
-            <label for="groupDesc" class="form-label">Description</label>
+            <label for="groupDesc" class="form-label small mb-1">Description</label>
             <input
               id="groupDesc"
               type="text"
-              class="form-control"
+              class="form-control form-control-sm"
               placeholder="Optional description"
               [formField]="groupForm.description"
             />
           </div>
           <div class="col-12 col-md-3">
-            <label for="groupRole" class="form-label">Granted role</label>
-            <select id="groupRole" class="form-select" [formField]="groupForm.role">
+            <label for="groupRole" class="form-label small mb-1">Granted role</label>
+            <select id="groupRole" class="form-select form-select-sm" [formField]="groupForm.role">
               @for (role of roleOptions; track role) {
               <option [value]="role">{{ roleLabel(role) }}</option>
               }
             </select>
             <div class="form-text">Every member gets at least this role.</div>
           </div>
-          <div class="col-12">
-            <button type="submit" class="btn btn-primary" [disabled]="savingGroup() || groupForm().invalid()">
+          <div class="col-12 d-flex justify-content-end gap-2">
+            <button type="button" class="btn btn-sm btn-outline-secondary" (click)="closeGroupForm()">Cancel</button>
+            <button type="submit" class="btn btn-sm btn-primary" [disabled]="savingGroup() || groupForm().invalid()">
               @if (savingGroup()) {
               <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
               } {{ editedGroupId() === null ? 'Create' : 'Save' }}
             </button>
-            <button type="button" class="btn btn-outline-secondary ms-2" (click)="closeGroupForm()">Cancel</button>
           </div>
           @if (groupFormError(); as msg) {
           <div class="col-12">

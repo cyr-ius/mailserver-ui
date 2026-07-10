@@ -19,7 +19,7 @@
         <i class="bi bi-plus-circle me-1" aria-hidden="true"></i>
         New mailbox
       </h2>
-      <form class="row g-2 align-items-start" (submit)="onCreate(); $event.preventDefault()" novalidate>
+      <form class="row g-2" (submit)="onCreate(); $event.preventDefault()" novalidate>
         <div class="col-12 col-lg-4">
           <label for="mb-email" class="form-label small mb-1">Email address</label>
           <input
@@ -62,7 +62,7 @@
             [formField]="createForm.quota"
           />
         </div>
-        <div class="col-6 col-lg-1 d-flex align-items-end pt-lg-4">
+        <div class="col-6 col-lg-1 d-flex align-items-end">
           <button type="submit" class="btn btn-sm btn-primary w-100" [disabled]="creating() || createForm().invalid()">
             @if (creating()) {
             <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
@@ -213,9 +213,13 @@
                       </button>
                     </div>
                     @if (quotaError(); as msg) {
-                    <div class="col-12"><span class="text-danger small">{{ msg }}</span></div>
+                    <div class="col-12">
+                      <span class="text-danger small">{{ msg }}</span>
+                    </div>
                     }
-                    <div class="col-12"><div class="form-text">Units: K, M, G, T — e.g. 512M, 5G.</div></div>
+                    <div class="col-12">
+                      <div class="form-text">Units: K, M, G, T — e.g. 512M, 5G.</div>
+                    </div>
                   </div>
                 </div>
 
@@ -237,8 +241,9 @@
                       class="list-group-item d-flex justify-content-between align-items-center px-0 py-1 bg-transparent"
                     >
                       <span
-                        >{{ a.alias }} <i class="bi bi-arrow-right mx-1 text-body-secondary" aria-hidden="true"></i> {{
-                        m.email }}</span
+                        >{{ a.alias }}
+                        <i class="bi bi-arrow-right mx-1 text-body-secondary" aria-hidden="true"></i>
+                        {{ m.email }}</span
                       >
                       <button
                         type="button"
@@ -282,7 +287,9 @@
                       </button>
                     </div>
                     @if (aliasError(); as msg) {
-                    <div class="col-12"><span class="text-danger small">{{ msg }}</span></div>
+                    <div class="col-12">
+                      <span class="text-danger small">{{ msg }}</span>
+                    </div>
                     }
                   </form>
                 </div>

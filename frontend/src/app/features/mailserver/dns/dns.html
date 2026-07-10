@@ -1,0 +1,98 @@
+<main class="container py-4">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h1 class="h4 mb-0">
+      <i class="bi bi-globe2 text-primary me-2" aria-hidden="true"></i>
+      DNS records
+    </h1>
+  </div>
+
+  <p class="text-body-secondary small">
+    The records to publish for each hosted domain. DKIM entries come from the keys the mailserver generated; MX, SPF and
+    DMARC are suggestions built from its hostname — review them before publishing.
+  </p>
+
+  @if (error(); as msg) {
+  <div class="alert alert-danger py-2" role="alert">{{ msg }}</div>
+  }
+
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <h2 class="h6 text-uppercase text-body-secondary mb-3">Why all three</h2>
+      <p class="text-body-secondary small">
+        DKIM alone is not enough: receiving servers also check <strong>SPF</strong> (which hosts may send for the
+        domain) and <strong>DMARC</strong> (what to do when a check fails, and where to send reports). Publish all three
+        to avoid being flagged as spam.
+      </p>
+
+      <h3 class="h6 mb-1">SPF</h3>
+      <p class="text-body-secondary small">
+        A single TXT record on the domain apex. <code>mx</code> authorises the hosts listed as MX for the domain; add
+        <code>ip4:</code>, <code>ip6:</code> or <code>include:</code> for any other sender (an SMTP relay, a newsletter
+        provider…). Finish with <code>-all</code> (reject anything else) or <code>~all</code> (soft fail) while you are
+        still testing. Only one SPF record per domain, and no more than 10 DNS lookups.
+      </p>
+
+      <h3 class="h6 mb-1">DMARC</h3>
+      <p class="text-body-secondary small mb-0">
+        A TXT record on <code>_dmarc.&lt;domain&gt;</code>. Start with <code>p=none</code> to collect reports without
+        affecting delivery, then move to <code>p=quarantine</code> and finally <code>p=reject</code> once the aggregate
+        reports sent to <code>rua=</code> show that all your legitimate mail passes. <code>adkim=s</code> and
+        <code>aspf=s</code> require strict alignment between the <code>From:</code> domain and the DKIM/SPF domain; use
+        <code>r</code> (relaxed) if you send from subdomains.
+      </p>
+    </div>
+  </div>
+
+  @if (loading()) {
+  <div class="text-center text-body-secondary py-5">
+    <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+    Loading DNS records…
+  </div>
+  } @else if (records().length === 0) {
+  <div class="text-center text-body-secondary py-4">No hosted domain yet. Create a mailbox to get its records.</div>
+  } @else { @for (entry of records(); track entry.domain) {
+  <div class="card shadow-sm mb-3">
+    <div class="card-body">
+      <h2 class="h6 mb-3">{{ entry.domain }}</h2>
+      <div class="table-responsive">
+        <table class="table align-middle mb-0">
+          <thead>
+            <tr>
+              <th scope="col">Name</th>
+              <th scope="col" style="width: 1%">Type</th>
+              <th scope="col">Value</th>
+              <th scope="col" class="text-end" style="width: 1%"></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (record of entry.records; track record.name + record.type + record.value) {
+            <tr>
+              <td class="font-monospace">{{ record.name }}</td>
+              <td>
+                <span class="badge text-bg-light">{{ record.type }}</span>
+                @if (!record.suggested) {
+                <span class="badge text-bg-success ms-1">DKIM</span>
+                }
+              </td>
+              <td>
+                <code class="record-value">{{ record.value }}</code>
+              </td>
+              <td class="text-end">
+                <button
+                  type="button"
+                  class="btn btn-sm btn-outline-secondary"
+                  (click)="copy(record.value)"
+                  title="Copy value"
+                >
+                  <i class="bi bi-clipboard" aria-hidden="true"></i>
+                </button>
+              </td>
+            </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  } }
+</main>

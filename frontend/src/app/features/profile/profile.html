@@ -1,0 +1,276 @@
+<main class="container py-4">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h1 class="h4 mb-0">
+      <i class="bi bi-person-circle text-primary me-2" aria-hidden="true"></i>
+      My profile
+    </h1>
+  </div>
+
+  @if (loadError(); as msg) {
+  <div class="alert alert-danger py-2" role="alert">{{ msg }}</div>
+  } @if (loading()) {
+  <div class="text-center text-body-secondary py-5">
+    <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+    Loading…
+  </div>
+  } @else if (profile(); as me) {
+  <div class="row g-4">
+    <div class="col-12 col-lg-5">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <h2 class="h6 card-title mb-3">Account</h2>
+          <dl class="row mb-0 small">
+            <dt class="col-5 text-body-secondary fw-normal">Username</dt>
+            <dd class="col-7 fw-medium text-truncate">{{ me.username }}</dd>
+
+            <dt class="col-5 text-body-secondary fw-normal">Display name</dt>
+            <dd class="col-7 text-truncate">{{ me.display_name || '—' }}</dd>
+
+            <dt class="col-5 text-body-secondary fw-normal">Role</dt>
+            <dd class="col-7">
+              <span class="badge" [class]="roleBadge(me.effective_role)"> {{ roleLabel(me.effective_role) }} </span>
+              @if (me.effective_role !== me.role) {
+              <div class="form-text mt-1">granted by a group</div>
+              }
+            </dd>
+
+            <dt class="col-5 text-body-secondary fw-normal">Provider</dt>
+            <dd class="col-7">
+              <span class="badge text-bg-light text-uppercase">{{ me.provider }}</span>
+            </dd>
+
+            <dt class="col-5 text-body-secondary fw-normal">Created</dt>
+            <dd class="col-7">{{ me.created_at | date: 'short' }}</dd>
+
+            <dt class="col-5 text-body-secondary fw-normal">Last login</dt>
+            <dd class="col-7 mb-0">{{ me.last_login_at ? (me.last_login_at | date: 'short') : 'Never' }}</dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-lg-7">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <h2 class="h6 card-title mb-3">
+            <i class="bi bi-key me-1" aria-hidden="true"></i>
+            Change password
+          </h2>
+
+          @if (successMessage(); as msg) {
+          <div class="alert alert-success py-2" role="alert">{{ msg }}</div>
+          } @if (!isLocalAccount()) {
+          <div class="alert alert-info py-2 mb-0" role="alert">
+            <i class="bi bi-shield-lock me-1" aria-hidden="true"></i>
+            Your password is managed by the identity provider and cannot be changed here.
+          </div>
+          } @else {
+          <form class="row g-3" (submit)="onSubmit(); $event.preventDefault()" novalidate>
+            <div class="col-12">
+              <label for="currentPassword" class="form-label small mb-1">Current password *</label>
+              <input
+                id="currentPassword"
+                type="password"
+                autocomplete="current-password"
+                class="form-control form-control-sm"
+                [formField]="passwordForm.current"
+              />
+            </div>
+            <div class="col-12 col-md-6">
+              <label for="newPassword" class="form-label small mb-1">New password *</label>
+              <input
+                id="newPassword"
+                type="password"
+                autocomplete="new-password"
+                class="form-control form-control-sm"
+                [formField]="passwordForm.password"
+              />
+              <div class="form-text">Minimum {{ minLength }} characters.</div>
+            </div>
+            <div class="col-12 col-md-6">
+              <label for="confirmPassword" class="form-label small mb-1">Confirm new password *</label>
+              <input
+                id="confirmPassword"
+                type="password"
+                autocomplete="new-password"
+                class="form-control form-control-sm"
+                [formField]="passwordForm.confirm"
+              />
+            </div>
+
+            @if (formError(); as msg) {
+            <div class="col-12">
+              <div class="text-danger small">{{ msg }}</div>
+            </div>
+            }
+
+            <div class="col-12 d-flex justify-content-end">
+              <button type="submit" class="btn btn-sm btn-primary" [disabled]="saving() || passwordForm().invalid()">
+                @if (saving()) {
+                <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+                } Update password
+              </button>
+            </div>
+          </form>
+          }
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="d-flex align-items-start justify-content-between mb-3">
+            <div>
+              <h2 class="h6 card-title mb-1">
+                <i class="bi bi-key-fill me-1" aria-hidden="true"></i>
+                API keys
+              </h2>
+              <p class="form-text mb-0">
+                Call the REST API from a script with the
+                <code>{{ apiKeyHeader }}</code> header. A key carries your own permissions ({{
+                roleLabel(me.effective_role) }}).
+              </p>
+            </div>
+            @if (!showKeyForm()) {
+            <button type="button" class="btn btn-sm btn-primary" (click)="startCreateKey()">
+              <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>
+              New key
+            </button>
+            }
+          </div>
+
+          @if (keysError(); as msg) {
+          <div class="alert alert-danger py-2" role="alert">{{ msg }}</div>
+          } @if (newKey(); as created) {
+          <div class="alert alert-success" role="alert">
+            <div class="d-flex align-items-start justify-content-between gap-2">
+              <div class="flex-grow-1 overflow-hidden">
+                <div class="fw-semibold mb-1">
+                  <i class="bi bi-check-circle me-1" aria-hidden="true"></i>
+                  Key "{{ created.name }}" created
+                </div>
+                <div class="small mb-2">Copy it now: it is shown only once and cannot be recovered.</div>
+                <code class="d-block text-break user-select-all">{{ created.key }}</code>
+              </div>
+              <div class="d-flex flex-column gap-1">
+                <button
+                  type="button"
+                  class="btn btn-sm btn-outline-success"
+                  (click)="copyKey()"
+                  [disabled]="keyCopied()"
+                >
+                  <i
+                    class="bi me-1"
+                    [class.bi-clipboard]="!keyCopied()"
+                    [class.bi-clipboard-check]="keyCopied()"
+                    aria-hidden="true"
+                  ></i>
+                  {{ keyCopied() ? 'Copied' : 'Copy' }}
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" (click)="dismissNewKey()">
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          </div>
+          } @if (showKeyForm()) {
+          <form class="row g-2 align-items-end mb-3" (submit)="createKey(); $event.preventDefault()" novalidate>
+            <div class="col-12 col-md-5">
+              <label for="keyName" class="form-label small mb-1">Name *</label>
+              <input
+                id="keyName"
+                type="text"
+                autocomplete="off"
+                placeholder="Backup script"
+                class="form-control form-control-sm"
+                [formField]="keyForm.name"
+              />
+            </div>
+            <div class="col-12 col-md-3">
+              <label for="keyExpiry" class="form-label small mb-1">Expiration</label>
+              <select id="keyExpiry" class="form-select form-select-sm" (change)="onExpiryChange($event)">
+                @for (option of expiryOptions; track option.label) {
+                <option [value]="option.days ?? ''">{{ option.label }}</option>
+                }
+              </select>
+            </div>
+            <div class="col-12 col-md-4 d-flex gap-2">
+              <button type="submit" class="btn btn-sm btn-primary" [disabled]="creatingKey() || keyForm().invalid()">
+                @if (creatingKey()) {
+                <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+                } Create key
+              </button>
+              <button type="button" class="btn btn-sm btn-outline-secondary" (click)="cancelCreateKey()">Cancel</button>
+            </div>
+            @if (keyFormError(); as msg) {
+            <div class="col-12">
+              <div class="text-danger small">{{ msg }}</div>
+            </div>
+            }
+          </form>
+          } @if (loadingKeys()) {
+          <div class="text-center text-body-secondary py-3">
+            <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+            Loading keys…
+          </div>
+          } @else if (apiKeys().length === 0) {
+          <p class="text-body-secondary small mb-0">
+            You have no API key yet. Create one to call the API without signing in.
+          </p>
+          } @else {
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead>
+                <tr class="small text-body-secondary">
+                  <th scope="col">Name</th>
+                  <th scope="col">Key</th>
+                  <th scope="col">Created</th>
+                  <th scope="col">Expires</th>
+                  <th scope="col">Last used</th>
+                  <th scope="col" class="text-end">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (key of apiKeys(); track key.id) {
+                <tr [class.opacity-50]="isExpired(key)">
+                  <td class="fw-medium text-truncate">{{ key.name }}</td>
+                  <td>
+                    <code class="small">{{ key.prefix }}…</code>
+                  </td>
+                  <td class="small">{{ key.created_at | date: 'short' }}</td>
+                  <td class="small">
+                    @if (key.expires_at) { @if (isExpired(key)) {
+                    <span class="badge text-bg-danger">Expired</span>
+                    } @else { {{ key.expires_at | date: 'short' }} } } @else {
+                    <span class="text-body-secondary">Never</span>
+                    }
+                  </td>
+                  <td class="small">{{ key.last_used_at ? (key.last_used_at | date: 'short') : 'Never' }}</td>
+                  <td class="text-end">
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-danger"
+                      [disabled]="revokingKeyId() === key.id"
+                      (click)="revokeKey(key)"
+                      [attr.aria-label]="'Revoke ' + key.name"
+                    >
+                      @if (revokingKeyId() === key.id) {
+                      <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                      } @else {
+                      <i class="bi bi-trash" aria-hidden="true"></i>
+                      }
+                    </button>
+                  </td>
+                </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+  }
+</main>

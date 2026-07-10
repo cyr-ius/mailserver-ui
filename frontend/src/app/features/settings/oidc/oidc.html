@@ -1,8 +1,8 @@
 <main class="container py-4">
   <div class="d-flex align-items-center justify-content-between mb-3">
     <h1 class="h4 mb-0">
-      <i class="bi bi-gear-fill text-primary me-2" aria-hidden="true"></i>
-      {{ pageTitle() }}
+      <i class="bi bi-shield-lock text-primary me-2" aria-hidden="true"></i>
+      OIDC / SSO settings
     </h1>
   </div>
 
@@ -10,44 +10,7 @@
   <div class="alert alert-success py-2" role="alert">{{ msg }}</div>
   } @if (loadError(); as msg) {
   <div class="alert alert-danger py-2" role="alert">{{ msg }}</div>
-  } @if (activeTab() === 'appearance') {
-  <div class="card shadow-sm settings-card">
-    <div class="card-body">
-      <h2 class="h6 text-uppercase text-body-secondary mb-4">Theme</h2>
-
-      <div class="row g-3">
-        <div class="col-12">
-          <label class="form-label">Theme preference</label>
-          <div class="d-flex gap-2 flex-wrap">
-            @for (mode of themeModes; track mode) {
-            <div class="form-check">
-              <input
-                type="radio"
-                class="form-check-input"
-                name="theme"
-                [id]="'theme-' + mode"
-                [value]="mode"
-                [checked]="theme.themeMode() === mode"
-                (change)="onThemeChange(mode)"
-              />
-              <label class="form-check-label" [for]="'theme-' + mode">
-                @switch (mode) { @case ('light') {
-                <i class="bi bi-sun-fill me-1" aria-hidden="true"></i>
-                Light } @case ('dark') {
-                <i class="bi bi-moon-fill me-1" aria-hidden="true"></i>
-                Dark } @case ('auto') {
-                <i class="bi bi-circle-half me-1" aria-hidden="true"></i>
-                Auto } }
-              </label>
-            </div>
-            }
-          </div>
-          <div class="form-text mt-2">Choose your preferred theme. "Auto" will use your system settings.</div>
-        </div>
-      </div>
-    </div>
-  </div>
-  } @if (activeTab() === 'oidc') { @if (loading()) {
+  } @if (loading()) {
   <div class="text-center text-body-secondary py-5">
     <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
     Loading configuration…
@@ -64,58 +27,58 @@
         <h2 class="h6 text-uppercase text-body-secondary mb-3">Provider</h2>
         <div class="row g-3 mb-4">
           <div class="col-12 col-lg-6">
-            <label for="oidc-issuer" class="form-label">Issuer URL</label>
+            <label for="oidc-issuer" class="form-label small mb-1">Issuer URL</label>
             <input
               id="oidc-issuer"
               type="url"
-              class="form-control"
+              class="form-control form-control-sm"
               placeholder="https://idp.example.com/realms/main"
               [formField]="oidcForm.issuer"
             />
             <div class="form-text">Base URL exposing /.well-known/openid-configuration.</div>
           </div>
           <div class="col-12 col-lg-6">
-            <label for="oidc-client-id" class="form-label">Client ID</label>
+            <label for="oidc-client-id" class="form-label small mb-1">Client ID</label>
             <input
               id="oidc-client-id"
               type="text"
               autocomplete="off"
-              class="form-control"
+              class="form-control form-control-sm"
               [formField]="oidcForm.client_id"
             />
           </div>
           <div class="col-12 col-lg-6">
-            <label for="oidc-client-secret" class="form-label">Client secret</label>
+            <label for="oidc-client-secret" class="form-label small mb-1">Client secret</label>
             <input
               id="oidc-client-secret"
               type="password"
               autocomplete="new-password"
-              class="form-control"
+              class="form-control form-control-sm"
               [placeholder]="secretStored() ? '•••••••• (unchanged)' : 'Enter client secret'"
               [formField]="oidcForm.client_secret"
             />
             <div class="form-text">Leave empty to keep the current secret.</div>
           </div>
           <div class="col-12 col-lg-6">
-            <label for="oidc-scope" class="form-label">Scopes</label>
-            <input id="oidc-scope" type="text" class="form-control" [formField]="oidcForm.scope" />
+            <label for="oidc-scope" class="form-label small mb-1">Scopes</label>
+            <input id="oidc-scope" type="text" class="form-control form-control-sm" [formField]="oidcForm.scope" />
           </div>
           <div class="col-12 col-lg-6">
-            <label for="oidc-redirect" class="form-label">Redirect URI</label>
+            <label for="oidc-redirect" class="form-label small mb-1">Redirect URI</label>
             <input
               id="oidc-redirect"
               type="url"
-              class="form-control"
+              class="form-control form-control-sm"
               placeholder="https://mail.example.com/api/auth/oidc/callback"
               [formField]="oidcForm.redirect_uri"
             />
           </div>
           <div class="col-12 col-lg-6">
-            <label for="oidc-logout-redirect" class="form-label"> Post-logout redirect URI </label>
+            <label for="oidc-logout-redirect" class="form-label small mb-1">Post-logout redirect URI</label>
             <input
               id="oidc-logout-redirect"
               type="url"
-              class="form-control"
+              class="form-control form-control-sm"
               [formField]="oidcForm.post_logout_redirect_uri"
             />
           </div>
@@ -129,32 +92,42 @@
         </p>
         <div class="row g-3 mb-3">
           <div class="col-12 col-lg-6">
-            <label for="oidc-admin-claim" class="form-label">Admin group claim</label>
+            <label for="oidc-admin-claim" class="form-label small mb-1">Admin group claim</label>
             <input
               id="oidc-admin-claim"
               type="text"
-              class="form-control"
+              class="form-control form-control-sm"
               placeholder="groups"
               [formField]="oidcForm.admin_group_claim"
             />
           </div>
           <div class="col-12 col-lg-6">
-            <label for="oidc-admin-group" class="form-label">Admin group value</label>
-            <input id="oidc-admin-group" type="text" class="form-control" [formField]="oidcForm.admin_group" />
+            <label for="oidc-admin-group" class="form-label small mb-1">Admin group value</label>
+            <input
+              id="oidc-admin-group"
+              type="text"
+              class="form-control form-control-sm"
+              [formField]="oidcForm.admin_group"
+            />
           </div>
           <div class="col-12 col-lg-6">
-            <label for="oidc-manager-claim" class="form-label">Mailbox manager group claim</label>
+            <label for="oidc-manager-claim" class="form-label small mb-1">Mailbox manager group claim</label>
             <input
               id="oidc-manager-claim"
               type="text"
-              class="form-control"
+              class="form-control form-control-sm"
               placeholder="groups"
               [formField]="oidcForm.manager_group_claim"
             />
           </div>
           <div class="col-12 col-lg-6">
-            <label for="oidc-manager-group" class="form-label">Mailbox manager group value</label>
-            <input id="oidc-manager-group" type="text" class="form-control" [formField]="oidcForm.manager_group" />
+            <label for="oidc-manager-group" class="form-label small mb-1">Mailbox manager group value</label>
+            <input
+              id="oidc-manager-group"
+              type="text"
+              class="form-control form-control-sm"
+              [formField]="oidcForm.manager_group"
+            />
           </div>
         </div>
 
@@ -178,8 +151,8 @@
         <div class="alert alert-danger py-2" role="alert">{{ msg }}</div>
         }
 
-        <div class="d-flex gap-2">
-          <button type="submit" class="btn btn-primary" [disabled]="saving()">
+        <div class="d-flex justify-content-end gap-2">
+          <button type="submit" class="btn btn-sm btn-primary" [disabled]="saving()">
             @if (saving()) {
             <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
             } Save changes
@@ -188,5 +161,5 @@
       </form>
     </div>
   </div>
-  } }
+  }
 </main>

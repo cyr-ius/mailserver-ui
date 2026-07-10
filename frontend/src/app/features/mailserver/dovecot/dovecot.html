@@ -1,0 +1,126 @@
+<main class="container py-4">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h1 class="h4 mb-0">
+      <i class="bi bi-inboxes text-primary me-2" aria-hidden="true"></i>
+      Dovecot
+    </h1>
+  </div>
+
+  <p class="text-body-secondary small">
+    Dovecot master accounts can log in to any mailbox for administration or migration (<code>dovecot-masters.cf</code>).
+  </p>
+
+  @if (success(); as msg) {
+  <div class="alert alert-success py-2" role="alert">{{ msg }}</div>
+  } @if (error(); as msg) {
+  <div class="alert alert-danger py-2" role="alert">{{ msg }}</div>
+  }
+
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <h2 class="h6 text-uppercase text-body-secondary mb-3">Add a master account</h2>
+      <form (submit)="onCreateMaster(); $event.preventDefault()" novalidate>
+        <div class="row g-3">
+          <div class="col-12 col-lg-5">
+            <label for="master-name" class="form-label small mb-1">Name</label>
+            <input
+              id="master-name"
+              type="text"
+              autocomplete="off"
+              class="form-control form-control-sm"
+              placeholder="admin"
+              [formField]="masterForm.name"
+            />
+            <div class="form-text">A bare name without <code>&#64;</code>.</div>
+          </div>
+          <div class="col-12 col-lg-4">
+            <label for="master-password" class="form-label small mb-1">Password</label>
+            <input
+              id="master-password"
+              type="password"
+              autocomplete="new-password"
+              class="form-control form-control-sm"
+              [formField]="masterForm.password"
+            />
+          </div>
+          <div class="col-12 col-lg-3">
+            <label class="form-label small mb-1 d-none d-lg-inline-block" aria-hidden="true">&nbsp;</label>
+            <button type="submit" class="btn btn-sm btn-primary w-100" [disabled]="creatingMaster()">
+              @if (creatingMaster()) {
+              <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+              } Add
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  @if (loading()) {
+  <div class="text-center text-body-secondary py-5">
+    <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+    Loading master accounts…
+  </div>
+  } @else if (masters().length === 0) {
+  <div class="text-center text-body-secondary py-4">No Dovecot master account.</div>
+  } @else {
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead>
+        <tr>
+          <th scope="col">Name</th>
+          <th scope="col" class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (master of masters(); track master.name) {
+        <tr>
+          <td class="font-monospace">{{ master.name }}</td>
+          <td class="text-end">
+            <button
+              type="button"
+              class="btn btn-sm btn-outline-danger"
+              (click)="onDeleteMaster(master)"
+              [disabled]="deletingMaster() === master.name"
+            >
+              @if (deletingMaster() === master.name) {
+              <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+              } @else {
+              <i class="bi bi-trash" aria-hidden="true"></i>
+              }
+            </button>
+          </td>
+        </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  }
+
+  <div class="card shadow-sm mt-4">
+    <div class="card-body">
+      <h2 class="h6 text-uppercase text-body-secondary mb-3">Configuration override</h2>
+      <p class="text-body-secondary small">
+        The contents of <code>dovecot.cf</code>, copied verbatim to <code>/etc/dovecot/local.conf</code> when the
+        mailserver starts. Nothing is validated here: a syntax error will only surface on restart, and may prevent
+        Dovecot from starting.
+      </p>
+      <textarea
+        class="form-control font-monospace"
+        rows="10"
+        spellcheck="false"
+        aria-label="Dovecot configuration override"
+        placeholder="mail_max_userip_connections = 100"
+        [value]="config()"
+        (input)="onConfig($event)"
+      ></textarea>
+      <div class="d-flex justify-content-end mt-3">
+        <button type="button" class="btn btn-sm btn-primary" (click)="onSaveConfig()" [disabled]="savingConfig()">
+          @if (savingConfig()) {
+          <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+          } Save configuration
+        </button>
+      </div>
+    </div>
+  </div>
+</main>

@@ -14,7 +14,6 @@ const QUOTA_PATTERN = /^\d+[KMGT]$/;
   selector: 'app-mailboxes',
   imports: [FormField],
   templateUrl: './mailboxes.html',
-  styleUrl: './mailboxes.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class Mailboxes {

@@ -1,0 +1,99 @@
+<main class="container py-4">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h1 class="h4 mb-0">
+      <i class="bi bi-list-task text-primary me-2" aria-hidden="true"></i>
+      Mail queue
+    </h1>
+    <div class="d-flex gap-2">
+      <button type="button" class="btn btn-sm btn-outline-secondary" (click)="refresh()" [disabled]="loading()">
+        <i class="bi bi-arrow-clockwise me-1" aria-hidden="true"></i>
+        Refresh
+      </button>
+      <button
+        type="button"
+        class="btn btn-sm btn-outline-primary"
+        (click)="onFlush()"
+        [disabled]="flushing() || queue().length === 0"
+      >
+        @if (flushing()) {
+        <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+        } Flush
+      </button>
+      <button
+        type="button"
+        class="btn btn-sm btn-outline-danger"
+        (click)="onDeleteAll()"
+        [disabled]="flushing() || queue().length === 0"
+      >
+        Delete all
+      </button>
+    </div>
+  </div>
+
+  <p class="text-body-secondary small">
+    Messages Postfix has accepted but not yet delivered. Deferred mail is retried automatically; flushing only asks
+    Postfix to try again now.
+  </p>
+
+  @if (success(); as msg) {
+  <div class="alert alert-success py-2" role="alert">{{ msg }}</div>
+  } @if (error(); as msg) {
+  <div class="alert alert-danger py-2" role="alert">{{ msg }}</div>
+  } @if (countEntries().length > 0) {
+  <div class="mb-3">
+    @for (entry of countEntries(); track entry[0]) {
+    <span class="badge text-bg-light me-1">{{ entry[0] }}: {{ entry[1] }}</span>
+    }
+  </div>
+  } @if (loading()) {
+  <div class="text-center text-body-secondary py-5">
+    <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+    Loading the queue…
+  </div>
+  } @else if (queue().length === 0) {
+  <div class="text-center text-body-secondary py-4">The mail queue is empty.</div>
+  } @else {
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead>
+        <tr>
+          <th scope="col">Queue ID</th>
+          <th scope="col">Sender</th>
+          <th scope="col">Recipients</th>
+          <th scope="col">Arrived</th>
+          <th scope="col">Reason</th>
+          <th scope="col" class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (message of queue(); track message.queue_id) {
+        <tr>
+          <td class="font-monospace">
+            {{ message.queue_id }}
+            <span class="badge text-bg-light ms-1">{{ message.queue_name }}</span>
+          </td>
+          <td class="font-monospace">{{ message.sender }}</td>
+          <td class="font-monospace">{{ message.recipients.join(', ') }}</td>
+          <td>{{ message.arrival_time }}</td>
+          <td class="text-body-secondary small">{{ message.delay_reason }}</td>
+          <td class="text-end">
+            <button
+              type="button"
+              class="btn btn-sm btn-outline-danger"
+              (click)="onDelete(message)"
+              [disabled]="deletingQueueId() === message.queue_id"
+            >
+              @if (deletingQueueId() === message.queue_id) {
+              <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+              } @else {
+              <i class="bi bi-trash" aria-hidden="true"></i>
+              }
+            </button>
+          </td>
+        </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  }
+</main>

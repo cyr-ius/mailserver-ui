@@ -1,16 +1,9 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
-import { CommonModule } from '@angular/common';
 import { form, FormField } from '@angular/forms/signals';
 
-import { AuthService } from '../../core/auth.service';
-import { SettingsService } from '../../core/settings.service';
-import { ThemeService, ThemeMode } from '../../core/theme.service';
-import { OidcSettings, OidcSettingsUpdate } from '../../core/settings.models';
-
-/** Settings pages. Only OIDC is implemented for now. */
-type Tab = 'oidc' | 'appearance' | 'syslog' | 'email';
+import { SettingsService } from '../../../core/settings.service';
+import { OidcSettings, OidcSettingsUpdate } from '../../../core/settings.models';
 
 /** Form shape for the OIDC page (mirrors OidcSettingsUpdate). */
 interface OidcForm {
@@ -48,36 +41,16 @@ const EMPTY_OIDC: OidcForm = {
   restrict_to_groups: false,
 };
 
+/** Single sign-on against an external OpenID Connect provider. */
 @Component({
-  selector: 'app-settings',
-  imports: [FormField, CommonModule],
-  templateUrl: './settings.html',
-  styleUrl: './settings.css',
+  selector: 'app-settings-oidc',
+  imports: [FormField],
+  templateUrl: './oidc.html',
+  styleUrl: './oidc.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class Settings {
-  private readonly auth = inject(AuthService);
+export class Oidc {
   private readonly settings = inject(SettingsService);
-  private readonly router = inject(Router);
-  private readonly route = inject(ActivatedRoute);
-  protected readonly theme = inject(ThemeService);
-
-  protected readonly user = this.auth.user;
-  protected readonly loggingOut = signal(false);
-
-  protected readonly activeTab = signal<Tab>('oidc');
-  protected readonly pageTitle = computed(() => {
-    switch (this.activeTab()) {
-      case 'appearance':
-        return 'Appearance settings';
-      case 'syslog':
-        return 'Syslog settings';
-      case 'email':
-        return 'Email settings';
-      default:
-        return 'OIDC / SSO settings';
-    }
-  });
 
   protected readonly loading = signal(true);
   protected readonly loadError = signal<string | null>(null);
@@ -91,27 +64,11 @@ export class Settings {
   protected readonly model = signal<OidcForm>({ ...EMPTY_OIDC });
   protected readonly oidcForm = form(this.model);
 
-  protected readonly themeModes: ThemeMode[] = ['light', 'dark', 'auto'];
-
   constructor() {
-    this.route.url.subscribe((segments) => {
-      const requestedPage = (segments[0]?.path || 'oidc') as Tab;
-      const validPages: Tab[] = ['oidc', 'appearance', 'syslog', 'email'];
-      if (validPages.includes(requestedPage)) {
-        this.activeTab.set(requestedPage);
-      } else {
-        void this.router.navigate(['/settings/oidc']);
-      }
-    });
-
-    void this.loadOidc();
+    void this.load();
   }
 
-  protected onThemeChange(mode: ThemeMode): void {
-    this.theme.setThemeMode(mode);
-  }
-
-  private async loadOidc(): Promise<void> {
+  private async load(): Promise<void> {
     this.loading.set(true);
     this.loadError.set(null);
     try {
@@ -145,16 +102,6 @@ export class Settings {
       this.formError.set(this.messageFor(err));
     } finally {
       this.saving.set(false);
-    }
-  }
-
-  protected async onLogout(): Promise<void> {
-    this.loggingOut.set(true);
-    try {
-      await this.auth.logout();
-      await this.router.navigate(['/login']);
-    } finally {
-      this.loggingOut.set(false);
     }
   }
 

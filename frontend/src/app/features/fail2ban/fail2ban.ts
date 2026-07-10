@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { DatePipe } from '@angular/common';
 import { Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { form, FormField, required, submit } from '@angular/forms/signals';
@@ -6,13 +7,85 @@ import { form, FormField, required, submit } from '@angular/forms/signals';
 import { AuthService } from '../../core/auth.service';
 import { Fail2banService } from '../../core/fail2ban.service';
 import { BannedIp, Fail2banJail } from '../../core/fail2ban.models';
+import { TableSort } from '../../shared/table-sort';
 
 /** Displayed sections. */
 type Tab = 'overview' | 'policy' | 'log';
 
+/** Sortable log columns; the message column is free text and stays unsorted. */
+type LogColumn = 'date' | 'logger' | 'pid' | 'level';
+
+/** A single fail2ban log line split into its fields. */
+interface Fail2banLogEntry {
+  date: Date | null;
+  timestamp: string;
+  logger: string;
+  pid: string;
+  level: string;
+  message: string;
+  raw: string;
+}
+
+/**
+ * `<date> <time>,<ms> <logger> [<pid>]: <level> <message>`, as written by
+ * fail2ban's default log format — for instance
+ * `2025-07-09 12:34:56,789 fail2ban.filter [143]: INFO [postfix] Found 203.0.113.42`.
+ */
+const LOG_LINE =
+  /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3})\s+(\S+)\s+\[(\d+)\]:\s+(\S+)\s+(.*)$/;
+
+/** Loggers are all namespaced under `fail2ban.`; the prefix carries no information. */
+const LOGGER_PREFIX = 'fail2ban.';
+
+/** Severity order, so sorting on the level groups the worrying lines together. */
+const LEVEL_RANK: Record<string, number> = {
+  DEBUG: 0,
+  INFO: 1,
+  NOTICE: 2,
+  WARNING: 3,
+  ERROR: 4,
+  CRITICAL: 5,
+};
+
+/** Compare two entries on a column, ascending. Dates, PIDs and levels sort numerically. */
+function compareOn(column: LogColumn, a: Fail2banLogEntry, b: Fail2banLogEntry): number {
+  switch (column) {
+    case 'date':
+      return (a.date?.getTime() ?? 0) - (b.date?.getTime() ?? 0);
+    case 'pid':
+      // A missing PID reads as 0 and groups before the real ones.
+      return Number(a.pid || 0) - Number(b.pid || 0);
+    case 'level':
+      // An unknown level sorts below DEBUG rather than between two known levels.
+      return (LEVEL_RANK[a.level] ?? -1) - (LEVEL_RANK[b.level] ?? -1);
+    default:
+      return a[column].localeCompare(b[column]);
+  }
+}
+
+/** Split a raw fail2ban log line; an unparsable line keeps its text in `message`. */
+function parseLogLine(raw: string): Fail2banLogEntry {
+  const match = LOG_LINE.exec(raw);
+  if (!match) {
+    return { date: null, timestamp: '', logger: '', pid: '', level: '', message: raw, raw };
+  }
+  const [, timestamp, logger, pid, level, message] = match;
+  // `2025-07-09 12:34:56,789` is not a format `Date` parses; ISO 8601 local time is.
+  const date = new Date(timestamp.replace(' ', 'T').replace(',', '.'));
+  return {
+    date: Number.isNaN(date.getTime()) ? null : date,
+    timestamp,
+    logger: logger.startsWith(LOGGER_PREFIX) ? logger.slice(LOGGER_PREFIX.length) : logger,
+    pid,
+    level,
+    message,
+    raw,
+  };
+}
+
 @Component({
   selector: 'app-fail2ban',
-  imports: [FormField],
+  imports: [DatePipe, FormField],
   templateUrl: './fail2ban.html',
   styleUrl: './fail2ban.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -67,6 +140,22 @@ export class Fail2ban {
   protected readonly logLoading = signal(false);
   protected readonly logLoaded = signal(false);
   protected readonly logError = signal<string | null>(null);
+
+  protected readonly logFilter = signal('');
+  protected readonly logSort = new TableSort<LogColumn>();
+
+  protected readonly logEntries = computed(() => this.logLines().map(parseLogLine));
+
+  protected readonly filteredLog = computed(() => {
+    const needle = this.logFilter().trim().toLowerCase();
+    const entries = this.logEntries();
+    if (!needle) {
+      return entries;
+    }
+    return entries.filter((entry) => entry.raw.toLowerCase().includes(needle));
+  });
+
+  protected readonly visibleLog = computed(() => this.logSort.apply(this.filteredLog(), compareOn));
 
   constructor() {
     void this.loadStatus();
@@ -210,6 +299,25 @@ export class Fail2ban {
       this.logError.set(this.messageFor(err));
     } finally {
       this.logLoading.set(false);
+    }
+  }
+
+  protected onLogFilterInput(event: Event): void {
+    this.logFilter.set((event.target as HTMLInputElement).value);
+  }
+
+  /** Colour a level badge by severity; anything unknown stays neutral. */
+  protected levelBadgeClass(level: string): string {
+    switch (level) {
+      case 'CRITICAL':
+      case 'ERROR':
+        return 'text-bg-danger';
+      case 'WARNING':
+        return 'text-bg-warning';
+      case 'NOTICE':
+        return 'text-bg-info';
+      default:
+        return 'text-bg-light';
     }
   }
 

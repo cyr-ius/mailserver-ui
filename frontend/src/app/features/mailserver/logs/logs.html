@@ -1,0 +1,123 @@
+<main class="container py-4 d-flex flex-column h-100">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h1 class="h4 mb-0">
+      <i class="bi bi-journal-text text-primary me-2" aria-hidden="true"></i>
+      Mail log
+    </h1>
+    <button
+      type="button"
+      class="btn btn-sm btn-outline-secondary flex-shrink-0"
+      (click)="refresh()"
+      [disabled]="loading()"
+    >
+      <i class="bi bi-arrow-clockwise me-1" aria-hidden="true"></i>
+      Refresh
+    </button>
+  </div>
+
+  <p class="text-body-secondary small">
+    Latest lines of the mailserver mail log (<code>/var/log/mail/mail.log</code>). Requires
+    <code>MAILSERVER_EXEC_ENABLED=true</code> and a mounted Docker socket.
+  </p>
+
+  @if (error(); as msg) {
+  <div class="alert alert-danger py-2" role="alert">{{ msg }}</div>
+  } @if (loading()) {
+  <div class="text-center text-body-secondary py-5">
+    <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+    Loading mail log…
+  </div>
+  } @else if (lines().length === 0) {
+  <div class="text-center text-body-secondary py-4">The mail log is empty.</div>
+  } @else {
+  <div class="d-flex align-items-center gap-2 mb-2">
+    <div class="input-group input-group-sm flex-grow-1 mail-log-search">
+      <span class="input-group-text" id="log-search-icon">
+        <i class="bi bi-search" aria-hidden="true"></i>
+      </span>
+      <input
+        type="search"
+        class="form-control"
+        placeholder="Search the log…"
+        aria-label="Search the mail log"
+        aria-describedby="log-search-icon"
+        [value]="filter()"
+        (input)="onFilterInput($event)"
+      />
+    </div>
+    <span class="text-body-secondary small flex-shrink-0">
+      {{ filtered().length }} / {{ entries().length }} lines
+    </span>
+  </div>
+
+  @if (filtered().length === 0) {
+  <div class="text-center text-body-secondary py-4">No line matches this search.</div>
+  } @else {
+  <div class="table-responsive mail-log border rounded flex-fill">
+    <table class="table table-sm table-hover align-middle mb-0">
+      <thead class="sticky-top">
+        <tr>
+          <th scope="col" class="mail-log-date" [attr.aria-sort]="sort.aria('date')">
+            <button
+              type="button"
+              class="btn btn-link btn-sm p-0 text-reset text-decoration-none"
+              (click)="sort.toggle('date')"
+            >
+              Date
+              <i [class]="sort.icon('date')" class="ms-1" aria-hidden="true"></i>
+            </button>
+          </th>
+          <th scope="col" class="mail-log-product" [attr.aria-sort]="sort.aria('product')">
+            <button
+              type="button"
+              class="btn btn-link btn-sm p-0 text-reset text-decoration-none"
+              (click)="sort.toggle('product')"
+            >
+              Product
+              <i [class]="sort.icon('product')" class="ms-1" aria-hidden="true"></i>
+            </button>
+          </th>
+          <th scope="col" class="mail-log-process" [attr.aria-sort]="sort.aria('process')">
+            <button
+              type="button"
+              class="btn btn-link btn-sm p-0 text-reset text-decoration-none"
+              (click)="sort.toggle('process')"
+            >
+              Process
+              <i [class]="sort.icon('process')" class="ms-1" aria-hidden="true"></i>
+            </button>
+          </th>
+          <th scope="col" class="mail-log-pid text-end" [attr.aria-sort]="sort.aria('pid')">
+            <button
+              type="button"
+              class="btn btn-link btn-sm p-0 text-reset text-decoration-none"
+              (click)="sort.toggle('pid')"
+            >
+              PID
+              <i [class]="sort.icon('pid')" class="ms-1" aria-hidden="true"></i>
+            </button>
+          </th>
+          <th scope="col">Message</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (entry of visible(); track $index) {
+        <tr>
+          <td class="font-monospace text-nowrap">
+            @if (entry.date) { {{ entry.date | date: 'yyyy-MM-dd HH:mm:ss' }} } @else { {{ entry.timestamp }} }
+          </td>
+          <td>
+            @if (entry.product) {
+            <span class="badge text-bg-light">{{ entry.product }}</span>
+            }
+          </td>
+          <td class="font-monospace text-nowrap">{{ entry.process }}</td>
+          <td class="font-monospace text-body-secondary text-end">{{ entry.pid }}</td>
+          <td class="font-monospace mail-log-message">{{ entry.message }}</td>
+        </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  } }
+</main>

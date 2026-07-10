@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, OnInit, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  OnInit,
+  signal,
+} from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 
@@ -22,7 +30,7 @@ export class About implements OnInit {
   protected readonly issueUrl = computed(
     () =>
       `https://github.com/${this.repo()}/issues/new?title=${encodeURIComponent('[Bug] ')}&body=${encodeURIComponent(
-        `Version: ${this.appVersion() }\n\nDescribe the issue:\n`,
+        `Version: ${this.appVersion()}\n\nDescribe the issue:\n`,
       )}`,
   );
 

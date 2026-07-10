@@ -1,4 +1,13 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  computed,
+  effect,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { Router } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -24,7 +33,6 @@ const ROLE_BADGE: Record<Role, string> = {
   selector: 'app-users',
   imports: [FormField, DatePipe, UserMultiSelect],
   templateUrl: './users.html',
-  styleUrl: './users.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class Users {
@@ -56,6 +64,7 @@ export class Users {
     required(path.password, { message: 'A password is required' });
     required(path.confirm, { message: 'Please confirm the password' });
   });
+  private readonly usernameInput = viewChild<ElementRef<HTMLInputElement>>('usernameInput');
 
   // Groups management state
   protected readonly activeTab = signal<'users' | 'groups'>('users');
@@ -65,6 +74,7 @@ export class Users {
   protected readonly groupForm = form(this.groupModel, (path) => {
     required(path.name, { message: 'Group name is required' });
   });
+  private readonly groupNameInput = viewChild<ElementRef<HTMLInputElement>>('groupNameInput');
   protected readonly showGroupForm = signal(false);
   /** Id of the group the form edits, or null when it creates a new one. */
   protected readonly editedGroupId = signal<number | null>(null);
@@ -117,6 +127,9 @@ export class Users {
   constructor() {
     void this.loadUsers();
     void this.loadGroups();
+
+    effect(() => this.usernameInput()?.nativeElement.focus());
+    effect(() => this.groupNameInput()?.nativeElement.focus());
   }
 
   /** Creates the group, or saves the one being edited when `editedGroupId` is set. */
@@ -319,6 +332,12 @@ export class Users {
         this.creatingUser.set(false);
       }
     });
+  }
+
+  protected startCreateUser(): void {
+    this.userCreationError.set(null);
+    this.successMessage.set(null);
+    this.showUserForm.set(true);
   }
 
   protected cancelCreateUser(): void {

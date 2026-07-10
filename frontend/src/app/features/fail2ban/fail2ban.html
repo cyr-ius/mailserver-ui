@@ -64,26 +64,43 @@
       <form (submit)="onSavePolicy(); $event.preventDefault()" novalidate>
         <div class="row g-3">
           <div class="col-12 col-lg-4">
-            <label for="policy-bantime" class="form-label">Ban duration (seconds)</label>
-            <input id="policy-bantime" type="number" class="form-control" [formField]="policyForm.bantime" />
+            <label for="policy-bantime" class="form-label small mb-1">Ban duration (seconds)</label>
+            <input
+              id="policy-bantime"
+              type="number"
+              class="form-control form-control-sm"
+              [formField]="policyForm.bantime"
+            />
             <div class="form-text">How long a banned IP stays banned. 604800 = one week.</div>
           </div>
           <div class="col-12 col-lg-4">
-            <label for="policy-findtime" class="form-label">Detection window (seconds)</label>
-            <input id="policy-findtime" type="number" class="form-control" [formField]="policyForm.findtime" />
+            <label for="policy-findtime" class="form-label small mb-1">Detection window (seconds)</label>
+            <input
+              id="policy-findtime"
+              type="number"
+              class="form-control form-control-sm"
+              [formField]="policyForm.findtime"
+            />
             <div class="form-text">Failures are counted over this rolling window.</div>
           </div>
           <div class="col-12 col-lg-4">
-            <label for="policy-maxretry" class="form-label">Failures before ban</label>
-            <input id="policy-maxretry" type="number" class="form-control" [formField]="policyForm.maxretry" />
+            <label for="policy-maxretry" class="form-label small mb-1">Failures before ban</label>
+            <input
+              id="policy-maxretry"
+              type="number"
+              class="form-control form-control-sm"
+              [formField]="policyForm.maxretry"
+            />
             <div class="form-text">Attempts allowed within the window.</div>
           </div>
         </div>
-        <button type="submit" class="btn btn-primary mt-3" [disabled]="savingPolicy()">
-          @if (savingPolicy()) {
-          <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
-          } Save policy
-        </button>
+        <div class="d-flex justify-content-end mt-3">
+          <button type="submit" class="btn btn-sm btn-primary" [disabled]="savingPolicy()">
+            @if (savingPolicy()) {
+            <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+            } Save policy
+          </button>
+        </div>
       </form>
     </div>
   </div>
@@ -108,19 +125,20 @@
       <form (submit)="onBan(); $event.preventDefault()" novalidate>
         <div class="row g-3">
           <div class="col-12 col-lg-9">
-            <label for="ban-ip" class="form-label">IP address</label>
+            <label for="ban-ip" class="form-label small mb-1">IP address</label>
             <input
               id="ban-ip"
               type="text"
-              class="form-control font-monospace"
+              class="form-control form-control-sm font-monospace"
               placeholder="203.0.113.42"
               autocomplete="off"
               [formField]="banForm.ip"
             />
             <div class="form-text">An IPv4 or IPv6 address.</div>
           </div>
-          <div class="col-12 col-lg-3 d-flex align-items-end">
-            <button type="submit" class="btn btn-danger w-100" [disabled]="banning()">
+          <div class="col-12 col-lg-3">
+            <label class="form-label small mb-1 d-none d-lg-inline-block" aria-hidden="true">&nbsp;</label>
+            <button type="submit" class="btn btn-sm btn-danger w-100" [disabled]="banning()">
               @if (banning()) {
               <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
               } Ban
@@ -225,7 +243,94 @@
   } @else if (logLines().length === 0) {
   <div class="text-center text-body-secondary py-4">The fail2ban log is empty.</div>
   } @else {
-  <pre class="fail2ban-log border rounded p-3 mb-0"><code>@for (line of logLines(); track $index) {{{ line }}
-}</code></pre>
-  } }
+  <div class="d-flex align-items-center gap-2 mb-2">
+    <div class="input-group input-group-sm flex-grow-1 fail2ban-log-search">
+      <span class="input-group-text" id="log-search-icon">
+        <i class="bi bi-search" aria-hidden="true"></i>
+      </span>
+      <input
+        type="search"
+        class="form-control"
+        placeholder="Search the log…"
+        aria-label="Search the fail2ban log"
+        aria-describedby="log-search-icon"
+        [value]="logFilter()"
+        (input)="onLogFilterInput($event)"
+      />
+    </div>
+    <span class="text-body-secondary small flex-shrink-0">
+      {{ filteredLog().length }} / {{ logEntries().length }} lines
+    </span>
+  </div>
+
+  @if (filteredLog().length === 0) {
+  <div class="text-center text-body-secondary py-4">No line matches this search.</div>
+  } @else {
+  <div class="table-responsive fail2ban-log border rounded">
+    <table class="table table-sm table-hover align-middle mb-0">
+      <thead class="sticky-top">
+        <tr>
+          <th scope="col" class="fail2ban-log-date" [attr.aria-sort]="logSort.aria('date')">
+            <button
+              type="button"
+              class="btn btn-link btn-sm p-0 text-reset text-decoration-none"
+              (click)="logSort.toggle('date')"
+            >
+              Date
+              <i [class]="logSort.icon('date')" class="ms-1" aria-hidden="true"></i>
+            </button>
+          </th>
+          <th scope="col" class="fail2ban-log-logger" [attr.aria-sort]="logSort.aria('logger')">
+            <button
+              type="button"
+              class="btn btn-link btn-sm p-0 text-reset text-decoration-none"
+              (click)="logSort.toggle('logger')"
+            >
+              Logger
+              <i [class]="logSort.icon('logger')" class="ms-1" aria-hidden="true"></i>
+            </button>
+          </th>
+          <th scope="col" class="fail2ban-log-pid text-end" [attr.aria-sort]="logSort.aria('pid')">
+            <button
+              type="button"
+              class="btn btn-link btn-sm p-0 text-reset text-decoration-none"
+              (click)="logSort.toggle('pid')"
+            >
+              PID
+              <i [class]="logSort.icon('pid')" class="ms-1" aria-hidden="true"></i>
+            </button>
+          </th>
+          <th scope="col" class="fail2ban-log-level" [attr.aria-sort]="logSort.aria('level')">
+            <button
+              type="button"
+              class="btn btn-link btn-sm p-0 text-reset text-decoration-none"
+              (click)="logSort.toggle('level')"
+            >
+              Level
+              <i [class]="logSort.icon('level')" class="ms-1" aria-hidden="true"></i>
+            </button>
+          </th>
+          <th scope="col">Message</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (entry of visibleLog(); track $index) {
+        <tr>
+          <td class="font-monospace text-nowrap">
+            @if (entry.date) { {{ entry.date | date: 'yyyy-MM-dd HH:mm:ss' }} } @else { {{ entry.timestamp }} }
+          </td>
+          <td class="font-monospace text-nowrap">{{ entry.logger }}</td>
+          <td class="font-monospace text-body-secondary text-end">{{ entry.pid }}</td>
+          <td>
+            @if (entry.level) {
+            <span class="badge" [class]="levelBadgeClass(entry.level)"> {{ entry.level }} </span>
+            }
+          </td>
+          <td class="font-monospace fail2ban-log-message">{{ entry.message }}</td>
+        </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  } } }
 </main>

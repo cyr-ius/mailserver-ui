@@ -1,0 +1,77 @@
+<main class="container py-4">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h1 class="h4 mb-0">
+      <i class="bi bi-terminal text-primary me-2" aria-hidden="true"></i>
+      Environment
+    </h1>
+  </div>
+
+  <p class="text-body-secondary small">
+    The environment the mailserver container started with. These values cannot be changed from here: edit the
+    container's environment and restart it.
+  </p>
+
+  @if (error(); as msg) {
+  <div class="alert alert-danger py-2" role="alert">{{ msg }}</div>
+  } @if (loading()) {
+  <div class="text-center text-body-secondary py-5">
+    <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+    Loading the environment…
+  </div>
+  } @else if (environment(); as env) {
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <h2 class="h6 text-uppercase text-body-secondary mb-3">What this UI depends on</h2>
+      <dl class="row mb-0">
+        <dt class="col-12 col-sm-4 text-body-secondary fw-normal">DKIM backend</dt>
+        <dd class="col-12 col-sm-8">
+          <span class="font-monospace">{{ env.dkim_backend }}</span>
+          @if (env.dkim_backend === 'rspamd') {
+          <div class="form-text">
+            Keys are read from <code>rspamd/dkim</code> rather than <code>opendkim/keys</code>.
+          </div>
+          }
+        </dd>
+        <dt class="col-12 col-sm-4 text-body-secondary fw-normal">Global relay host</dt>
+        <dd class="col-12 col-sm-8 font-monospace">{{ env.global_relay_host || 'none' }}</dd>
+        <dt class="col-12 col-sm-4 text-body-secondary fw-normal">Account provisioner</dt>
+        <dd class="col-12 col-sm-8">
+          <span class="font-monospace">{{ env.account_provisioner || 'unknown' }}</span>
+          @if (env.account_provisioner !== 'FILE') {
+          <div class="form-text text-danger">
+            This UI writes account files directly and needs
+            <code>ACCOUNT_PROVISIONER=FILE</code>.
+          </div>
+          }
+        </dd>
+        <dt class="col-12 col-sm-4 text-body-secondary fw-normal">Quotas</dt>
+        <dd class="col-12 col-sm-8">{{ env.quotas_enabled ? 'enabled' : 'disabled' }}</dd>
+        <dt class="col-12 col-sm-4 text-body-secondary fw-normal">ManageSieve</dt>
+        <dd class="col-12 col-sm-8">{{ env.managesieve_enabled ? 'enabled' : 'disabled' }}</dd>
+        <dt class="col-12 col-sm-4 text-body-secondary fw-normal">Postmaster</dt>
+        <dd class="col-12 col-sm-8 font-monospace">{{ env.postmaster_address || 'unset' }}</dd>
+        <dt class="col-12 col-sm-4 text-body-secondary fw-normal mb-0">TLS provisioning</dt>
+        <dd class="col-12 col-sm-8 font-monospace mb-0">{{ env.ssl_type || 'disabled' }}</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <h2 class="h6 text-uppercase text-body-secondary mb-3">All variables</h2>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <tbody>
+            @for (entry of entries(); track entry[0]) {
+            <tr>
+              <td class="font-monospace">{{ entry[0] }}</td>
+              <td class="font-monospace">{{ entry[1] }}</td>
+            </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  }
+</main>
