@@ -1,0 +1,11 @@
+/* The dialog is rendered by hand rather than through the Bootstrap JS API, so
+   the elevation and the blurred backdrop are restated here. */
+.session-expired-modal .modal-content {
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-lg);
+  box-shadow: var(--app-shadow-lg);
+}
+
+.modal-backdrop {
+  backdrop-filter: blur(2px);
+}

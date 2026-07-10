@@ -1,0 +1,39 @@
+@if (expired()) {
+<div class="modal-backdrop fade show"></div>
+
+<div
+  class="modal fade show d-block session-expired-modal"
+  tabindex="-1"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="session-expired-title"
+  aria-describedby="session-expired-text"
+>
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title d-flex align-items-center gap-2" id="session-expired-title">
+          <i class="bi bi-clock-history text-warning" aria-hidden="true"></i>
+          <span>Session expired</span>
+        </h5>
+      </div>
+
+      <div class="modal-body">
+        <p class="mb-0 text-body-secondary" id="session-expired-text">
+          Your session has expired for security reasons. Please sign in again to continue.
+        </p>
+      </div>
+
+      <div class="modal-footer border-0 pt-0">
+        <button #signIn type="button" class="btn btn-primary" [disabled]="signingIn()" (click)="onSignIn()">
+          @if (signingIn()) {
+          <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+          } @else {
+          <i class="bi bi-box-arrow-in-right me-2" aria-hidden="true"></i>
+          } Sign in again
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+}
