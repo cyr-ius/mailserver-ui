@@ -32,10 +32,14 @@ from ..models.fail2ban_models import (
     Fail2banPolicyUpdate,
     Fail2banStatus,
 )
-from . import container
+from . import container, mailserver_service
 from .container import run_in_container
 
 logger = logging.getLogger(__name__)
+
+# The mailserver toggle starting the fail2ban daemon. With it off, the two
+# config files below are stored in the volume but never copied into place.
+_FEATURE_VARIABLE = "ENABLE_FAIL2BAN"
 
 # Ban policy file in the shared config volume, copied to
 # ``/etc/fail2ban/jail.d/user-jail.local`` when the mailserver starts.
@@ -131,10 +135,18 @@ def _parse_jail(name: str, status_text: str) -> Fail2banJail:
 
 
 def get_status() -> Fail2banStatus:
-    """Return the status of every fail2ban jail, including banned IPs."""
+    """Return the status of every fail2ban jail, including banned IPs.
+
+    A mailserver started with ``ENABLE_FAIL2BAN=0`` runs no daemon, and
+    ``fail2ban-client`` would fail against its missing socket. Report the
+    disabled feature instead, so the UI can say so rather than show an error.
+    """
+    _ensure_enabled()
+    if not mailserver_service.feature_enabled(_FEATURE_VARIABLE):
+        return Fail2banStatus()
     jail_names = _parse_jail_names(_run(["fail2ban-client", "status"]))
     jails = [_parse_jail(name, _run(["fail2ban-client", "status", name])) for name in jail_names]
-    return Fail2banStatus(jails=jails)
+    return Fail2banStatus(jails=jails, fail2ban_enabled=True)
 
 
 def list_banned_ips() -> list[BannedIp]:

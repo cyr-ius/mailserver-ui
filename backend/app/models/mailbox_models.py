@@ -79,6 +79,18 @@ class MailboxUsageSummary(BaseModel):
     total_limit_bytes: int | None = None
 
 
+class MailboxFeatures(BaseModel):
+    """The mailserver toggles that decide what mailbox management can achieve.
+
+    Mailbox managers are not administrators, so they cannot read the mailserver
+    environment: the toggles bearing on their own page are surfaced here instead.
+    """
+
+    # False when ``ENABLE_QUOTAS=0``: a quota is stored in ``dovecot-quotas.cf``
+    # but Dovecot never enforces it.
+    quotas_enabled: bool = False
+
+
 class Alias(BaseModel):
     """An alias address that forwards to a mailbox."""
 

@@ -290,6 +290,10 @@ export type SpamConfigScope = 'rules' | 'whitelist-clients' | 'whitelist-recipie
 export interface SpamConfig {
   scope: SpamConfigScope;
   content: string;
+  /** The ENABLE_* toggle guarding this file, e.g. ENABLE_SPAMASSASSIN. */
+  feature: string;
+  /** False when the toggle is off: the file is written but never read. */
+  feature_enabled: boolean;
   /** These files are copied into place at startup: an edit needs a restart. */
   restart_required: boolean;
 }

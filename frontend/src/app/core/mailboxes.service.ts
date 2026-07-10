@@ -7,6 +7,7 @@ import {
   AliasCreateRequest,
   Mailbox,
   MailboxCreateRequest,
+  MailboxFeatures,
   MailboxPasswordUpdateRequest,
   MailboxSieveScript,
   MailboxSieveScriptUpdateRequest,
@@ -26,6 +27,11 @@ export class MailboxesService {
   /** List all mail accounts. */
   async list(): Promise<Mailbox[]> {
     return firstValueFrom(this.http.get<Mailbox[]>('/api/mailboxes'));
+  }
+
+  /** Report the mailserver toggles bearing on mailbox management. */
+  async features(): Promise<MailboxFeatures> {
+    return firstValueFrom(this.http.get<MailboxFeatures>('/api/mailboxes/features'));
   }
 
   /** Report the disk each mail account really occupies (asks Dovecot). */

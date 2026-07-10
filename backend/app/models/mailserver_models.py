@@ -244,6 +244,10 @@ class SpamConfig(BaseModel):
 
     scope: SpamConfigScope
     content: str = ""
+    # The ``ENABLE_*`` toggle guarding this file, and whether the container
+    # started with it on. False means the file is written but never read.
+    feature: str = ""
+    feature_enabled: bool = False
     # docker-mailserver copies these files into place when it starts, so an edit
     # only takes effect after the container is restarted.
     restart_required: bool = True

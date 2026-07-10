@@ -9,6 +9,8 @@ interface ScopeDescriptor {
   scope: SpamConfigScope;
   label: string;
   filename: string;
+  /** The component reading the file, named as the warning names it. */
+  feature: string;
   placeholder: string;
 }
 
@@ -17,6 +19,7 @@ const SCOPES: readonly ScopeDescriptor[] = [
     scope: 'rules',
     label: 'SpamAssassin rules',
     filename: 'spamassassin-rules.cf',
+    feature: 'SpamAssassin',
     placeholder:
       'header LOCAL_DEMO_SUBJECT Subject =~ /\\bdemo\\b/i\nscore LOCAL_DEMO_SUBJECT 2.0\ndescribe LOCAL_DEMO_SUBJECT Subject mentions a demo',
   },
@@ -24,18 +27,21 @@ const SCOPES: readonly ScopeDescriptor[] = [
     scope: 'whitelist-clients',
     label: 'Postgrey clients',
     filename: 'whitelist_clients.local',
+    feature: 'Postgrey',
     placeholder: 'example.com\nmail.partner.example\n/^smtp[0-9]+\\.bulk\\.example$/',
   },
   {
     scope: 'whitelist-recipients',
     label: 'Postgrey recipients',
     filename: 'whitelist_recipients',
+    feature: 'Postgrey',
     placeholder: 'postmaster@example.com\nsupport@example.com',
   },
   {
     scope: 'amavis',
     label: 'Amavis',
     filename: 'amavis.cf',
+    feature: 'Amavis',
     placeholder:
       '$sa_tag_level_deflt = -999;\n$sa_tag2_level_deflt = 6.0;\n$sa_kill_level_deflt = 10.0;\n$final_spam_destiny = D_PASS;\n\n# Do not remove: Amavis requires the file to end with a true value.\n1;',
   },
@@ -53,6 +59,9 @@ export class Spam {
   protected readonly scopes = SCOPES;
   protected readonly scope = signal<SpamConfigScope>('rules');
   protected readonly content = signal('');
+  /** The ENABLE_* variable guarding the open file, and whether it is on. */
+  protected readonly featureVariable = signal('');
+  protected readonly featureEnabled = signal(true);
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly success = signal<string | null>(null);
@@ -71,7 +80,10 @@ export class Spam {
     this.loading.set(true);
     this.error.set(null);
     try {
-      this.content.set((await this.mailserver.getSpamConfig(this.scope())).content);
+      const config = await this.mailserver.getSpamConfig(this.scope());
+      this.content.set(config.content);
+      this.featureVariable.set(config.feature);
+      this.featureEnabled.set(config.feature_enabled);
     } catch (err) {
       this.error.set(mailserverErrorMessage(err));
     } finally {

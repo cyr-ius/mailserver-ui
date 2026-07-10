@@ -114,6 +114,16 @@ _SPAM_CONFIG_FILENAMES: dict[str, str] = {
     "amavis": "amavis.cf",
 }
 
+# The ``ENABLE_*`` toggle guarding each spam-filtering file: docker-mailserver
+# only copies the file out of the config volume when its feature is on, so an
+# edit made while the feature is off is stored and never read.
+_SPAM_CONFIG_VARIABLES: dict[str, str] = {
+    "rules": "ENABLE_SPAMASSASSIN",
+    "whitelist-clients": "ENABLE_POSTGREY",
+    "whitelist-recipients": "ENABLE_POSTGREY",
+    "amavis": "ENABLE_AMAVIS",
+}
+
 # Rspamd's simplified override file, applied after ``rspamd/override.d/``.
 _RSPAMD_COMMANDS_FILENAME = "rspamd/custom-commands.conf"
 
@@ -136,6 +146,16 @@ _LDAP_QUERY_FILTER_VARIABLES: dict[str, str] = {
 
 # A Postfix LDAP map line: ``key = value``, the key a lower_snake identifier.
 _LDAP_LINE_RE = re.compile(r"^[A-Za-z0-9_]+\s*=")
+
+# The ``ENABLE_*`` toggles docker-mailserver ships enabled. Every other toggle
+# defaults to ``0``, so only the exceptions are listed here.
+_FEATURE_DEFAULTS: dict[str, str] = {
+    "ENABLE_AMAVIS": "1",
+    "ENABLE_OPENDKIM": "1",
+    "ENABLE_POLICYD_SPF": "1",
+    "ENABLE_QUOTAS": "1",
+    "ENABLE_UPDATE_CHECK": "1",
+}
 
 # Variables docker-mailserver writes to ``/etc/dms-settings`` that hold a secret.
 # They are read-only here, so their value is of no use to the UI.
@@ -1086,9 +1106,20 @@ def _spam_config_filename(scope: str) -> str:
     return filename
 
 
+def _spam_config_view(scope: SpamConfigScope, content: str) -> SpamConfig:
+    """Return the spam-filtering file for ``scope``, next to the toggle guarding it."""
+    variable = _SPAM_CONFIG_VARIABLES[scope]
+    return SpamConfig(
+        scope=scope,
+        content=content,
+        feature=variable,
+        feature_enabled=feature_enabled(variable),
+    )
+
+
 def get_spam_config(scope: SpamConfigScope) -> SpamConfig:
     """Return the spam-filtering file for ``scope`` (empty when absent)."""
-    return SpamConfig(scope=scope, content=_read_managed_body(_spam_config_filename(scope)))
+    return _spam_config_view(scope, _read_managed_body(_spam_config_filename(scope)))
 
 
 def set_spam_config(scope: SpamConfigScope, content: str) -> SpamConfig:
@@ -1101,7 +1132,7 @@ def set_spam_config(scope: SpamConfigScope, content: str) -> SpamConfig:
     body = content.strip()
     _write_managed_body(_spam_config_filename(scope), body)
     logger.info("Updated the '%s' spam configuration (%d bytes)", scope, len(body))
-    return SpamConfig(scope=scope, content=body)
+    return _spam_config_view(scope, body)
 
 
 # ── Rspamd overrides (custom-commands.conf) ───────────────────────────────────
@@ -1514,14 +1545,24 @@ def _dms_settings() -> dict[str, str]:
     return variables
 
 
-def _flag(variables: dict[str, str], name: str, *, default: str = "0") -> bool:
+def _flag(variables: dict[str, str], name: str) -> bool:
     """Return whether the ``ENABLE_*`` toggle ``name`` is on.
 
     docker-mailserver omits a variable from ``/etc/dms-settings`` only when it
-    never defaulted it, so ``default`` carries the value the mailserver would
-    have assumed — ``1`` for the features it ships enabled.
+    never defaulted it, so a missing one falls back to the value the mailserver
+    would have assumed: ``1`` for the features it ships enabled.
     """
-    return variables.get(name, default) == "1"
+    return variables.get(name, _FEATURE_DEFAULTS.get(name, "0")) == "1"
+
+
+def feature_enabled(name: str) -> bool:
+    """Return whether the container started with the ``ENABLE_*`` toggle ``name`` on.
+
+    Read straight from ``/etc/dms-settings`` so that any service can tell an
+    unused configuration file — one docker-mailserver never copies into place —
+    from a live one.
+    """
+    return _flag(_dms_settings(), name)
 
 
 def dkim_backend() -> str:
@@ -1552,7 +1593,7 @@ def _environment_warnings(variables: dict[str, str]) -> list[EnvironmentWarning]
     running both means two filters, two DKIM signers and two greylists.
     """
     rspamd = _flag(variables, "ENABLE_RSPAMD")
-    amavis = _flag(variables, "ENABLE_AMAVIS", default="1")
+    amavis = _flag(variables, "ENABLE_AMAVIS")
     spamassassin = _flag(variables, "ENABLE_SPAMASSASSIN")
     clamav = _flag(variables, "ENABLE_CLAMAV")
     warnings: list[EnvironmentWarning] = []
@@ -1613,7 +1654,7 @@ def _environment_warnings(variables: dict[str, str]) -> list[EnvironmentWarning]
                 ),
             )
         )
-    if rspamd and _flag(variables, "ENABLE_OPENDKIM", default="1"):
+    if rspamd and _flag(variables, "ENABLE_OPENDKIM"):
         warnings.append(
             EnvironmentWarning(
                 level="warning",
@@ -1644,7 +1685,7 @@ def _environment_warnings(variables: dict[str, str]) -> list[EnvironmentWarning]
                 ),
             )
         )
-    if rspamd and _flag(variables, "ENABLE_POLICYD_SPF", default="1"):
+    if rspamd and _flag(variables, "ENABLE_POLICYD_SPF"):
         warnings.append(
             EnvironmentWarning(
                 level="warning",
@@ -1655,9 +1696,7 @@ def _environment_warnings(variables: dict[str, str]) -> list[EnvironmentWarning]
                 ),
             )
         )
-    if _flag(variables, "ENABLE_UPDATE_CHECK", default="1") and not variables.get(
-        "POSTMASTER_ADDRESS"
-    ):
+    if _flag(variables, "ENABLE_UPDATE_CHECK") and not variables.get("POSTMASTER_ADDRESS"):
         warnings.append(
             EnvironmentWarning(
                 level="warning",
@@ -1694,9 +1733,9 @@ def get_environment() -> MailserverEnvironment:
         managesieve_enabled=_flag(variables, "ENABLE_MANAGESIEVE"),
         quotas_enabled=_flag(variables, "ENABLE_QUOTAS"),
         spam_filter=_spam_filter(variables),
-        amavis_enabled=_flag(variables, "ENABLE_AMAVIS", default="1"),
+        amavis_enabled=_flag(variables, "ENABLE_AMAVIS"),
         clamav_enabled=_flag(variables, "ENABLE_CLAMAV"),
         postgrey_enabled=_flag(variables, "ENABLE_POSTGREY"),
-        update_check_enabled=_flag(variables, "ENABLE_UPDATE_CHECK", default="1"),
+        update_check_enabled=_flag(variables, "ENABLE_UPDATE_CHECK"),
         warnings=_environment_warnings(variables),
     )

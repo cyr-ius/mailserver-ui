@@ -19,6 +19,7 @@ from ..models.mailbox_models import (
     AliasCreate,
     Mailbox,
     MailboxCreate,
+    MailboxFeatures,
     MailboxPasswordUpdate,
     MailboxSieveScript,
     MailboxSieveScriptUpdate,
@@ -41,6 +42,15 @@ ManagerDep = Annotated[SessionUser, Depends(require_mailbox_manager)]
 async def list_mailboxes(_manager: ManagerDep) -> list[Mailbox]:
     """List all mail accounts (mailbox manager)."""
     return mailbox_service.list_mailboxes()
+
+
+@router.get("/features", response_model=MailboxFeatures)
+async def get_features(_manager: ManagerDep) -> MailboxFeatures:
+    """Report the mailserver toggles bearing on mailbox management (mailbox manager).
+
+    Declared before ``/{email}`` so that "features" is not read as an address.
+    """
+    return await run_in_threadpool(mailbox_service.get_features)
 
 
 @router.get("/usage", response_model=MailboxUsageSummary)

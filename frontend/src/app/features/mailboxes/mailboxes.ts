@@ -26,6 +26,8 @@ export class Mailboxes {
   protected readonly loading = signal(true);
   protected readonly loadError = signal<string | null>(null);
   protected readonly loggingOut = signal(false);
+  /** False when ENABLE_QUOTAS=0: a quota is stored but Dovecot never enforces it. */
+  protected readonly quotasEnabled = signal(true);
 
   protected readonly successMessage = signal<string | null>(null);
   protected readonly minLength = MIN_PASSWORD_LENGTH;
@@ -81,6 +83,7 @@ export class Mailboxes {
 
   constructor() {
     void this.loadMailboxes();
+    void this.loadFeatures();
   }
 
   private async loadMailboxes(): Promise<void> {
@@ -92,6 +95,15 @@ export class Mailboxes {
       this.loadError.set('Unable to load mailboxes.');
     } finally {
       this.loading.set(false);
+    }
+  }
+
+  /** Read the toggles the warnings depend on; a failure just leaves them unstated. */
+  private async loadFeatures(): Promise<void> {
+    try {
+      this.quotasEnabled.set((await this.mailboxesService.features()).quotas_enabled);
+    } catch {
+      this.quotasEnabled.set(true);
     }
   }
 

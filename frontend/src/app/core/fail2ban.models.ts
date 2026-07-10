@@ -14,6 +14,8 @@ export interface Fail2banJail {
 /** Aggregated fail2ban status returned by GET /api/fail2ban/status. */
 export interface Fail2banStatus {
   jails: Fail2banJail[];
+  /** False when ENABLE_FAIL2BAN=0: no daemon runs, so no jail exists. */
+  fail2ban_enabled: boolean;
 }
 
 /** A single banned IP and the jail it is banned in. */

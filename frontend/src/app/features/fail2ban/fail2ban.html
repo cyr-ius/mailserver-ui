@@ -36,6 +36,14 @@
     </li>
   </ul>
 
+  @if (!statusLoading() && !fail2banEnabled()) {
+  <div class="alert alert-warning py-2" role="alert">
+    <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
+    Fail2ban is disabled on this container (<code>ENABLE_FAIL2BAN=0</code>). No daemon watches the logs: nothing is ever
+    banned, and the policy below is stored but never read.
+  </div>
+  }
+
   <!-- ── Ban policy ───────────────────────────────────────────────────────────── -->
   @if (activeTab() === 'policy') {
   <p class="text-body-secondary small">

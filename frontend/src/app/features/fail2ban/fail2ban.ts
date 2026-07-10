@@ -102,6 +102,8 @@ export class Fail2ban {
 
   // ── Status / banned IPs ─────────────────────────────────────────────────────
   protected readonly jails = signal<Fail2banJail[]>([]);
+  /** False when the mailserver started with ENABLE_FAIL2BAN=0: no daemon runs. */
+  protected readonly fail2banEnabled = signal(true);
   protected readonly statusLoading = signal(true);
   protected readonly statusError = signal<string | null>(null);
   protected readonly actionSuccess = signal<string | null>(null);
@@ -196,6 +198,7 @@ export class Fail2ban {
     try {
       const status = await this.fail2ban.getStatus();
       this.jails.set(status.jails);
+      this.fail2banEnabled.set(status.fail2ban_enabled);
     } catch (err) {
       this.statusError.set(this.messageFor(err));
     } finally {

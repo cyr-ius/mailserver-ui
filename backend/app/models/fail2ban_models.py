@@ -28,6 +28,9 @@ class Fail2banStatus(BaseModel):
     """Aggregated fail2ban status: every configured jail."""
 
     jails: list[Fail2banJail] = Field(default_factory=list)
+    # False when the mailserver started with ``ENABLE_FAIL2BAN=0``: no daemon
+    # runs, so there is no jail to report and no ban to perform.
+    fail2ban_enabled: bool = False
 
 
 class BannedIp(BaseModel):

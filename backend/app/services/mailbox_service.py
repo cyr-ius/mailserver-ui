@@ -28,11 +28,12 @@ from ..exceptions import BadRequestException, ConflictException, NotFoundExcepti
 from ..models.mailbox_models import (
     Alias,
     Mailbox,
+    MailboxFeatures,
     MailboxSieveScript,
     MailboxUsage,
     MailboxUsageSummary,
 )
-from ..services import container
+from ..services import container, mailserver_service
 from ..services.passwords import hash_dovecot_password
 
 logger = logging.getLogger(__name__)
@@ -95,6 +96,11 @@ def _require_mailbox(address: str) -> None:
     """Raise ``NotFoundException`` when no account exists for ``address``."""
     if address not in _account_addresses():
         raise NotFoundException("Mailbox", address)
+
+
+def get_features() -> MailboxFeatures:
+    """Return the mailserver toggles bearing on mailbox management."""
+    return MailboxFeatures(quotas_enabled=mailserver_service.feature_enabled("ENABLE_QUOTAS"))
 
 
 def list_mailboxes() -> list[Mailbox]:

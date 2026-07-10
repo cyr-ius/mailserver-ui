@@ -45,6 +45,12 @@ export interface MailboxUsageSummary {
   total_limit_bytes: number | null;
 }
 
+/** The mailserver toggles bearing on mailbox management. */
+export interface MailboxFeatures {
+  /** False when ENABLE_QUOTAS=0: a quota is stored but Dovecot never enforces it. */
+  quotas_enabled: boolean;
+}
+
 /** An alias address forwarding to a mailbox. */
 export interface Alias {
   alias: string;
