@@ -68,6 +68,14 @@ export class Mailboxes {
     required(path.alias, { message: 'An alias address is required' });
   });
 
+  // ── Sieve filter ────────────────────────────────────────────────────────────
+  protected readonly sieveContent = signal('');
+  protected readonly sieveConfigured = signal(false);
+  protected readonly sieveLoading = signal(false);
+  protected readonly savingSieve = signal(false);
+  protected readonly removingSieve = signal(false);
+  protected readonly sieveError = signal<string | null>(null);
+
   /** Email of the mailbox being deleted, or null (drives the row spinner). */
   protected readonly deletingEmail = signal<string | null>(null);
 
@@ -133,11 +141,12 @@ export class Mailboxes {
     this.formError.set(null);
     this.quotaError.set(null);
     this.aliasError.set(null);
+    this.sieveError.set(null);
     this.successMessage.set(null);
     this.pwModel.set({ password: '', confirm: '' });
     this.aliasModel.set({ alias: '' });
     this.quotaValue.set(mailbox.quota ?? '');
-    await this.loadAliases(mailbox.email);
+    await Promise.all([this.loadAliases(mailbox.email), this.loadSieve(mailbox.email)]);
   }
 
   // ── Reset password ──────────────────────────────────────────────────────────
@@ -249,6 +258,71 @@ export class Mailboxes {
       this.aliasError.set(this.messageFor(err));
     } finally {
       this.removingAlias.set(null);
+    }
+  }
+
+  // ── Sieve filter ────────────────────────────────────────────────────────────
+
+  private async loadSieve(email: string): Promise<void> {
+    this.sieveLoading.set(true);
+    this.sieveContent.set('');
+    this.sieveConfigured.set(false);
+    try {
+      const script = await this.mailboxesService.getSieveScript(email);
+      this.sieveContent.set(script.content);
+      this.sieveConfigured.set(script.configured);
+    } catch {
+      this.sieveError.set('Unable to load the Sieve filter.');
+    } finally {
+      this.sieveLoading.set(false);
+    }
+  }
+
+  protected onSieveInput(event: Event): void {
+    this.sieveContent.set((event.target as HTMLTextAreaElement).value);
+  }
+
+  protected async onSaveSieve(): Promise<void> {
+    const email = this.managingEmail();
+    if (!email) {
+      return;
+    }
+    this.sieveError.set(null);
+    this.successMessage.set(null);
+    this.savingSieve.set(true);
+    try {
+      const script = await this.mailboxesService.setSieveScript(email, this.sieveContent());
+      this.sieveContent.set(script.content);
+      this.sieveConfigured.set(script.configured);
+      this.successMessage.set(
+        script.configured
+          ? `Sieve filter saved for ${email}. Restart the mailserver to apply it.`
+          : `Sieve filter removed for ${email}.`,
+      );
+    } catch (err) {
+      this.sieveError.set(this.messageFor(err));
+    } finally {
+      this.savingSieve.set(false);
+    }
+  }
+
+  protected async onRemoveSieve(): Promise<void> {
+    const email = this.managingEmail();
+    if (!email || !confirm(`Remove the Sieve filter of ${email}?`)) {
+      return;
+    }
+    this.sieveError.set(null);
+    this.successMessage.set(null);
+    this.removingSieve.set(true);
+    try {
+      await this.mailboxesService.deleteSieveScript(email);
+      this.sieveContent.set('');
+      this.sieveConfigured.set(false);
+      this.successMessage.set(`Sieve filter removed for ${email}.`);
+    } catch (err) {
+      this.sieveError.set(this.messageFor(err));
+    } finally {
+      this.removingSieve.set(false);
     }
   }
 

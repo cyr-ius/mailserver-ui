@@ -28,10 +28,16 @@ import {
   Restriction,
   RestrictionCreateRequest,
   RestrictionKind,
+  RspamdCommand,
+  RspamdCommandsUpdateRequest,
+  RspamdOverrides,
   ServiceStatus,
   SieveScope,
   SieveScript,
   SieveScriptUpdateRequest,
+  SpamConfig,
+  SpamConfigScope,
+  SpamConfigUpdateRequest,
   SystemAlias,
   SystemAliasCreateRequest,
   TlsCertificate,
@@ -40,9 +46,9 @@ import {
 /**
  * Access to the docker-mailserver global configuration API (admin only). Wraps
  * the calls managing SMTP relays, Postfix and Dovecot overrides, aliases, Sieve
- * scripts and DKIM records stored in the shared config volume, plus the
- * read-only runtime views (queue, TLS, DNS, environment, service health and mail
- * statistics); callers own the resulting data.
+ * scripts, DKIM records, the Rspamd overrides and the spam-filtering files stored
+ * in the shared config volume, plus the read-only runtime views (queue, TLS, DNS,
+ * environment, service health and mail statistics); callers own the resulting data.
  */
 @Injectable({ providedIn: 'root' })
 export class MailserverService {
@@ -237,6 +243,32 @@ export class MailserverService {
   async setSieveScript(scope: SieveScope, content: string): Promise<SieveScript> {
     const body: SieveScriptUpdateRequest = { content };
     return firstValueFrom(this.http.put<SieveScript>(`/api/mailserver/sieve/${scope}`, body));
+  }
+
+  // ── Spam filter configuration files ─────────────────────────────────────────
+
+  /** Return the SpamAssassin rules or a Postgrey whitelist. */
+  async getSpamConfig(scope: SpamConfigScope): Promise<SpamConfig> {
+    return firstValueFrom(this.http.get<SpamConfig>(`/api/mailserver/spam/${scope}`));
+  }
+
+  /** Replace a spam-filtering file; takes effect when the mailserver restarts. */
+  async setSpamConfig(scope: SpamConfigScope, content: string): Promise<SpamConfig> {
+    const body: SpamConfigUpdateRequest = { content };
+    return firstValueFrom(this.http.put<SpamConfig>(`/api/mailserver/spam/${scope}`, body));
+  }
+
+  // ── Rspamd overrides ────────────────────────────────────────────────────────
+
+  /** Return the directives of rspamd/custom-commands.conf, in file order. */
+  async getRspamdOverrides(): Promise<RspamdOverrides> {
+    return firstValueFrom(this.http.get<RspamdOverrides>('/api/mailserver/rspamd'));
+  }
+
+  /** Replace the Rspamd custom commands; takes effect when the mailserver restarts. */
+  async setRspamdOverrides(commands: RspamdCommand[]): Promise<RspamdOverrides> {
+    const body: RspamdCommandsUpdateRequest = { commands };
+    return firstValueFrom(this.http.put<RspamdOverrides>('/api/mailserver/rspamd', body));
   }
 
   // ── Postfix mail queue ──────────────────────────────────────────────────────

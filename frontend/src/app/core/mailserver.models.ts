@@ -202,6 +202,20 @@ export interface DomainDnsRecords {
   records: DnsRecord[];
 }
 
+/** Which content filter scans incoming mail. */
+export type SpamFilter = 'rspamd' | 'spamassassin' | 'none';
+
+/** How badly a misconfiguration bites: `danger` breaks a feature outright. */
+export type WarningLevel = 'danger' | 'warning';
+
+/** One inconsistency found in the environment the container started with. */
+export interface EnvironmentWarning {
+  level: WarningLevel;
+  /** The variables the message is about. */
+  variables: string[];
+  message: string;
+}
+
 /**
  * The mailserver's effective environment, read from /etc/dms-settings. These
  * values are baked in when the container starts and cannot be changed here.
@@ -217,6 +231,14 @@ export interface MailserverEnvironment {
   account_provisioner: string;
   managesieve_enabled: boolean;
   quotas_enabled: boolean;
+  /** Which content filter is in charge, and the services backing it. */
+  spam_filter: SpamFilter;
+  amavis_enabled: boolean;
+  clamav_enabled: boolean;
+  postgrey_enabled: boolean;
+  update_check_enabled: boolean;
+  /** Contradictions between the toggles above, worst first. */
+  warnings: EnvironmentWarning[];
 }
 
 /**
@@ -236,16 +258,81 @@ export interface ServiceStatus {
   detail: string;
 }
 
-/** Delivery counters parsed from the mail log over a trailing time window. */
+/**
+ * Delivery counters parsed from the mail log over a trailing time window.
+ *
+ * `sent`/`deferred`/`bounced`/`rejected`/`greylisted` are the mutually exclusive
+ * outcomes of one delivery attempt. `spam` and `virus` are a separate axis — why
+ * a message was refused — so they do not add up with the outcomes.
+ */
 export interface MailStats {
   period_hours: number;
+  /** Distinct messages accepted, deduplicated by message-id across Amavis reinjection. */
   received: number;
   sent: number;
   rejected: number;
+  /** Senders deferred on purpose by Postgrey or Rspamd, to be retried shortly. */
+  greylisted: number;
   bounced: number;
   deferred: number;
+  spam: number;
+  virus: number;
   /** False when no log line could be dated: the counters are then meaningless. */
   parsed: boolean;
   /** Lines scanned; a full scan means the window may be truncated. */
   scanned_lines: number;
+}
+
+/** Which spam-filtering file to edit. */
+export type SpamConfigScope = 'rules' | 'whitelist-clients' | 'whitelist-recipients' | 'amavis';
+
+/** A free-form spam-filtering file from the docker-mailserver config volume. */
+export interface SpamConfig {
+  scope: SpamConfigScope;
+  content: string;
+  /** These files are copied into place at startup: an edit needs a restart. */
+  restart_required: boolean;
+}
+
+/** Request schema replacing a spam-filtering file. */
+export interface SpamConfigUpdateRequest {
+  content: string;
+}
+
+/**
+ * A directive of rspamd/custom-commands.conf. Each one writes into a file under
+ * /etc/rspamd/override.d/ when the mailserver starts.
+ */
+export type RspamdCommandKind =
+  | 'set-common-option'
+  | 'set-option-for-controller'
+  | 'set-option-for-proxy'
+  | 'enable-module'
+  | 'disable-module'
+  | 'set-option-for-module'
+  | 'add-line';
+
+/**
+ * One Rspamd directive. The fields carry whichever arguments the directive
+ * takes; the unused ones stay empty. `target` is a module name, or the override
+ * file name for `add-line`; `value` is the option value, or the verbatim line.
+ */
+export interface RspamdCommand {
+  kind: RspamdCommandKind;
+  target: string;
+  option: string;
+  value: string;
+}
+
+/** The Rspamd custom commands, plus whether Rspamd is the active filter. */
+export interface RspamdOverrides {
+  commands: RspamdCommand[];
+  /** False when ENABLE_RSPAMD=0: the file is written but nothing reads it. */
+  rspamd_enabled: boolean;
+  restart_required: boolean;
+}
+
+/** Request schema replacing the full set of Rspamd commands. */
+export interface RspamdCommandsUpdateRequest {
+  commands: RspamdCommand[];
 }

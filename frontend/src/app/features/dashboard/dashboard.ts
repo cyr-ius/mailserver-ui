@@ -184,6 +184,13 @@ export class Dashboard {
     }),
   );
 
+  /** Contradictions between the container's environment variables, worst first. */
+  protected readonly environmentWarnings = computed(() => this.environment().data?.warnings ?? []);
+
+  protected readonly hasDangerWarning = computed(() =>
+    this.environmentWarnings().some((warning) => warning.level === 'danger'),
+  );
+
   protected readonly oidcUserCount = computed(
     () => (this.accounts().data?.users ?? []).filter((u) => u.provider === 'oidc').length,
   );

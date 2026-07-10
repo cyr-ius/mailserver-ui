@@ -293,6 +293,60 @@
                     }
                   </form>
                 </div>
+
+                <!-- Sieve filter -->
+                <div class="col-12">
+                  <h3 class="h6 text-uppercase text-body-secondary mb-2">
+                    <i class="bi bi-filter me-1" aria-hidden="true"></i>
+                    Sieve filter
+                  </h3>
+                  <p class="form-text mt-0 mb-2">
+                    <code>{{ m.email }}.dovecot.sieve</code> — the account's personal filter, compiled when the
+                    mailserver starts. Saving an empty script removes it.
+                  </p>
+                  @if (sieveLoading()) {
+                  <div class="text-body-secondary small py-2">
+                    <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+                    Loading the filter…
+                  </div>
+                  } @else {
+                  <textarea
+                    class="form-control form-control-sm font-monospace"
+                    rows="8"
+                    spellcheck="false"
+                    [attr.aria-label]="'Sieve filter of ' + m.email"
+                    placeholder='require ["fileinto"];&#10;&#10;if header :contains "subject" "newsletter" {&#10;  fileinto "INBOX.News";&#10;}'
+                    [value]="sieveContent()"
+                    (input)="onSieveInput($event)"
+                  ></textarea>
+                  <div class="d-flex justify-content-end gap-2 mt-2">
+                    @if (sieveConfigured()) {
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-danger"
+                      (click)="onRemoveSieve()"
+                      [disabled]="savingSieve() || removingSieve()"
+                    >
+                      @if (removingSieve()) {
+                      <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+                      } Remove filter
+                    </button>
+                    }
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-primary"
+                      (click)="onSaveSieve()"
+                      [disabled]="savingSieve() || removingSieve()"
+                    >
+                      @if (savingSieve()) {
+                      <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+                      } Save filter
+                    </button>
+                  </div>
+                  } @if (sieveError(); as msg) {
+                  <span class="text-danger small">{{ msg }}</span>
+                  }
+                </div>
               </div>
             </td>
           </tr>

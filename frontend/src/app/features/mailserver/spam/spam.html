@@ -1,0 +1,69 @@
+<main class="container py-4">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h1 class="h4 mb-0">
+      <i class="bi bi-shield-slash text-primary me-2" aria-hidden="true"></i>
+      Spam filter
+    </h1>
+  </div>
+
+  <p class="text-body-secondary small">
+    Custom SpamAssassin rules, the Postgrey whitelists exempting a client or a recipient from greylisting, and the
+    Amavis overrides. docker-mailserver copies these files into place when it starts: restart the container to apply a
+    change.
+  </p>
+
+  @if (success(); as msg) {
+  <div class="alert alert-success py-2" role="alert">{{ msg }}</div>
+  } @if (error(); as msg) {
+  <div class="alert alert-danger py-2" role="alert">{{ msg }}</div>
+  }
+
+  <div class="btn-group btn-group-sm mb-3" role="group" aria-label="Spam configuration file">
+    @for (entry of scopes; track entry.scope) {
+    <button
+      type="button"
+      class="btn"
+      [class.btn-primary]="scope() === entry.scope"
+      [class.btn-outline-primary]="scope() !== entry.scope"
+      (click)="setScope(entry.scope)"
+    >
+      {{ entry.label }}
+    </button>
+    }
+  </div>
+
+  @if (loading()) {
+  <div class="text-center text-body-secondary py-5">
+    <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+    Loading the file…
+  </div>
+  } @else {
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <p class="form-text mt-0 mb-2">
+        <code>{{ current().filename }}</code>
+        @switch (scope()) { @case ('rules') { — SpamAssassin only validates these rules when it starts. } @case
+        ('whitelist-clients') { — one per line: a client host name, a domain, or a <code>/regex/</code>. } @case
+        ('whitelist-recipients') { — one per line: a recipient address, a domain, or a <code>/regex/</code>. } @case
+        ('amavis') { — Perl, replacing <code>/etc/amavis/conf.d/50-user</code>; it must end with <code>1;</code>. } }
+      </p>
+      <textarea
+        class="form-control font-monospace"
+        rows="14"
+        spellcheck="false"
+        [attr.aria-label]="current().label"
+        [placeholder]="current().placeholder"
+        [value]="content()"
+        (input)="onContent($event)"
+      ></textarea>
+      <div class="d-flex justify-content-end mt-3">
+        <button type="button" class="btn btn-sm btn-primary" (click)="onSave()" [disabled]="saving()">
+          @if (saving()) {
+          <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+          } Save file
+        </button>
+      </div>
+    </div>
+  </div>
+  }
+</main>

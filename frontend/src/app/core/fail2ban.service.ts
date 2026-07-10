@@ -6,6 +6,8 @@ import {
   BannedIp,
   BanRequest,
   Fail2banActionResult,
+  Fail2banConfig,
+  Fail2banConfigUpdateRequest,
   Fail2banLog,
   Fail2banPolicy,
   Fail2banPolicyUpdateRequest,
@@ -57,5 +59,16 @@ export class Fail2banService {
   /** Replace the ban policy; takes effect when the mailserver restarts. */
   async setPolicy(body: Fail2banPolicyUpdateRequest): Promise<Fail2banPolicy> {
     return firstValueFrom(this.http.put<Fail2banPolicy>('/api/fail2ban/policy', body));
+  }
+
+  /** Return the raw fail2ban-fail2ban.cf daemon configuration. */
+  async getConfig(): Promise<Fail2banConfig> {
+    return firstValueFrom(this.http.get<Fail2banConfig>('/api/fail2ban/config'));
+  }
+
+  /** Replace the daemon configuration; takes effect when the mailserver restarts. */
+  async setConfig(content: string): Promise<Fail2banConfig> {
+    const body: Fail2banConfigUpdateRequest = { content };
+    return firstValueFrom(this.http.put<Fail2banConfig>('/api/fail2ban/config', body));
   }
 }

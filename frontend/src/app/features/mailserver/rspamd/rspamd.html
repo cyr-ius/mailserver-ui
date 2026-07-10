@@ -1,0 +1,148 @@
+<main class="container py-4">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h1 class="h4 mb-0">
+      <i class="bi bi-funnel text-primary me-2" aria-hidden="true"></i>
+      Rspamd overrides
+    </h1>
+  </div>
+
+  <p class="text-body-secondary small">
+    Simple <code>option = value</code> overrides, stored in <code>rspamd/custom-commands.conf</code> and applied to
+    <code>/etc/rspamd/override.d/</code> when the mailserver starts: restart the container to apply a change. For
+    anything the directives below cannot express, drop a UCL file into <code>rspamd/override.d/</code> instead.
+  </p>
+
+  @if (success(); as msg) {
+  <div class="alert alert-success py-2" role="alert">{{ msg }}</div>
+  } @if (error(); as msg) {
+  <div class="alert alert-danger py-2" role="alert">{{ msg }}</div>
+  } @if (!loading() && !rspamdEnabled()) {
+  <div class="alert alert-warning py-2" role="alert">
+    <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
+    Rspamd is disabled on this container (<code>ENABLE_RSPAMD=0</code>). These commands are stored but never read.
+  </div>
+  } @if (loading()) {
+  <div class="text-center text-body-secondary py-5">
+    <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+    Loading the Rspamd commands…
+  </div>
+  } @else {
+  <div class="card shadow-sm">
+    <div class="card-body">
+      @if (!hasCommands()) {
+      <p class="text-body-secondary mb-3">No Rspamd command defined yet.</p>
+      } @else {
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead>
+            <tr>
+              <th scope="col" style="width: 22%">Directive</th>
+              <th scope="col" style="width: 20%">Module / file</th>
+              <th scope="col" style="width: 20%">Option</th>
+              <th scope="col">Value</th>
+              <th scope="col" class="text-end" style="width: 1%"></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (command of commands(); track $index) {
+            <tr>
+              <td>
+                <select
+                  class="form-select form-select-sm font-monospace"
+                  aria-label="Directive"
+                  [value]="command.kind"
+                  (change)="onKind($index, $event)"
+                >
+                  @for (entry of kinds; track entry.kind) {
+                  <option [value]="entry.kind" [selected]="entry.kind === command.kind">{{ entry.kind }}</option>
+                  }
+                </select>
+              </td>
+              <td>
+                @if (descriptor(command).target; as target) {
+                <input
+                  type="text"
+                  class="form-control form-control-sm font-monospace"
+                  [attr.aria-label]="target.label"
+                  [placeholder]="target.placeholder"
+                  [value]="command.target"
+                  (input)="onField($index, 'target', $event)"
+                />
+                } @else {
+                <span class="text-body-secondary small">—</span>
+                }
+              </td>
+              <td>
+                @if (descriptor(command).option; as option) {
+                <input
+                  type="text"
+                  class="form-control form-control-sm font-monospace"
+                  aria-label="Option"
+                  [placeholder]="option.placeholder"
+                  [value]="command.option"
+                  (input)="onField($index, 'option', $event)"
+                />
+                } @else {
+                <span class="text-body-secondary small">—</span>
+                }
+              </td>
+              <td>
+                @if (descriptor(command).value; as value) {
+                <input
+                  type="text"
+                  class="form-control form-control-sm font-monospace"
+                  aria-label="Value"
+                  [placeholder]="value.placeholder"
+                  [value]="command.value"
+                  (input)="onField($index, 'value', $event)"
+                />
+                } @else {
+                <span class="text-body-secondary small">—</span>
+                }
+              </td>
+              <td class="text-end">
+                <button
+                  type="button"
+                  class="btn btn-sm btn-outline-danger"
+                  aria-label="Remove the command"
+                  (click)="removeCommand($index)"
+                >
+                  <i class="bi bi-trash" aria-hidden="true"></i>
+                </button>
+              </td>
+            </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      }
+
+      <div class="d-flex justify-content-between gap-2 mt-2">
+        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="addCommand()">
+          <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>
+          Add command
+        </button>
+        <button type="button" class="btn btn-sm btn-primary" (click)="onSave()" [disabled]="saving()">
+          @if (saving()) {
+          <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+          } Save changes
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm mt-4">
+    <div class="card-body">
+      <h2 class="h6 text-uppercase text-body-secondary mb-3">What each directive writes</h2>
+      <dl class="row mb-0 small">
+        @for (entry of kinds; track entry.kind) {
+        <dt class="col-sm-5 col-lg-4 font-monospace fw-normal">{{ entry.kind }}</dt>
+        <dd class="col-sm-7 col-lg-8 text-body-secondary">
+          <code>{{ entry.hint }}</code>
+        </dd>
+        }
+      </dl>
+    </div>
+  </div>
+  }
+</main>

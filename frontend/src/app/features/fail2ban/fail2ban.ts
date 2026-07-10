@@ -135,6 +135,10 @@ export class Fail2ban {
     required(path.maxretry, { message: 'A retry count is required' });
   });
 
+  /** The raw fail2ban-fail2ban.cf, shown next to the policy it does not overlap. */
+  protected readonly daemonConfig = signal('');
+  protected readonly savingConfig = signal(false);
+
   // ── Log ─────────────────────────────────────────────────────────────────────
   protected readonly logLines = signal<string[]>([]);
   protected readonly logLoading = signal(false);
@@ -242,13 +246,17 @@ export class Fail2ban {
     this.policyLoading.set(true);
     this.policyError.set(null);
     try {
-      const policy = await this.fail2ban.getPolicy();
+      const [policy, config] = await Promise.all([
+        this.fail2ban.getPolicy(),
+        this.fail2ban.getConfig(),
+      ]);
       this.policyModel.set({
         bantime: policy.bantime,
         findtime: policy.findtime,
         maxretry: policy.maxretry,
       });
       this.policyConfigured.set(policy.configured);
+      this.daemonConfig.set(config.content);
       this.policyLoaded.set(true);
     } catch (err) {
       this.policyError.set(this.messageFor(err));
@@ -284,6 +292,27 @@ export class Fail2ban {
         this.savingPolicy.set(false);
       }
     });
+  }
+
+  // ── Daemon configuration ────────────────────────────────────────────────────
+
+  protected onDaemonConfig(event: Event): void {
+    this.daemonConfig.set((event.target as HTMLTextAreaElement).value);
+  }
+
+  protected async onSaveConfig(): Promise<void> {
+    this.policyError.set(null);
+    this.policySuccess.set(null);
+    this.savingConfig.set(true);
+    try {
+      const config = await this.fail2ban.setConfig(this.daemonConfig());
+      this.daemonConfig.set(config.content);
+      this.policySuccess.set('Daemon configuration saved. Restart the mailserver to apply it.');
+    } catch (err) {
+      this.policyError.set(this.messageFor(err));
+    } finally {
+      this.savingConfig.set(false);
+    }
   }
 
   // ── Log ─────────────────────────────────────────────────────────────────────

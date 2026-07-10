@@ -8,14 +8,16 @@ import {
   Mailbox,
   MailboxCreateRequest,
   MailboxPasswordUpdateRequest,
+  MailboxSieveScript,
+  MailboxSieveScriptUpdateRequest,
   MailboxUsageSummary,
   QuotaUpdateRequest,
 } from './mailbox.models';
 
 /**
  * Access to the mailbox-management API (admin only). Wraps the CRUD calls
- * against docker-mailserver accounts, quotas and aliases; callers own the
- * resulting data.
+ * against docker-mailserver accounts, quotas, aliases and personal Sieve
+ * filters; callers own the resulting data.
  */
 @Injectable({ providedIn: 'root' })
 export class MailboxesService {
@@ -79,6 +81,28 @@ export class MailboxesService {
       this.http.delete<void>(
         `/api/mailboxes/${encodeURIComponent(email)}/aliases/${encodeURIComponent(alias)}`,
       ),
+    );
+  }
+
+  /** Return the personal Sieve filter of a mail account (empty when it has none). */
+  async getSieveScript(email: string): Promise<MailboxSieveScript> {
+    return firstValueFrom(
+      this.http.get<MailboxSieveScript>(`/api/mailboxes/${encodeURIComponent(email)}/sieve`),
+    );
+  }
+
+  /** Replace the personal Sieve filter of a mail account; an empty script removes it. */
+  async setSieveScript(email: string, content: string): Promise<MailboxSieveScript> {
+    const body: MailboxSieveScriptUpdateRequest = { content };
+    return firstValueFrom(
+      this.http.put<MailboxSieveScript>(`/api/mailboxes/${encodeURIComponent(email)}/sieve`, body),
+    );
+  }
+
+  /** Remove the personal Sieve filter of a mail account. */
+  async deleteSieveScript(email: string): Promise<void> {
+    await firstValueFrom(
+      this.http.delete<void>(`/api/mailboxes/${encodeURIComponent(email)}/sieve`),
     );
   }
 }

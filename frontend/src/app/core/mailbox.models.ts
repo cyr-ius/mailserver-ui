@@ -53,3 +53,17 @@ export interface Alias {
 export interface AliasCreateRequest {
   alias: string;
 }
+
+/** The personal Sieve filter of one account (<email>.dovecot.sieve). */
+export interface MailboxSieveScript {
+  email: string;
+  content: string;
+  /** False when the account has no personal script yet. */
+  configured: boolean;
+  /** The script is compiled into the maildir when the mailserver starts. */
+  restart_required: boolean;
+}
+
+export interface MailboxSieveScriptUpdateRequest {
+  content: string;
+}

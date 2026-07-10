@@ -55,6 +55,14 @@ export const routes: Routes = [
         loadComponent: () => import('./features/mailserver/sieve/sieve').then((m) => m.Sieve),
       },
       {
+        path: 'spam',
+        loadComponent: () => import('./features/mailserver/spam/spam').then((m) => m.Spam),
+      },
+      {
+        path: 'rspamd',
+        loadComponent: () => import('./features/mailserver/rspamd/rspamd').then((m) => m.Rspamd),
+      },
+      {
         path: 'dkim',
         loadComponent: () => import('./features/mailserver/dkim/dkim').then((m) => m.Dkim),
       },

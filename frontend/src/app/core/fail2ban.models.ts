@@ -55,3 +55,17 @@ export interface Fail2banPolicyUpdateRequest {
   findtime: number;
   maxretry: number;
 }
+
+/**
+ * The raw contents of fail2ban-fail2ban.cf: the daemon's own options — log level,
+ * database retention — rather than any jail.
+ */
+export interface Fail2banConfig {
+  content: string;
+  /** Copied to /etc/fail2ban/fail2ban.local at startup: an edit needs a restart. */
+  restart_required: boolean;
+}
+
+export interface Fail2banConfigUpdateRequest {
+  content: string;
+}

@@ -104,6 +104,32 @@
       </form>
     </div>
   </div>
+
+  <div class="card shadow-sm mt-4">
+    <div class="card-body">
+      <h2 class="h6 text-uppercase text-body-secondary mb-2">Daemon configuration</h2>
+      <p class="form-text mt-0 mb-2">
+        <code>fail2ban-fail2ban.cf</code> — fail2ban's own options rather than any jail, copied to
+        <code>/etc/fail2ban/fail2ban.local</code> at startup.
+      </p>
+      <textarea
+        class="form-control font-monospace"
+        rows="10"
+        spellcheck="false"
+        aria-label="Fail2ban daemon configuration"
+        placeholder="[Definition]&#10;loglevel = INFO&#10;dbpurgeage = 648000"
+        [value]="daemonConfig()"
+        (input)="onDaemonConfig($event)"
+      ></textarea>
+      <div class="d-flex justify-content-end mt-3">
+        <button type="button" class="btn btn-sm btn-primary" (click)="onSaveConfig()" [disabled]="savingConfig()">
+          @if (savingConfig()) {
+          <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+          } Save configuration
+        </button>
+      </div>
+    </div>
+  </div>
   } }
 
   <!-- ── Bans & jails ─────────────────────────────────────────────────────────── -->

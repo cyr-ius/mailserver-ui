@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 
 import { MailserverService } from '../../../core/mailserver.service';
 import { MailserverEnvironment } from '../../../core/mailserver.models';
@@ -8,6 +9,7 @@ import { mailserverErrorMessage } from '../mailserver.utils';
 @Component({
   selector: 'app-mailserver-environment',
   templateUrl: './environment.html',
+  imports: [RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class Environment {

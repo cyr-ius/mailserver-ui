@@ -330,7 +330,7 @@
             No dated line in the mail log — nothing to report for this window.
           </p>
           } @else {
-          <div class="row text-center g-3">
+          <div class="row row-cols-3 row-cols-sm-5 text-center g-3">
             <div class="col">
               <div class="h4 mb-0 text-primary">{{ counters.received }}</div>
               <div class="small text-body-secondary">Received</div>
@@ -364,8 +364,38 @@
               <div class="small text-body-secondary">Rejected</div>
             </div>
           </div>
+
+          <!-- Deferrals the filters caused, and why mail was refused: a rejected
+               spam is counted both here and under Rejected above -->
+          <div class="row row-cols-3 text-center g-3 mt-0 pt-3 border-top">
+            <div class="col">
+              <div class="h4 mb-0 text-body-secondary">{{ counters.greylisted }}</div>
+              <div class="small text-body-secondary">Greylisted</div>
+            </div>
+            <div class="col">
+              <div
+                class="h4 mb-0"
+                [class.text-warning]="counters.spam > 0"
+                [class.text-body-secondary]="counters.spam === 0"
+              >
+                {{ counters.spam }}
+              </div>
+              <div class="small text-body-secondary">Spam</div>
+            </div>
+            <div class="col">
+              <div
+                class="h4 mb-0"
+                [class.text-danger]="counters.virus > 0"
+                [class.text-body-secondary]="counters.virus === 0"
+              >
+                {{ counters.virus }}
+              </div>
+              <div class="small text-body-secondary">Virus</div>
+            </div>
+          </div>
           <p class="small text-body-secondary mb-0 mt-3">
-            Parsed from the last {{ counters.scanned_lines }} mail log lines.
+            Parsed from the last {{ counters.scanned_lines }} mail log lines. Greylisted senders come back on their own;
+            spam and virus counts overlap the rejections above.
           </p>
           } }
         </div>
@@ -436,9 +466,21 @@
     <div class="col-lg-6">
       <a class="card h-100 shadow-sm text-decoration-none text-reset" routerLink="/mailserver/environment">
         <div class="card-body">
-          <h6 class="card-title text-muted mb-3">
-            <i class="bi bi-gear me-1" aria-hidden="true"></i>
-            Configuration
+          <h6 class="card-title text-muted mb-3 d-flex align-items-center justify-content-between">
+            <span>
+              <i class="bi bi-gear me-1" aria-hidden="true"></i>
+              Configuration
+            </span>
+            @if (environmentWarnings().length) {
+            <span
+              class="badge"
+              [class.text-bg-danger]="hasDangerWarning()"
+              [class.text-bg-warning]="!hasDangerWarning()"
+            >
+              <i class="bi bi-exclamation-triangle-fill me-1" aria-hidden="true"></i>
+              {{ environmentWarnings().length }}
+            </span>
+            }
           </h6>
           @if (environment().loading) {
           <p class="placeholder-glow mb-0">
@@ -464,6 +506,39 @@
             <dt class="col-5 fw-normal text-body-secondary">Global relay</dt>
             <dd class="col-7 text-truncate mb-2">{{ env.global_relay_host || 'none' }}</dd>
 
+            <dt class="col-5 fw-normal text-body-secondary">Spam filter</dt>
+            <dd class="col-7 mb-2">
+              <span
+                class="badge"
+                [class.text-bg-success]="env.spam_filter !== 'none'"
+                [class.text-bg-secondary]="env.spam_filter === 'none'"
+              >
+                {{ env.spam_filter }}
+              </span>
+            </dd>
+
+            <dt class="col-5 fw-normal text-body-secondary">Antivirus</dt>
+            <dd class="col-7 mb-2">
+              <span
+                class="badge"
+                [class.text-bg-success]="env.clamav_enabled"
+                [class.text-bg-secondary]="!env.clamav_enabled"
+              >
+                {{ env.clamav_enabled ? 'ClamAV' : 'disabled' }}
+              </span>
+            </dd>
+
+            <dt class="col-5 fw-normal text-body-secondary">Greylisting</dt>
+            <dd class="col-7 mb-2">
+              <span
+                class="badge"
+                [class.text-bg-success]="env.postgrey_enabled"
+                [class.text-bg-secondary]="!env.postgrey_enabled"
+              >
+                {{ env.postgrey_enabled ? 'Postgrey' : 'disabled' }}
+              </span>
+            </dd>
+
             <dt class="col-5 fw-normal text-body-secondary">Quotas</dt>
             <dd class="col-7 mb-2">
               <span
@@ -486,7 +561,12 @@
               </span>
             </dd>
           </dl>
-          }
+          @if (environmentWarnings().length) {
+          <p class="small mb-0 mt-3" [class.text-danger]="hasDangerWarning()">
+            <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
+            {{ environmentWarnings()[0].message }}
+          </p>
+          } }
         </div>
       </a>
     </div>

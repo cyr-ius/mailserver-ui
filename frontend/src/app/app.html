@@ -121,6 +121,22 @@
           </a>
           <a
             class="nav-link"
+            routerLink="/mailserver/spam"
+            routerLinkActive="active"
+            [routerLinkActiveOptions]="{ exact: true }"
+          >
+            Spam filter
+          </a>
+          <a
+            class="nav-link"
+            routerLink="/mailserver/rspamd"
+            routerLinkActive="active"
+            [routerLinkActiveOptions]="{ exact: true }"
+          >
+            Rspamd
+          </a>
+          <a
+            class="nav-link"
             routerLink="/mailserver/dkim"
             routerLinkActive="active"
             [routerLinkActiveOptions]="{ exact: true }"
