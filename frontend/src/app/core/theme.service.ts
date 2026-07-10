@@ -1,79 +1,166 @@
-import { Injectable, signal, computed, inject, effect } from '@angular/core';
+import { DOCUMENT, DestroyRef, Injectable, computed, effect, inject, signal } from '@angular/core';
 
+/** The preference expressed by the user. */
 export type ThemeMode = 'light' | 'dark' | 'auto';
 
+/** The theme actually applied to the document, once `auto` is resolved. */
+export type ResolvedTheme = 'light' | 'dark';
+
+const STORAGE_KEY = 'mailserver-ui-theme';
+const DARK_MEDIA_QUERY = '(prefers-color-scheme: dark)';
+const TRANSITION_CLASS = 'theme-transition';
+const TRANSITION_DURATION_MS = 250;
+
+/** Mobile address bar color, kept in sync with `--app-canvas`. */
+const THEME_COLOR: Record<ResolvedTheme, string> = {
+  light: '#eef1f6',
+  dark: '#0d1220',
+};
+
+const THEME_MODES: readonly ThemeMode[] = ['light', 'dark', 'auto'];
+
+/** A mode, as presented in the theme selectors. */
+export interface ThemeOption {
+  readonly mode: ThemeMode;
+  readonly label: string;
+  readonly icon: string;
+}
+
+export const THEME_OPTIONS: readonly ThemeOption[] = [
+  { mode: 'light', label: 'Light', icon: 'bi-sun-fill' },
+  { mode: 'dark', label: 'Dark', icon: 'bi-moon-stars-fill' },
+  { mode: 'auto', label: 'System', icon: 'bi-circle-half' },
+];
+
+function isThemeMode(value: string | null): value is ThemeMode {
+  return value !== null && THEME_MODES.includes(value as ThemeMode);
+}
+
 /**
- * Service de gestion du thème (clair/sombre/auto)
- * Persiste la préférence dans localStorage
+ * Light/dark theme management.
+ *
+ * The preference is persisted in `localStorage` and applied through the
+ * `data-bs-theme` attribute on `<html>`, read by Bootstrap and the `--app-*` tokens.
  */
 @Injectable({ providedIn: 'root' })
 export class ThemeService {
-  private readonly STORAGE_KEY = 'mailserver-ui-theme';
+  private readonly document = inject(DOCUMENT);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly window = this.document.defaultView;
 
-  private readonly _themeMode = signal<ThemeMode>(this.loadThemeFromStorage());
-  private readonly _isDarkMode = computed(() => {
-    const mode = this._themeMode();
+  // `matchMedia` is missing from some render-less environments (SSR, jsdom):
+  // there the theme simply falls back to `light`.
+  private readonly mediaQuery =
+    typeof this.window?.matchMedia === 'function' ? this.window.matchMedia(DARK_MEDIA_QUERY) : null;
+  private readonly systemPrefersDark = signal(this.mediaQuery?.matches ?? false);
+  private readonly mode = signal<ThemeMode>(this.readStoredMode());
+
+  private transitionTimer: ReturnType<typeof setTimeout> | undefined;
+
+  /** The selected mode (`light`, `dark` or `auto`). */
+  readonly themeMode = this.mode.asReadonly();
+
+  /** The theme that is effectively applied. */
+  readonly resolvedTheme = computed<ResolvedTheme>(() => {
+    const mode = this.mode();
     if (mode === 'auto') {
-      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+      return this.systemPrefersDark() ? 'dark' : 'light';
     }
-    return mode === 'dark';
+    return mode;
   });
 
-  /** Le mode de thème actuellement sélectionné (light/dark/auto) */
-  readonly themeMode = computed(() => this._themeMode());
-
-  /** True si le thème sombre doit être appliqué */
-  readonly isDarkMode = this._isDarkMode;
+  readonly isDarkMode = computed(() => this.resolvedTheme() === 'dark');
 
   constructor() {
-    // Appliquer le thème au démarrage
-    this.applyTheme(this._isDarkMode());
+    this.watchSystemPreference();
 
-    // Réappliquer le thème quand isDarkMode change
+    // The first pass runs synchronously with the initial render: no animation
+    // on the theme already set by the anti-FOUC script in `index.html`.
+    let initial = true;
     effect(() => {
-      this.applyTheme(this._isDarkMode());
+      const theme = this.resolvedTheme();
+      this.applyTheme(theme, { animate: !initial });
+      initial = false;
     });
-
-    // Écouter les changements de préférence système quand en mode auto
-    if (this._themeMode() === 'auto') {
-      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-      mediaQuery.addEventListener('change', () => {
-        // Forcer une mise à jour de isDarkMode en changeant le signal
-        this._themeMode.set('auto');
-      });
-    }
   }
 
-  /** Changer le mode de thème */
+  /** Select a mode and persist it. */
   setThemeMode(mode: ThemeMode): void {
-    this._themeMode.set(mode);
-    localStorage.setItem(this.STORAGE_KEY, mode);
+    this.mode.set(mode);
+    this.persistMode(mode);
+  }
 
-    // Réenregistrer le listener si passé à auto
-    if (mode === 'auto') {
-      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-      mediaQuery.addEventListener('change', () => {
-        this._themeMode.set('auto');
-      });
+  /** Switch between light and dark, starting from the currently visible theme. */
+  toggle(): void {
+    this.setThemeMode(this.isDarkMode() ? 'light' : 'dark');
+  }
+
+  /**
+   * Track the system preference. The dedicated signal guarantees that `auto`
+   * reacts to changes, which a `set('auto')` would not: writing the same value
+   * back into a signal notifies no consumer.
+   */
+  private watchSystemPreference(): void {
+    const mediaQuery = this.mediaQuery;
+    if (!mediaQuery) {
+      return;
+    }
+
+    const onChange = (event: MediaQueryListEvent): void => {
+      this.systemPrefersDark.set(event.matches);
+    };
+
+    mediaQuery.addEventListener('change', onChange);
+    this.destroyRef.onDestroy(() => {
+      mediaQuery.removeEventListener('change', onChange);
+      clearTimeout(this.transitionTimer);
+    });
+  }
+
+  private applyTheme(theme: ResolvedTheme, options: { animate: boolean }): void {
+    const root = this.document.documentElement;
+
+    if (options.animate) {
+      this.playTransition(root);
+    }
+
+    root.setAttribute('data-bs-theme', theme);
+    this.syncThemeColor(theme);
+  }
+
+  /**
+   * Fade the colors for the duration of the switch only: leaving the transition
+   * permanently enabled would delay every color change in the application
+   * (hovers, focus, navigation).
+   */
+  private playTransition(root: HTMLElement): void {
+    root.classList.add(TRANSITION_CLASS);
+    clearTimeout(this.transitionTimer);
+    this.transitionTimer = setTimeout(() => {
+      root.classList.remove(TRANSITION_CLASS);
+    }, TRANSITION_DURATION_MS);
+  }
+
+  private syncThemeColor(theme: ResolvedTheme): void {
+    const meta = this.document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    meta?.setAttribute('content', THEME_COLOR[theme]);
+  }
+
+  private readStoredMode(): ThemeMode {
+    try {
+      const stored = this.window?.localStorage.getItem(STORAGE_KEY) ?? null;
+      return isThemeMode(stored) ? stored : 'auto';
+    } catch {
+      // localStorage unavailable (private browsing, blocked cookies).
+      return 'auto';
     }
   }
 
-  /** Charger la préférence de thème depuis localStorage */
-  private loadThemeFromStorage(): ThemeMode {
-    const stored = localStorage.getItem(this.STORAGE_KEY) as ThemeMode | null;
-    if (stored && ['light', 'dark', 'auto'].includes(stored)) {
-      return stored;
-    }
-    return 'auto';
-  }
-
-  /** Appliquer le thème en modifiant l'attribut data-bs-theme */
-  private applyTheme(isDark: boolean): void {
-    const root = document.documentElement;
-    if (isDark) {
-      root.setAttribute('data-bs-theme', 'dark');
-    } else {
-      root.removeAttribute('data-bs-theme');
+  private persistMode(mode: ThemeMode): void {
+    try {
+      this.window?.localStorage.setItem(STORAGE_KEY, mode);
+    } catch {
+      // The theme still applies for the current session.
     }
   }
 }

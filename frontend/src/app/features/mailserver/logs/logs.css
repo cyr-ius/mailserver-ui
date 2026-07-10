@@ -1,0 +1,48 @@
+/* The page fills the main pane so the log body scrolls instead of the page. */
+:host {
+  display: block;
+  height: 100%;
+}
+
+.mail-log {
+  /* `min-height: 0` lets the flex item shrink below its content and scroll;
+     without it the table would grow the page and defeat the sticky header. */
+  min-height: 0;
+  overflow: auto;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  background-color: var(--app-surface-sunken);
+  color: var(--app-text);
+}
+
+/* The header stays visible while the log body scrolls. */
+.mail-log thead th {
+  background-color: var(--app-surface-sunken);
+  white-space: nowrap;
+}
+
+.mail-log-search {
+  max-width: 24rem;
+}
+
+/* Fixed widths for the syslog fields; the message takes whatever is left. */
+.mail-log-date {
+  width: 12rem;
+}
+
+.mail-log-product {
+  width: 8rem;
+}
+
+.mail-log-process {
+  width: 11rem;
+}
+
+.mail-log-pid {
+  width: 5rem;
+}
+
+.mail-log-message {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}

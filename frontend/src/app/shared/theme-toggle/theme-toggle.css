@@ -1,0 +1,27 @@
+.theme-toggle-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  line-height: 1;
+}
+
+/* The caret would crowd a square icon-only trigger. */
+.theme-toggle-trigger::after {
+  display: none;
+}
+
+.dropdown-menu {
+  min-width: 10rem;
+}
+
+.dropdown-item {
+  cursor: pointer;
+}
+
+.dropdown-item i {
+  width: 1rem;
+  text-align: center;
+}

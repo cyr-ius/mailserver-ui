@@ -1,0 +1,45 @@
+.user-menu-trigger {
+  line-height: 1;
+  border: 0;
+  color: var(--bs-body-color);
+}
+
+.user-menu-trigger:hover,
+.user-menu-trigger:focus-visible,
+.user-menu-trigger.show {
+  background-color: var(--bs-secondary-bg);
+  color: var(--bs-body-color);
+}
+
+/* The chevron below replaces it, so it stays right after the name. */
+.user-menu-trigger::after {
+  display: none;
+}
+
+.user-menu-name {
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-menu-caret {
+  font-size: 0.7em;
+}
+
+.dropdown-menu {
+  min-width: 12rem;
+}
+
+.user-menu-identity {
+  max-width: 16rem;
+}
+
+.dropdown-item {
+  cursor: pointer;
+}
+
+.dropdown-item i {
+  width: 1rem;
+  text-align: center;
+}

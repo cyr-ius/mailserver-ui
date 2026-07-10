@@ -1,43 +1,29 @@
 .login-page {
-  min-height: 100vh;
-  background: linear-gradient(135deg, var(--bs-primary-bg-subtle), var(--bs-body-bg));
+  min-height: 100dvh;
+  background: radial-gradient(1200px 600px at 50% -10%, var(--app-accent-soft), transparent 70%), var(--app-canvas);
   padding-inline: 1rem;
 }
 
 .login-card {
   width: 100%;
   max-width: 26rem;
-  border: 0;
-  border-radius: 1rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-lg);
+  box-shadow: var(--app-shadow-lg) !important;
+}
+
+.login-header {
+  position: relative;
+}
+
+/* Taken out of the flow so the logo stays centred on the card. */
+.login-theme {
+  position: absolute;
+  top: 0;
+  right: 0;
 }
 
 .login-logo {
   font-size: 2.75rem;
   line-height: 1;
-}
-
-.theme-selector {
-  margin-top: 0.25rem;
-}
-
-.theme-selector .btn-group-sm .btn {
-  padding: 0.35rem 0.5rem;
-  font-size: 0.85rem;
-}
-
-.theme-selector .btn-check:checked + .btn {
-  background-color: var(--bs-primary);
-  border-color: var(--bs-primary);
-  color: white;
-}
-
-@media (max-width: 576px) {
-  .theme-selector {
-    margin-top: 0;
-  }
-
-  .theme-selector .btn-group-sm .btn {
-    padding: 0.25rem 0.4rem;
-    font-size: 0.75rem;
-  }
 }

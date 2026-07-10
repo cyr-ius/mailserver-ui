@@ -1,5 +1,6 @@
 .control {
-  min-height: calc(1.5em + 0.75rem + 2px);
+  /* Matches the height of a Bootstrap .form-control-sm. */
+  min-height: calc(1.5em + 0.5rem + 2px);
   height: auto;
   cursor: text;
 }

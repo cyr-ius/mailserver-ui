@@ -1,4 +1,168 @@
-/* Global styles */
+/* ==========================================================================
+   Mailserver UI — design tokens & Bootstrap 5.3 theme overrides
+   --------------------------------------------------------------------------
+   Layer 1 : `--app-*` tokens, the single source of truth for both schemes.
+   Layer 2 : Bootstrap `--bs-*` variables remapped onto those tokens.
+   Layer 3 : component polish that Bootstrap variables cannot reach.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Layer 1 — Light scheme tokens
+   -------------------------------------------------------------------------- */
+:root,
+[data-bs-theme="light"] {
+  color-scheme: light;
+
+  /* Surfaces */
+  --app-canvas: #eef1f6;
+  --app-surface: #ffffff;
+  --app-surface-muted: #f6f8fb;
+  --app-surface-sunken: #eaeef4;
+
+  /* Borders */
+  --app-border: #dde2ea;
+  --app-border-strong: #c3cbd8;
+
+  /* Text */
+  --app-text: #1f2937;
+  --app-text-strong: #0f172a;
+  /* Darker than slate-500: secondary text sits on the tinted canvas too. */
+  --app-text-muted: #5b6a80;
+
+  /* Accent — `solid` backs filled buttons, `accent` tints text and links */
+  --app-accent: #2563eb;
+  --app-accent-hover: #1d4ed8;
+  --app-accent-solid: #2563eb;
+  --app-accent-solid-hover: #1d4ed8;
+  --app-accent-solid-active: #1e40af;
+  --app-accent-contrast: #ffffff;
+  --app-accent-soft: #e7effd;
+  --app-accent-soft-border: #c3d7fb;
+  --app-focus-ring: rgb(37 99 235 / 22%);
+
+  /* Elevation */
+  --app-shadow-sm: 0 1px 2px rgb(15 23 42 / 6%), 0 1px 3px rgb(15 23 42 / 7%);
+  --app-shadow-md: 0 4px 14px rgb(15 23 42 / 8%);
+  --app-shadow-lg: 0 16px 40px rgb(15 23 42 / 12%);
+
+  /* Interaction wash — neutral hover/active fills */
+  --app-hover: rgb(15 23 42 / 4%);
+  --app-active: rgb(15 23 42 / 7%);
+
+  /* Shape */
+  --app-radius-sm: 0.375rem;
+  --app-radius: 0.625rem;
+  --app-radius-lg: 0.875rem;
+}
+
+/* --------------------------------------------------------------------------
+   Layer 1 — Dark scheme tokens
+   Deep slate rather than pure black: less halation, keeps elevation readable.
+   -------------------------------------------------------------------------- */
+[data-bs-theme="dark"] {
+  color-scheme: dark;
+
+  --app-canvas: #0d1220;
+  --app-surface: #151c2b;
+  --app-surface-muted: #1b2333;
+  --app-surface-sunken: #0a0f1b;
+
+  --app-border: #2a3346;
+  --app-border-strong: #3c4860;
+
+  --app-text: #e5eaf3;
+  --app-text-strong: #f8fafc;
+  --app-text-muted: #97a3b8;
+
+  --app-accent: #6fa2f8;
+  --app-accent-hover: #8fb8fa;
+  --app-accent-solid: #3b6fe0;
+  --app-accent-solid-hover: #4a7ce8;
+  --app-accent-solid-active: #2f5fc7;
+  --app-accent-contrast: #ffffff;
+  --app-accent-soft: rgb(111 162 248 / 14%);
+  --app-accent-soft-border: rgb(111 162 248 / 30%);
+  --app-focus-ring: rgb(111 162 248 / 32%);
+
+  --app-shadow-sm: 0 1px 2px rgb(0 0 0 / 32%), 0 1px 3px rgb(0 0 0 / 24%);
+  --app-shadow-md: 0 4px 14px rgb(0 0 0 / 36%);
+  --app-shadow-lg: 0 16px 40px rgb(0 0 0 / 48%);
+
+  --app-hover: rgb(255 255 255 / 5%);
+  --app-active: rgb(255 255 255 / 9%);
+}
+
+/* --------------------------------------------------------------------------
+   Layer 2 — Bootstrap variable remapping
+   -------------------------------------------------------------------------- */
+:root,
+[data-bs-theme="light"] {
+  --bs-body-bg: var(--app-canvas);
+  --bs-body-bg-rgb: 238, 241, 246;
+  --bs-body-color: var(--app-text);
+  --bs-body-color-rgb: 31, 41, 55;
+
+  --bs-emphasis-color: var(--app-text-strong);
+  --bs-emphasis-color-rgb: 15, 23, 42;
+  --bs-heading-color: var(--app-text-strong);
+
+  --bs-secondary-color: var(--app-text-muted);
+  --bs-secondary-color-rgb: 91, 106, 128;
+  --bs-secondary-bg: var(--app-surface-muted);
+  --bs-tertiary-color: var(--app-text-muted);
+  --bs-tertiary-bg: var(--app-surface-muted);
+
+  --bs-border-color: var(--app-border);
+  --bs-border-color-translucent: rgb(15 23 42 / 10%);
+
+  --bs-primary: var(--app-accent);
+  --bs-primary-rgb: 37, 99, 235;
+  --bs-primary-bg-subtle: var(--app-accent-soft);
+  --bs-primary-border-subtle: var(--app-accent-soft-border);
+  --bs-primary-text-emphasis: var(--app-accent-hover);
+
+  --bs-link-color: var(--app-accent);
+  --bs-link-color-rgb: 37, 99, 235;
+  --bs-link-hover-color: var(--app-accent-hover);
+
+  --bs-code-color: #b3246b;
+}
+
+[data-bs-theme="dark"] {
+  --bs-body-bg: var(--app-canvas);
+  --bs-body-bg-rgb: 13, 18, 32;
+  --bs-body-color: var(--app-text);
+  --bs-body-color-rgb: 229, 234, 243;
+
+  --bs-emphasis-color: var(--app-text-strong);
+  --bs-emphasis-color-rgb: 248, 250, 252;
+  --bs-heading-color: var(--app-text-strong);
+
+  --bs-secondary-color: var(--app-text-muted);
+  --bs-secondary-color-rgb: 151, 163, 184;
+  --bs-secondary-bg: var(--app-surface-muted);
+  --bs-tertiary-color: var(--app-text-muted);
+  --bs-tertiary-bg: var(--app-surface-muted);
+
+  --bs-border-color: var(--app-border);
+  --bs-border-color-translucent: rgb(255 255 255 / 12%);
+
+  --bs-primary: var(--app-accent);
+  --bs-primary-rgb: 111, 162, 248;
+  --bs-primary-bg-subtle: var(--app-accent-soft);
+  --bs-primary-border-subtle: var(--app-accent-soft-border);
+  --bs-primary-text-emphasis: var(--app-accent-hover);
+
+  --bs-link-color: var(--app-accent);
+  --bs-link-color-rgb: 111, 162, 248;
+  --bs-link-hover-color: var(--app-accent-hover);
+
+  --bs-code-color: #f0a5c8;
+}
+
+/* --------------------------------------------------------------------------
+   Layer 3 — Base
+   -------------------------------------------------------------------------- */
 html,
 body {
   height: 100%;
@@ -6,21 +170,285 @@ body {
 
 body {
   margin: 0;
-  min-height: 100vh;
+  min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Dark mode support via data-bs-theme attribute */
-:root[data-bs-theme="dark"] {
-  color-scheme: dark;
+/* Only the theme swap animates; page navigation must stay instant. */
+html.theme-transition,
+html.theme-transition *,
+html.theme-transition *::before,
+html.theme-transition *::after {
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease,
+    fill 0.2s ease;
+  transition-delay: 0s !important;
 }
 
-html:not([data-bs-theme="dark"]) {
-  color-scheme: light;
+::selection {
+  background-color: var(--app-accent-soft);
+  color: var(--app-text-strong);
 }
 
-/* Auto theme based on system preference */
-@media (prefers-color-scheme: dark) {
-  html:not([data-bs-theme]) {
-    color-scheme: dark;
+/* Accessibility: a single visible focus treatment across every control. */
+:focus-visible {
+  outline: 2px solid var(--app-accent);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+.btn:focus-visible,
+.form-control:focus,
+.form-select:focus,
+.form-check-input:focus {
+  border-color: var(--app-accent);
+  box-shadow: 0 0 0 0.25rem var(--app-focus-ring);
+}
+
+/* --------------------------------------------------------------------------
+   Layer 3 — Scrollbars
+   -------------------------------------------------------------------------- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--app-border-strong) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--app-border-strong);
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--app-text-muted);
+}
+
+/* --------------------------------------------------------------------------
+   Layer 3 — Surfaces
+   Bootstrap defaults `--bs-card-bg` to `--bs-body-bg`; the canvas is tinted,
+   so cards are pinned to the raised surface token instead.
+   -------------------------------------------------------------------------- */
+.card {
+  --bs-card-bg: var(--app-surface);
+  --bs-card-border-color: var(--app-border);
+  --bs-card-border-radius: var(--app-radius);
+  --bs-card-cap-bg: var(--app-surface-muted);
+}
+
+.card.shadow-sm {
+  box-shadow: var(--app-shadow-sm) !important;
+}
+
+.modal-content,
+.offcanvas,
+.dropdown-menu {
+  background-color: var(--app-surface);
+  border-color: var(--app-border);
+}
+
+.dropdown-menu {
+  --bs-dropdown-bg: var(--app-surface);
+  --bs-dropdown-border-color: var(--app-border);
+  --bs-dropdown-link-hover-bg: var(--app-hover);
+  --bs-dropdown-link-active-bg: var(--app-accent-soft);
+  --bs-dropdown-link-active-color: var(--app-accent-hover);
+  --bs-dropdown-border-radius: var(--app-radius);
+  box-shadow: var(--app-shadow-lg);
+  padding: 0.375rem;
+}
+
+.dropdown-item {
+  border-radius: var(--app-radius-sm);
+}
+
+/* --------------------------------------------------------------------------
+   Layer 3 — Buttons
+   `.btn-primary` hard-codes its own `--bs-btn-*` values, so overriding
+   `--bs-primary` alone leaves filled buttons on the stock Bootstrap blue.
+   -------------------------------------------------------------------------- */
+.btn {
+  --bs-btn-border-radius: var(--app-radius-sm);
+  --bs-btn-font-weight: 500;
+  --bs-btn-focus-box-shadow: 0 0 0 0.25rem var(--app-focus-ring);
+}
+
+.btn-primary {
+  --bs-btn-bg: var(--app-accent-solid);
+  --bs-btn-border-color: var(--app-accent-solid);
+  --bs-btn-color: var(--app-accent-contrast);
+  --bs-btn-hover-bg: var(--app-accent-solid-hover);
+  --bs-btn-hover-border-color: var(--app-accent-solid-hover);
+  --bs-btn-hover-color: var(--app-accent-contrast);
+  --bs-btn-active-bg: var(--app-accent-solid-active);
+  --bs-btn-active-border-color: var(--app-accent-solid-active);
+  --bs-btn-active-color: var(--app-accent-contrast);
+  --bs-btn-disabled-bg: var(--app-accent-solid);
+  --bs-btn-disabled-border-color: var(--app-accent-solid);
+  --bs-btn-disabled-color: var(--app-accent-contrast);
+}
+
+.btn-outline-primary {
+  --bs-btn-color: var(--app-accent);
+  --bs-btn-border-color: var(--app-accent-soft-border);
+  --bs-btn-hover-bg: var(--app-accent-solid);
+  --bs-btn-hover-border-color: var(--app-accent-solid);
+  --bs-btn-hover-color: var(--app-accent-contrast);
+  --bs-btn-active-bg: var(--app-accent-solid-active);
+  --bs-btn-active-border-color: var(--app-accent-solid-active);
+  --bs-btn-disabled-color: var(--app-accent);
+  --bs-btn-disabled-border-color: var(--app-accent-soft-border);
+}
+
+.btn-outline-secondary {
+  --bs-btn-color: var(--app-text);
+  --bs-btn-border-color: var(--app-border-strong);
+  --bs-btn-hover-bg: var(--app-hover);
+  --bs-btn-hover-border-color: var(--app-border-strong);
+  --bs-btn-hover-color: var(--app-text-strong);
+  --bs-btn-active-bg: var(--app-active);
+  --bs-btn-active-border-color: var(--app-border-strong);
+  --bs-btn-active-color: var(--app-text-strong);
+  --bs-btn-disabled-color: var(--app-text-muted);
+  --bs-btn-disabled-border-color: var(--app-border);
+}
+
+.btn-secondary {
+  --bs-btn-bg: var(--app-surface-muted);
+  --bs-btn-border-color: var(--app-border-strong);
+  --bs-btn-color: var(--app-text);
+  --bs-btn-hover-bg: var(--app-surface-sunken);
+  --bs-btn-hover-border-color: var(--app-border-strong);
+  --bs-btn-hover-color: var(--app-text-strong);
+  --bs-btn-active-bg: var(--app-surface-sunken);
+  --bs-btn-active-color: var(--app-text-strong);
+}
+
+/* --------------------------------------------------------------------------
+   Layer 3 — Forms
+   -------------------------------------------------------------------------- */
+.form-control,
+.form-select {
+  background-color: var(--app-surface);
+  border-color: var(--app-border-strong);
+  border-radius: var(--app-radius-sm);
+  color: var(--app-text);
+}
+
+.form-control:disabled,
+.form-select:disabled {
+  background-color: var(--app-surface-muted);
+  color: var(--app-text-muted);
+}
+
+.form-control::placeholder {
+  color: var(--app-text-muted);
+  opacity: 0.75;
+}
+
+.form-check-input {
+  border-color: var(--app-border-strong);
+}
+
+.form-check-input:checked {
+  background-color: var(--app-accent-solid);
+  border-color: var(--app-accent-solid);
+}
+
+.form-label {
+  font-weight: 500;
+  color: var(--app-text);
+}
+
+.form-text {
+  color: var(--app-text-muted);
+}
+
+/* --------------------------------------------------------------------------
+   Layer 3 — Tables
+   -------------------------------------------------------------------------- */
+.table {
+  --bs-table-bg: transparent;
+  --bs-table-border-color: var(--app-border);
+  --bs-table-hover-bg: var(--app-hover);
+  --bs-table-hover-color: var(--app-text-strong);
+  --bs-table-striped-bg: var(--app-hover);
+  vertical-align: middle;
+}
+
+.table > thead th {
+  font-weight: 600;
+  font-size: 0.8125rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--app-text-muted);
+  border-bottom-color: var(--app-border);
+  background-color: transparent;
+}
+
+/* --------------------------------------------------------------------------
+   Layer 3 — Navigation
+   -------------------------------------------------------------------------- */
+.nav-tabs {
+  --bs-nav-tabs-border-color: var(--app-border);
+  --bs-nav-tabs-link-active-bg: var(--app-surface);
+  --bs-nav-tabs-link-active-border-color: var(--app-border) var(--app-border) var(--app-surface);
+  --bs-nav-tabs-link-active-color: var(--app-text-strong);
+  --bs-nav-link-color: var(--app-text-muted);
+  --bs-nav-link-hover-color: var(--app-accent);
+}
+
+/* --------------------------------------------------------------------------
+   Layer 3 — Feedback
+   -------------------------------------------------------------------------- */
+.alert {
+  --bs-alert-border-radius: var(--app-radius-sm);
+  border-width: 1px;
+}
+
+.badge {
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+/* --------------------------------------------------------------------------
+   Layer 3 — Code
+   -------------------------------------------------------------------------- */
+code,
+kbd,
+pre,
+samp {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+pre {
+  background-color: var(--app-surface-sunken);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-sm);
+  color: var(--app-text);
+  padding: 0.875rem 1rem;
+}
+
+/* --------------------------------------------------------------------------
+   Layer 3 — Motion
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  html.theme-transition,
+  html.theme-transition *,
+  html.theme-transition *::before,
+  html.theme-transition *::after {
+    transition: none !important;
   }
 }

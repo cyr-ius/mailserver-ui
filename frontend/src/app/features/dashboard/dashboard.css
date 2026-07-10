@@ -1,7 +1,4 @@
-/* Dashboard specific styles */
 .card {
-  border: none;
-  border-radius: 0.5rem;
   transition:
     transform 0.2s ease-in-out,
     box-shadow 0.2s ease-in-out;
@@ -9,7 +6,7 @@
 
 .card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+  box-shadow: var(--app-shadow-md) !important;
 }
 
 .card-body h3,
@@ -18,7 +15,10 @@
   letter-spacing: -0.5px;
 }
 
-main {
-  min-height: calc(100vh - 56px);
-  background-color: #f8f9fa;
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .card:hover {
+    transform: none;
+    transition: none;
+  }
 }

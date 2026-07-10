@@ -2,10 +2,29 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Frontend</title>
+    <title>Mailserver UI</title>
     <base href="/" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="icon" type="image/x-icon" href="favicon.ico" />
+    <meta name="theme-color" content="#eef1f6" />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <script>
+      // Resolve the theme before first paint, otherwise a dark-mode reload
+      // flashes the light canvas until Angular boots. Mirrors ThemeService.
+      (function () {
+        try {
+          var stored = localStorage.getItem("mailserver-ui-theme");
+          var mode = stored === "light" || stored === "dark" ? stored : "auto";
+          var theme =
+            mode === "auto" ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : mode;
+          document.documentElement.setAttribute("data-bs-theme", theme);
+          document
+            .querySelector('meta[name="theme-color"]')
+            .setAttribute("content", theme === "dark" ? "#0d1220" : "#eef1f6");
+        } catch (error) {
+          document.documentElement.setAttribute("data-bs-theme", "light");
+        }
+      })();
+    </script>
   </head>
   <body>
     <app-root></app-root>

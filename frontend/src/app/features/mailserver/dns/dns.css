@@ -1,0 +1,5 @@
+.record-value {
+  display: block;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}

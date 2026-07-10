@@ -3,6 +3,38 @@
   overflow: auto;
   font-size: 0.8125rem;
   line-height: 1.4;
-  white-space: pre;
-  background-color: var(--bs-tertiary-bg);
+  background-color: var(--app-surface-sunken);
+  color: var(--app-text);
+}
+
+/* The header stays visible while the log body scrolls. */
+.fail2ban-log thead th {
+  background-color: var(--app-surface-sunken);
+  white-space: nowrap;
+}
+
+.fail2ban-log-search {
+  max-width: 24rem;
+}
+
+/* Fixed widths for the parsed fields; the message takes whatever is left. */
+.fail2ban-log-date {
+  width: 12rem;
+}
+
+.fail2ban-log-logger {
+  width: 9rem;
+}
+
+.fail2ban-log-pid {
+  width: 5rem;
+}
+
+.fail2ban-log-level {
+  width: 7rem;
+}
+
+.fail2ban-log-message {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
