@@ -40,7 +40,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(
-    title="PowerDNS UI",
+    title="Mailserver UI",
     description="REST API for docker mailserver management",
     version=settings.app_version,
     openapi_url="/api/openapi.json" if settings.swagger_enabled else None,
@@ -97,7 +97,7 @@ async def swagger_ui() -> HTMLResponse:
         title="Docker Mailserver API",
         swagger_js_url="/api/static/swagger/swagger-ui-bundle.js",
         swagger_css_url="/api/static/swagger/swagger-ui.css",
-        swagger_favicon_url="/favicon.ico",
+        swagger_favicon_url="/favicon.svg",
     )
 
 
