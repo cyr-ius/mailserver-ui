@@ -2,15 +2,35 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 
-import { PasswordChangeRequest, User, UserCreateRequest } from './auth.models';
+import {
+  PasswordChangeRequest,
+  SelfPasswordChangeRequest,
+  User,
+  UserCreateRequest,
+} from './auth.models';
 
 /**
- * Access to the user-management API (admin only). Stateless: callers own the
- * resulting data; the service just wraps the HTTP calls.
+ * Access to the user API: the `me` calls are open to any signed-in user, the
+ * rest is admin-only. Stateless: callers own the resulting data; the service
+ * just wraps the HTTP calls.
  */
 @Injectable({ providedIn: 'root' })
 export class UsersService {
   private readonly http = inject(HttpClient);
+
+  /** Full profile of the signed-in user, group-granted role included. */
+  async me(): Promise<User> {
+    return firstValueFrom(this.http.get<User>('/api/users/me'));
+  }
+
+  /** Change the signed-in user's own password. Local accounts only. */
+  async changeOwnPassword(currentPassword: string, newPassword: string): Promise<User> {
+    const body: SelfPasswordChangeRequest = {
+      current_password: currentPassword,
+      new_password: newPassword,
+    };
+    return firstValueFrom(this.http.patch<User>('/api/users/me/password', body));
+  }
 
   /** List all local and OIDC users. */
   async list(): Promise<User[]> {

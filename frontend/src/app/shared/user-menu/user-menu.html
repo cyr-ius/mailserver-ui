@@ -1,0 +1,56 @@
+@if (user(); as u) {
+<div class="dropdown user-menu">
+  <button
+    type="button"
+    class="btn btn-sm user-menu-trigger d-flex align-items-center gap-2"
+    data-bs-toggle="dropdown"
+    data-bs-display="static"
+    aria-expanded="false"
+    [attr.aria-label]="'Account menu for ' + u.display_name"
+  >
+    <i class="bi bi-person-circle" aria-hidden="true"></i>
+    <span class="user-menu-name d-none d-sm-inline">{{ u.display_name }}</span>
+    <i class="bi bi-chevron-down user-menu-caret" aria-hidden="true"></i>
+  </button>
+
+  <ul class="dropdown-menu dropdown-menu-end">
+    <!-- The identity block doubles as the entry point to the profile page. -->
+    <li>
+      <a class="dropdown-item user-menu-identity px-3 py-2" routerLink="/profile" routerLinkActive="active">
+        <div class="fw-semibold text-truncate">{{ u.display_name }}</div>
+        <div class="text-body-secondary small text-truncate">{{ roleLabel(u.role) }}</div>
+      </a>
+    </li>
+
+    <li><hr class="dropdown-divider" /></li>
+
+    <li><h6 class="dropdown-header">Theme</h6></li>
+    @for (option of themeOptions; track option.mode) {
+    <li>
+      <button
+        type="button"
+        class="dropdown-item d-flex align-items-center gap-2"
+        [class.active]="mode() === option.mode"
+        [attr.aria-current]="mode() === option.mode"
+        (click)="selectTheme(option.mode)"
+      >
+        <i class="bi" [class]="option.icon" aria-hidden="true"></i>
+        <span>{{ option.label }}</span>
+        @if (mode() === option.mode) {
+        <i class="bi bi-check2 ms-auto" aria-hidden="true"></i>
+        }
+      </button>
+    </li>
+    }
+
+    <li><hr class="dropdown-divider" /></li>
+
+    <li>
+      <button type="button" class="dropdown-item d-flex align-items-center gap-2" (click)="onLogout()">
+        <i class="bi bi-box-arrow-right" aria-hidden="true"></i>
+        <span>Logout</span>
+      </button>
+    </li>
+  </ul>
+</div>
+}

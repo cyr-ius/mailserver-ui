@@ -57,6 +57,12 @@ export interface PasswordChangeRequest {
   new_password: string;
 }
 
+/** Payload for a user rotating their own password; the current one is required. */
+export interface SelfPasswordChangeRequest {
+  current_password: string;
+  new_password: string;
+}
+
 /** Payload creating a local account. The role comes from group membership only. */
 export interface UserCreateRequest {
   username: string;
