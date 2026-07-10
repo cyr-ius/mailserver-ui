@@ -5,41 +5,20 @@ services:
     container_name: mailserver
     hostname: mail.example.com
     environment:
-      # The UI writes postfix-accounts.cf / dovecot-quotas.cf directly, which
-      # only docker-mailserver's FILE provisioner reads. Quotas require it too.
       - ACCOUNT_PROVISIONER=FILE
       - ENABLE_QUOTAS=1
-      # The UI reads DKIM records from opendkim/keys; Rspamd stores them
-      # elsewhere, so the two toggles must stay as they are here.
-      - ENABLE_OPENDKIM=1
-      - ENABLE_RSPAMD=0
-      # Required by the published 4190 port, otherwise nothing listens on it.
+      - ENABLE_OPENDKIM=0
+      - ENABLE_OPENDMARC=0
+      - ENABLE_POLICYD_SPF=0
+      - ENABLE_AMAVIS=0
+      - ENABLE_SPAMASSASSIN=0
+      - ENABLE_RSPAMD=1
       - ENABLE_MANAGESIEVE=1
       - ENABLE_FAIL2BAN=1
-      # Spam and virus filtering. Amavis drives both SpamAssassin and ClamAV, so
-      # it cannot be turned off while either is on. The whole stack is mutually
-      # exclusive with ENABLE_RSPAMD, which reimplements all of it.
-      - ENABLE_AMAVIS=1
-      - ENABLE_SPAMASSASSIN=1
-      - SPAMASSASSIN_SPAM_TO_INBOX=1
-      - MOVE_SPAM_TO_JUNK=1
-      # Spam score thresholds: add headers, flag as spam, then reject outright.
-      - SA_TAG=2.0
-      - SA_TAG2=6.31
-      - SA_KILL=10.0
-      # ClamAV needs roughly 1 GB of RAM, and stays down for the minutes
-      # freshclam spends downloading its signatures on first start.
       - ENABLE_CLAMAV=1
       - CLAMAV_MESSAGE_SIZE_LIMIT=25M
-      # Greylisting: an unknown sender is deferred once, then auto-whitelisted
-      # after POSTGREY_AUTO_WHITELIST_CLIENTS successful deliveries.
-      - ENABLE_POSTGREY=1
-      - POSTGREY_DELAY=300
-      - POSTGREY_MAX_AGE=35
-      - POSTGREY_AUTO_WHITELIST_CLIENTS=5
-      - POSTGREY_TEXT=Delayed by Postgrey
-      # Update notices are mailed to POSTMASTER_ADDRESS, which must accept mail
-      # or every check bounces.
+      - ENABLE_POSTGREY=0
+      - RSPAMD_GREYLISTING=1
       - ENABLE_UPDATE_CHECK=1
       - UPDATE_CHECK_INTERVAL=1d
       - POSTMASTER_ADDRESS=${POSTMASTER_ADDRESS:-postmaster@example.com}
@@ -57,17 +36,12 @@ services:
     volumes:
       - mailserver-mail:/var/mail
       - mailserver-config:/tmp/docker-mailserver/
-      # Postfix/Dovecot runtime state, including the fail2ban ban database the
-      # UI manages: without it every ban is lost when the container is recreated.
       - mailserver-state:/var/mail-state
-      # The UI tails /var/log/mail/mail.log.
       - mailserver-logs:/var/log/mail
     restart: unless-stopped
 
   mailserver-ui:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ghcr.io/cyr-ius/mailserver-ui:latest
     depends_on:
       - mailserver
     environment:
