@@ -22,6 +22,29 @@ export interface QuotaUpdateRequest {
   quota: string | null;
 }
 
+/**
+ * How much disk a mail account really occupies, as returned by
+ * /api/mailboxes/usage. Distinct from `Mailbox.quota`, which is the configured
+ * limit rather than the storage consumed.
+ */
+export interface MailboxUsage {
+  email: string;
+  used_bytes: number;
+  /** The storage limit in bytes, or null when unlimited. */
+  limit_bytes: number | null;
+  /** Percentage of the limit consumed, or null when unlimited. */
+  percent: number | null;
+  message_count: number;
+}
+
+/** Disk usage of every mail account, ordered by usage, plus the totals. */
+export interface MailboxUsageSummary {
+  mailboxes: MailboxUsage[];
+  total_used_bytes: number;
+  /** Null as soon as one account is unlimited. */
+  total_limit_bytes: number | null;
+}
+
 /** An alias address forwarding to a mailbox. */
 export interface Alias {
   alias: string;

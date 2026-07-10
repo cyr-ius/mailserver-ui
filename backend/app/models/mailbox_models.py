@@ -51,6 +51,33 @@ class QuotaUpdate(BaseModel):
     quota: QuotaStr | None = None
 
 
+class MailboxUsage(BaseModel):
+    """How much disk one mail account actually occupies, as Dovecot sees it.
+
+    ``quota`` in :class:`Mailbox` is the *configured limit*; this is the storage
+    really consumed, reported by ``doveadm quota get``.
+    """
+
+    email: str
+    # Bytes currently stored in the maildir.
+    used_bytes: int = 0
+    # The account's storage limit in bytes, or ``None`` when unlimited.
+    limit_bytes: int | None = None
+    # Percentage of the limit consumed, or ``None`` when unlimited.
+    percent: int | None = None
+    # Messages currently stored in the maildir.
+    message_count: int = 0
+
+
+class MailboxUsageSummary(BaseModel):
+    """Disk usage of every mail account plus the totals across all of them."""
+
+    mailboxes: list[MailboxUsage] = Field(default_factory=list)
+    total_used_bytes: int = 0
+    # Sum of the configured limits; ``None`` as soon as one account is unlimited.
+    total_limit_bytes: int | None = None
+
+
 class Alias(BaseModel):
     """An alias address that forwards to a mailbox."""
 

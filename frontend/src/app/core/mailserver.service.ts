@@ -12,6 +12,7 @@ import {
   DovecotMasterCreateRequest,
   MailLog,
   MailserverEnvironment,
+  MailStats,
   PostfixMasterOverride,
   PostfixMasterOverridesUpdateRequest,
   PostfixOverride,
@@ -27,6 +28,7 @@ import {
   Restriction,
   RestrictionCreateRequest,
   RestrictionKind,
+  ServiceStatus,
   SieveScope,
   SieveScript,
   SieveScriptUpdateRequest,
@@ -39,8 +41,8 @@ import {
  * Access to the docker-mailserver global configuration API (admin only). Wraps
  * the calls managing SMTP relays, Postfix and Dovecot overrides, aliases, Sieve
  * scripts and DKIM records stored in the shared config volume, plus the
- * read-only runtime views (queue, TLS, DNS, environment); callers own the
- * resulting data.
+ * read-only runtime views (queue, TLS, DNS, environment, service health and mail
+ * statistics); callers own the resulting data.
  */
 @Injectable({ providedIn: 'root' })
 export class MailserverService {
@@ -276,5 +278,17 @@ export class MailserverService {
   /** Return the mailserver's effective environment, set when the container started. */
   async getEnvironment(): Promise<MailserverEnvironment> {
     return firstValueFrom(this.http.get<MailserverEnvironment>('/api/mailserver/environment'));
+  }
+
+  // ── Runtime health (read-only) ──────────────────────────────────────────────
+
+  /** Report the state of every supervised process in the mailserver container. */
+  async listServices(): Promise<ServiceStatus[]> {
+    return firstValueFrom(this.http.get<ServiceStatus[]>('/api/mailserver/services'));
+  }
+
+  /** Count deliveries, rejections and bounces over the trailing stats window. */
+  async getMailStats(): Promise<MailStats> {
+    return firstValueFrom(this.http.get<MailStats>('/api/mailserver/stats'));
   }
 }

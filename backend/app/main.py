@@ -97,7 +97,7 @@ async def swagger_ui() -> HTMLResponse:
         title="Docker Mailserver API",
         swagger_js_url="/api/static/swagger/swagger-ui-bundle.js",
         swagger_css_url="/api/static/swagger/swagger-ui.css",
-        swagger_favicon_url="/favicon.svg",
+        swagger_favicon_url="/api/static/favicon.ico",
     )
 
 

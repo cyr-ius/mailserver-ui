@@ -32,12 +32,23 @@ def _ensure_enabled() -> None:
         )
 
 
-def _docker_exec(args: list[str], *, timeout: int, stdin: str | None = None) -> str:
+def _docker_exec(
+    args: list[str],
+    *,
+    timeout: int,
+    stdin: str | None = None,
+    check: bool = True,
+) -> str:
     """Run ``docker exec [-i] <container> <args…>`` and return stdout.
 
     ``stdin`` is streamed to the process (implying ``-i``) when provided. Raises
     :class:`BadGatewayException` when the Docker CLI is missing, the command
     times out, or the container reports a non-zero exit status.
+
+    ``check=False`` suits commands that report state through their exit code
+    (``supervisorctl status`` exits 3 when a service is down) yet still print
+    their answer. A failure that printed *nothing* — an unreachable container,
+    say — is still raised, so a silent empty result cannot pass for data.
     """
     _ensure_enabled()
     cmd = [settings.docker_binary, "exec"]
@@ -61,20 +72,21 @@ def _docker_exec(args: list[str], *, timeout: int, stdin: str | None = None) -> 
     except subprocess.TimeoutExpired as exc:
         raise BadGatewayException("The mailserver command timed out.") from exc
 
-    if result.returncode != 0:
+    if result.returncode != 0 and (check or not result.stdout.strip()):
         detail = (result.stderr or result.stdout or "").strip() or "unknown error"
         logger.warning("container command %s failed (%s): %s", args, result.returncode, detail)
         raise BadGatewayException(f"Mailserver command failed: {detail[:300]}")
     return result.stdout
 
 
-def run_in_container(args: list[str], *, timeout: int) -> str:
+def run_in_container(args: list[str], *, timeout: int, check: bool = True) -> str:
     """Run ``docker exec <container> <args…>`` and return stdout (see module docs).
 
     Enabling ``docker exec`` is handled here; validating any user-provided token
-    before it reaches this function is the caller's responsibility.
+    before it reaches this function is the caller's responsibility. Pass
+    ``check=False`` to accept a non-zero exit status *that produced output*.
     """
-    return _docker_exec(args, timeout=timeout)
+    return _docker_exec(args, timeout=timeout, check=check)
 
 
 # ── Config files inside the container ─────────────────────────────────────────

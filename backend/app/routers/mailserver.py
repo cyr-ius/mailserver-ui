@@ -29,6 +29,7 @@ from ..models.mailserver_models import (
     DovecotMasterCreate,
     MailLog,
     MailserverEnvironment,
+    MailStats,
     PostfixMasterOverride,
     PostfixMasterOverridesUpdate,
     PostfixOverride,
@@ -43,6 +44,7 @@ from ..models.mailserver_models import (
     RelayHostCreate,
     Restriction,
     RestrictionCreate,
+    ServiceStatus,
     SieveScope,
     SieveScript,
     SieveScriptUpdate,
@@ -310,6 +312,21 @@ async def get_environment(_admin: AdminDep) -> MailserverEnvironment:
 async def get_mail_logs(_admin: AdminDep) -> MailLog:
     """Return the trailing lines of the mailserver mail log (admin only)."""
     return await run_in_threadpool(mailserver_service.get_mail_logs)
+
+
+# ── Runtime health (read-only) ────────────────────────────────────────────────
+
+
+@router.get("/services", response_model=list[ServiceStatus])
+async def list_services(_admin: AdminDep) -> list[ServiceStatus]:
+    """Report the state of every supervised process in the container (admin only)."""
+    return await run_in_threadpool(mailserver_service.list_services)
+
+
+@router.get("/stats", response_model=MailStats)
+async def get_mail_stats(_admin: AdminDep) -> MailStats:
+    """Count deliveries, rejections and bounces over the trailing window (admin only)."""
+    return await run_in_threadpool(mailserver_service.get_mail_stats)
 
 
 # ── Dovecot master accounts ───────────────────────────────────────────────────

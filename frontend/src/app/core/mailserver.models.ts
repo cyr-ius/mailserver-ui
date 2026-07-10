@@ -218,3 +218,34 @@ export interface MailserverEnvironment {
   managesieve_enabled: boolean;
   quotas_enabled: boolean;
 }
+
+/**
+ * One supervised process inside the mailserver container. A healthy container
+ * normally holds many STOPPED processes — the features its environment left
+ * disabled — so `failed` is not the negation of `running`.
+ */
+export interface ServiceStatus {
+  name: string;
+  /** The raw supervisor state: RUNNING, STOPPED, FATAL, EXITED, STARTING, … */
+  state: string;
+  /** True only for RUNNING. */
+  running: boolean;
+  /** True when supervisor gave up on the process: broken, as opposed to disabled. */
+  failed: boolean;
+  /** What supervisor prints next to the state, e.g. "pid 42, uptime 1:02:03". */
+  detail: string;
+}
+
+/** Delivery counters parsed from the mail log over a trailing time window. */
+export interface MailStats {
+  period_hours: number;
+  received: number;
+  sent: number;
+  rejected: number;
+  bounced: number;
+  deferred: number;
+  /** False when no log line could be dated: the counters are then meaningless. */
+  parsed: boolean;
+  /** Lines scanned; a full scan means the window may be truncated. */
+  scanned_lines: number;
+}

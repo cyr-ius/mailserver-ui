@@ -321,3 +321,54 @@ class MailserverEnvironment(BaseModel):
     account_provisioner: str = ""
     managesieve_enabled: bool = False
     quotas_enabled: bool = False
+
+
+# ── Runtime health (read-only) ────────────────────────────────────────────────
+
+
+class ServiceStatus(BaseModel):
+    """One supervised process inside the mailserver container.
+
+    docker-mailserver supervises every optional feature it ships, so a healthy
+    container normally holds a dozen ``STOPPED`` processes — the ones its
+    environment left disabled. Only ``failed`` marks a process that tried to run
+    and could not, which is why the two flags are not each other's negation.
+    """
+
+    name: str
+    # The raw supervisor state: RUNNING, STOPPED, FATAL, EXITED, STARTING, …
+    state: str
+    # True only for RUNNING, so the UI never has to know supervisor's vocabulary.
+    running: bool = False
+    # True when supervisor gave up on the process: it is broken, not disabled.
+    failed: bool = False
+    # The detail supervisor prints, e.g. "pid 42, uptime 1:02:03".
+    detail: str = ""
+
+
+class MailStats(BaseModel):
+    """Delivery counters parsed from the mail log over a trailing time window.
+
+    The mail log is rotated and this app only reads its tail, so the counters
+    describe what the log still holds inside the window — not the mailserver's
+    whole history.
+    """
+
+    # Width of the window the counters cover.
+    period_hours: int = 24
+    # Messages accepted by Postfix (one ``cleanup`` message-id line each).
+    received: int = 0
+    # Deliveries Postfix completed (``status=sent``).
+    sent: int = 0
+    # Connections Postfix turned away (``reject:``): spam, relaying attempts, …
+    rejected: int = 0
+    # Deliveries that permanently failed (``status=bounced``).
+    bounced: int = 0
+    # Deliveries postponed and still to be retried (``status=deferred``).
+    deferred: int = 0
+    # False when the log held no line this app could date: every counter is then
+    # zero because nothing could be attributed to the window, not because the
+    # mailserver was idle.
+    parsed: bool = False
+    # How many log lines were scanned, so the UI can say the window is truncated.
+    scanned_lines: int = 0

@@ -36,7 +36,7 @@ restarted; the schemas that carry a single such file set ``restart_required``.
 import json
 import logging
 import re
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from ..config import settings
 from ..exceptions import BadRequestException, ConflictException, NotFoundException
@@ -49,6 +49,7 @@ from ..models.mailserver_models import (
     DovecotMaster,
     MailLog,
     MailserverEnvironment,
+    MailStats,
     PostfixMasterOverride,
     PostfixOverride,
     QueueActionResult,
@@ -59,6 +60,7 @@ from ..models.mailserver_models import (
     RelayHost,
     RelayHostCreate,
     Restriction,
+    ServiceStatus,
     SieveScope,
     SieveScript,
     SystemAlias,
@@ -88,6 +90,14 @@ _SIEVE_FILENAMES: dict[str, str] = {
 
 # The mailserver dumps its effective environment here when it starts.
 _DMS_SETTINGS_PATH = "/etc/dms-settings"
+
+# Where docker-mailserver's rsyslog writes the Postfix/Dovecot mail log.
+_MAIL_LOG_PATH = "/var/log/mail/mail.log"
+
+# Supervisor states meaning the process tried to run and could not. ``STOPPED``
+# is deliberately absent: docker-mailserver leaves every disabled feature in
+# that state, so treating it as a failure would flag a healthy container.
+_FAILED_SERVICE_STATES = frozenset({"FATAL", "BACKOFF", "EXITED", "UNKNOWN"})
 
 # Access maps backing ``setup email restrict <send|receive>``.
 _RESTRICTION_FILENAMES = {
@@ -119,6 +129,12 @@ _REGEX_ALIAS_PATTERN_RE = re.compile(r"^/.+/[imxs]*$")
 # A Postfix queue ID as printed by ``postqueue``; ``postsuper`` also accepts
 # ``ALL``, which is why only alphanumerics are allowed through here.
 _QUEUE_ID_RE = re.compile(r"^[A-Za-z0-9]{1,32}$")
+
+# The two timestamps rsyslog may open a mail log line with: RFC 3339
+# (``2026-07-10T12:34:56.123456+00:00``) and the traditional, year-less
+# ``Jul 10 12:34:56`` — where a single-digit day is space-padded.
+_LOG_ISO_DATE_RE = re.compile(r"^(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\S+)?)")
+_LOG_BSD_DATE_RE = re.compile(r"^([A-Z][a-z]{2}\s+\d{1,2} \d{2}:\d{2}:\d{2})")
 
 
 # ── Generic file access ───────────────────────────────────────────────────────
@@ -600,10 +616,114 @@ def delete_restriction(kind: str, address: str) -> None:
 def get_mail_logs() -> MailLog:
     """Return the trailing lines of the mailserver mail log via ``docker exec``."""
     output = container.run_in_container(
-        ["tail", "-n", str(settings.mailserver_log_lines), "/var/log/mail/mail.log"],
+        ["tail", "-n", str(settings.mailserver_log_lines), _MAIL_LOG_PATH],
         timeout=settings.mailserver_command_timeout,
     )
     return MailLog(lines=output.splitlines())
+
+
+# ── Runtime health (read-only) ────────────────────────────────────────────────
+
+
+def _parse_service_line(line: str) -> ServiceStatus | None:
+    """Build a :class:`ServiceStatus` from one ``supervisorctl status`` row.
+
+    Rows read ``<name> <STATE> <detail…>``, columns padded with spaces.
+    """
+    fields = line.split(None, 2)
+    if len(fields) < 2:
+        return None
+    name, state = fields[0], fields[1]
+    return ServiceStatus(
+        name=name,
+        state=state,
+        running=state == "RUNNING",
+        failed=state in _FAILED_SERVICE_STATES,
+        detail=fields[2].strip() if len(fields) > 2 else "",
+    )
+
+
+def list_services() -> list[ServiceStatus]:
+    """Return every supervised process in the mailserver container, by name.
+
+    ``supervisorctl status`` exits 3 as soon as one process is not RUNNING —
+    which a healthy docker-mailserver always is, since it supervises the
+    features its environment disabled. Hence ``check=False``.
+    """
+    output = container.run_in_container(
+        ["supervisorctl", "status"],
+        timeout=settings.mailserver_command_timeout,
+        check=False,
+    )
+    services = [
+        service for service in map(_parse_service_line, output.splitlines()) if service is not None
+    ]
+    return sorted(services, key=lambda service: service.name)
+
+
+def _parse_log_timestamp(line: str, now: datetime) -> datetime | None:
+    """Return the timestamp of a mail log line, or ``None`` when undated.
+
+    rsyslog writes either an RFC 3339 stamp or the traditional ``Mon DD
+    HH:MM:SS`` form, which carries no year: it is read as the most recent such
+    date not in the future. An undated stamp is assumed to be UTC, as the
+    mailserver container is.
+    """
+    iso_match = _LOG_ISO_DATE_RE.match(line)
+    if iso_match:
+        try:
+            parsed = datetime.fromisoformat(iso_match.group(1))
+        except ValueError:
+            return None
+        return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
+
+    bsd_match = _LOG_BSD_DATE_RE.match(line)
+    if not bsd_match:
+        return None
+    try:
+        parsed = datetime.strptime(bsd_match.group(1), "%b %d %H:%M:%S").replace(
+            year=now.year, tzinfo=UTC
+        )
+    except ValueError:  # Feb 29 of a non-leap current year.
+        return None
+    # A stamp in the future can only be last year's: the log crossed a new year.
+    return parsed.replace(year=now.year - 1) if parsed > now else parsed
+
+
+def get_mail_stats() -> MailStats:
+    """Count deliveries, rejections and bounces over the trailing stats window.
+
+    Postfix logs one line per delivery attempt; the counters below key off the
+    ``status=`` field it prints, plus the ``cleanup`` line every accepted message
+    produces. Lines older than the window, or that carry no timestamp this app
+    can read, are skipped.
+    """
+    hours = settings.mailserver_stats_hours
+    output = container.run_in_container(
+        ["tail", "-n", str(settings.mailserver_stats_log_lines), _MAIL_LOG_PATH],
+        timeout=settings.mailserver_command_timeout,
+    )
+
+    now = datetime.now(tz=UTC)
+    cutoff = now - timedelta(hours=hours)
+    stats = MailStats(period_hours=hours, scanned_lines=0)
+    for line in output.splitlines():
+        stats.scanned_lines += 1
+        timestamp = _parse_log_timestamp(line, now)
+        if timestamp is None or timestamp < cutoff:
+            continue
+        stats.parsed = True
+        if "status=sent" in line:
+            stats.sent += 1
+        elif "status=deferred" in line:
+            stats.deferred += 1
+        elif "status=bounced" in line:
+            stats.bounced += 1
+        elif " reject: " in line:
+            stats.rejected += 1
+        elif "postfix/cleanup" in line and "message-id=" in line:
+            stats.received += 1
+    return stats
 
 
 # ── Dovecot master accounts ───────────────────────────────────────────────────

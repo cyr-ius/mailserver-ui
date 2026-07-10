@@ -1,83 +1,126 @@
 <main class="container-fluid p-4">
-  <div class="row mb-4">
+  <div class="row align-items-center mb-4">
     <div class="col">
       <h1 class="mb-0">
         <i class="bi bi-speedometer2 me-2" aria-hidden="true"></i>
         Dashboard
       </h1>
+      @if (user(); as currentUser) {
+      <p class="text-body-secondary mb-0">Signed in as {{ currentUser.display_name }}</p>
+      }
     </div>
+    @if (canManageMailboxes() || isAdmin()) {
+    <div class="col-auto">
+      <button type="button" class="btn btn-outline-secondary" (click)="refresh()" [disabled]="refreshing()">
+        @if (refreshing()) {
+        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+        } @else {
+        <i class="bi bi-arrow-clockwise me-2" aria-hidden="true"></i>
+        } Refresh
+      </button>
+    </div>
+    }
   </div>
 
-  @if (loading()) {
-  <div class="alert alert-info" role="alert">
-    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-    Loading statistics...
-  </div>
-  } @else if (error()) {
-  <div class="alert alert-danger" role="alert">
-    <i class="bi bi-exclamation-triangle me-2" aria-hidden="true"></i>
-    {{ error() }}
-  </div>
-  } @else {
   <div class="row g-4">
     @if (canManageMailboxes()) {
-    <!-- Mailbox Count Card -->
+    <!-- Mailboxes and the domains they span -->
     <div class="col-md-6 col-lg-3">
-      <div class="card h-100 shadow-sm">
-        <div class="card-body d-flex align-items-center justify-content-between">
-          <div>
-            <h6 class="card-title text-muted mb-2">Mailboxes</h6>
-            <h3 class="mb-0 text-primary">{{ mailboxCount() }}</h3>
+      <a class="card h-100 shadow-sm text-decoration-none text-reset" routerLink="/mailboxes">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between">
+            <div>
+              <h6 class="card-title text-muted mb-2">Mailboxes</h6>
+              @if (mailboxes().loading) {
+              <p class="placeholder-glow mb-0"><span class="placeholder col-5"></span></p>
+              } @else if (mailboxes().error) {
+              <p class="small text-danger mb-0">
+                <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
+                {{ mailboxes().error }}
+              </p>
+              } @else {
+              <h3 class="mb-0 text-primary">{{ mailboxes().data?.length }}</h3>
+              }
+            </div>
+            <div class="text-primary fs-1 opacity-25">
+              <i class="bi bi-inbox-fill" aria-hidden="true"></i>
+            </div>
           </div>
-          <div class="text-primary fs-1 opacity-25">
-            <i class="bi bi-inbox-fill" aria-hidden="true"></i>
-          </div>
+          @if (domains().length) {
+          <p class="small text-body-secondary mb-0 mt-3">
+            across {{ domains().length }} domain{{ domains().length > 1 ? 's' : '' }}
+          </p>
+          }
         </div>
-      </div>
+      </a>
     </div>
 
-    <!-- Largest Mailbox Card -->
+    <!-- Storage actually consumed, as opposed to the configured quotas -->
     <div class="col-md-6 col-lg-3">
       <div class="card h-100 shadow-sm">
         <div class="card-body">
-          <h6 class="card-title text-muted mb-2">Largest Mailbox</h6>
-          <p class="mb-2 text-truncate">
-            <small class="text-body-secondary">{{ largestMailbox()?.email || 'N/A' }}</small>
+          <div class="d-flex align-items-center justify-content-between">
+            <div>
+              <h6 class="card-title text-muted mb-2">Storage used</h6>
+              @if (usage().loading) {
+              <p class="placeholder-glow mb-0"><span class="placeholder col-7"></span></p>
+              } @else if (usage().error) {
+              <p class="small text-danger mb-0">
+                <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
+                {{ usage().error }}
+              </p>
+              } @else if (usage().data; as summary) {
+              <h3 class="mb-0 text-success">{{ formatBytes(summary.total_used_bytes) }}</h3>
+              }
+            </div>
+            <div class="text-success fs-1 opacity-25">
+              <i class="bi bi-hdd-fill" aria-hidden="true"></i>
+            </div>
+          </div>
+          @if (usage().data; as summary) { @if (storagePercent() !== null && summary.total_limit_bytes) {
+          <div
+            class="progress mt-3"
+            role="progressbar"
+            aria-label="Share of the aggregate quota used"
+            [attr.aria-valuenow]="storagePercent()"
+            aria-valuemin="0"
+            aria-valuemax="100"
+          >
+            <div class="progress-bar bg-success" [style.width.%]="storagePercent()"></div>
+          </div>
+          <p class="small text-body-secondary mb-0 mt-2">
+            {{ storagePercent() }}% of {{ formatBytes(summary.total_limit_bytes) }}
           </p>
-          @if (largestMailbox()?.quota) {
-          <h4 class="mb-0 text-success">{{ largestMailbox()?.quota }}</h4>
           } @else {
-          <h4 class="mb-0 text-muted">Unlimited</h4>
-          }
-        </div>
-      </div>
-    </div>
-
-    <!-- Largest Quota Card -->
-    <div class="col-md-6 col-lg-3">
-      <div class="card h-100 shadow-sm">
-        <div class="card-body">
-          <h6 class="card-title text-muted mb-2">Largest Quota</h6>
-          <p class="mb-2 text-truncate">
-            <small class="text-body-secondary">{{ largestQuota()?.email || 'N/A' }}</small>
-          </p>
-          @if (largestQuota()?.quota) {
-          <h4 class="mb-0 text-info">{{ largestQuota()?.quota }}</h4>
-          } @else {
-          <h4 class="mb-0 text-muted">N/A</h4>
-          }
+          <p class="small text-body-secondary mb-0 mt-3">Some accounts are unlimited</p>
+          } }
         </div>
       </div>
     </div>
     } @if (isAdmin()) {
-    <!-- Mail Queue Card -->
+    <!-- Mail queue: the deferred backlog is what warrants attention -->
     <div class="col-md-6 col-lg-3">
       <a class="card h-100 shadow-sm text-decoration-none text-reset" routerLink="/mailserver/queue">
         <div class="card-body">
           <div class="d-flex align-items-center justify-content-between">
             <div>
-              <h6 class="card-title text-muted mb-2">Mail Queue</h6>
-              <h3 class="mb-0 text-warning">{{ queuedCount() }}</h3>
+              <h6 class="card-title text-muted mb-2">Mail queue</h6>
+              @if (queue().loading) {
+              <p class="placeholder-glow mb-0"><span class="placeholder col-5"></span></p>
+              } @else if (queue().error) {
+              <p class="small text-danger mb-0">
+                <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
+                {{ queue().error }}
+              </p>
+              } @else if (queue().data; as summary) {
+              <h3
+                class="mb-0"
+                [class.text-warning]="summary.messages.length > 0"
+                [class.text-success]="summary.messages.length === 0"
+              >
+                {{ summary.messages.length }}
+              </h3>
+              }
             </div>
             <div class="text-warning fs-1 opacity-25">
               <i class="bi bi-hourglass-split" aria-hidden="true"></i>
@@ -89,24 +132,405 @@
             <span class="badge text-bg-light">{{ entry[0] }}: {{ entry[1] }}</span>
             }
           </div>
+          } @if (deferredCount() > 0 && oldestQueued()) {
+          <p class="small text-warning mb-0 mt-2">
+            <i class="bi bi-clock-history me-1" aria-hidden="true"></i>
+            oldest {{ formatAge(oldestQueued()) }}
+          </p>
           }
         </div>
       </a>
     </div>
 
-    <!-- Banned IPs Card -->
+    <!-- Banned IPs, broken down by the jail that caught them -->
     <div class="col-md-6 col-lg-3">
+      <a class="card h-100 shadow-sm text-decoration-none text-reset" routerLink="/fail2ban">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between">
+            <div>
+              <h6 class="card-title text-muted mb-2">Banned IPs</h6>
+              @if (fail2ban().loading) {
+              <p class="placeholder-glow mb-0"><span class="placeholder col-5"></span></p>
+              } @else if (fail2ban().error) {
+              <p class="small text-danger mb-0">
+                <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
+                {{ fail2ban().error }}
+              </p>
+              } @else {
+              <h3 class="mb-0 text-danger">{{ bannedIpsCount() }}</h3>
+              }
+            </div>
+            <div class="text-danger fs-1 opacity-25">
+              <i class="bi bi-shield-exclamation-fill" aria-hidden="true"></i>
+            </div>
+          </div>
+          @if (activeJails().length) {
+          <div class="d-flex flex-wrap gap-1 mt-3">
+            @for (jail of activeJails(); track jail.name) {
+            <span class="badge text-bg-light">{{ jail.name }}: {{ jail.currently_banned }}</span>
+            }
+          </div>
+          }
+        </div>
+      </a>
+    </div>
+
+    <!-- Supervised processes inside the mailserver container -->
+    <div class="col-md-6 col-lg-4">
       <div class="card h-100 shadow-sm">
-        <div class="card-body d-flex align-items-center justify-content-between">
-          <div>
-            <h6 class="card-title text-muted mb-2">Banned IPs</h6>
-            <h3 class="mb-0 text-danger">{{ bannedIpsCount() }}</h3>
+        <div class="card-body">
+          <h6 class="card-title text-muted mb-3">
+            <i class="bi bi-activity me-1" aria-hidden="true"></i>
+            Services
+          </h6>
+          @if (services().loading) {
+          <p class="placeholder-glow mb-0">
+            <span class="placeholder col-12"></span>
+            <span class="placeholder col-8"></span>
+          </p>
+          } @else if (services().error) {
+          <p class="small text-danger mb-0">
+            <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
+            {{ services().error }}
+          </p>
+          } @else if (services().data; as processes) { @if (processes.length === 0) {
+          <p class="small text-body-secondary mb-0">Supervisor reported no process.</p>
+          } @else { @if (servicesFailed().length === 0) {
+          <p class="small text-success mb-3">
+            <i class="bi bi-check-circle-fill me-1" aria-hidden="true"></i>
+            {{ servicesRunning().length }} running, none failed
+          </p>
+          } @else {
+          <p class="small text-danger mb-3">
+            <i class="bi bi-x-circle-fill me-1" aria-hidden="true"></i>
+            {{ servicesFailed().length }} service{{ servicesFailed().length > 1 ? 's' : '' }} failed
+          </p>
+          }
+          <div class="d-flex flex-wrap gap-2">
+            @for (service of sortedServices(); track service.name) {
+            <span
+              class="badge"
+              [class.text-bg-success]="service.running"
+              [class.text-bg-danger]="service.failed"
+              [class.text-bg-secondary]="!service.running && !service.failed"
+              [title]="service.state + (service.detail ? ' — ' + service.detail : '')"
+            >
+              {{ service.name }}
+            </span>
+            }
           </div>
-          <div class="text-danger fs-1 opacity-25">
-            <i class="bi bi-shield-exclamation-fill" aria-hidden="true"></i>
-          </div>
+          <p class="small text-body-secondary mb-0 mt-3">
+            Grey badges are features this container was started without.
+          </p>
+          } }
         </div>
       </div>
+    </div>
+
+    <!-- TLS certificate: expiry is the failure operators notice too late -->
+    <div class="col-md-6 col-lg-4">
+      <a class="card h-100 shadow-sm text-decoration-none text-reset" routerLink="/mailserver/tls">
+        <div class="card-body">
+          <h6 class="card-title text-muted mb-3">
+            <i class="bi bi-shield-lock me-1" aria-hidden="true"></i>
+            TLS certificate
+          </h6>
+          @if (tls().loading) {
+          <p class="placeholder-glow mb-0">
+            <span class="placeholder col-6"></span>
+            <span class="placeholder col-10"></span>
+          </p>
+          } @else if (tls().error) {
+          <p class="small text-danger mb-0">
+            <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
+            {{ tls().error }}
+          </p>
+          } @else if (tls().data; as certificate) { @if (!certificate.configured) {
+          <p class="small text-body-secondary mb-0">No certificate configured (SSL_TYPE is unset).</p>
+          } @else {
+          <h3 class="mb-1" [class]="tlsClass()">
+            @if (certificate.days_remaining === null) { Unknown } @else if (certificate.days_remaining < 0) { Expired }
+            @else { {{ certificate.days_remaining }} day{{ certificate.days_remaining === 1 ? '' : 's' }} }
+          </h3>
+          <p class="small text-body-secondary mb-2">
+            @if (certificate.days_remaining !== null && certificate.days_remaining >= 0) { until expiry } @else if
+            (certificate.days_remaining !== null) { — renew it now }
+          </p>
+          @if (certificate.domains.length) {
+          <p class="small text-body-secondary text-truncate mb-0" [title]="certificate.domains.join(', ')">
+            {{ certificate.domains.join(', ') }}
+          </p>
+          } } }
+        </div>
+      </a>
+    </div>
+
+    <!-- DKIM coverage: an unsigned domain quietly loses deliverability -->
+    <div class="col-md-6 col-lg-4">
+      <a class="card h-100 shadow-sm text-decoration-none text-reset" routerLink="/mailserver/dkim">
+        <div class="card-body">
+          <h6 class="card-title text-muted mb-3">
+            <i class="bi bi-key me-1" aria-hidden="true"></i>
+            DKIM coverage
+          </h6>
+          @if (dkim().loading || mailboxes().loading) {
+          <p class="placeholder-glow mb-0">
+            <span class="placeholder col-6"></span>
+            <span class="placeholder col-9"></span>
+          </p>
+          } @else if (dkim().error) {
+          <p class="small text-danger mb-0">
+            <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
+            {{ dkim().error }}
+          </p>
+          } @else if (dkimCoverage(); as coverage) {
+          <h3
+            class="mb-1"
+            [class.text-success]="coverage.missing.length === 0"
+            [class.text-warning]="coverage.missing.length > 0"
+          >
+            {{ coverage.signed }} / {{ coverage.total }}
+          </h3>
+          <p class="small text-body-secondary mb-2">domains signing outgoing mail</p>
+          @if (coverage.missing.length) {
+          <div class="d-flex flex-wrap gap-1">
+            @for (domain of coverage.missing; track domain) {
+            <span class="badge text-bg-warning">{{ domain }}</span>
+            }
+          </div>
+          } } @else {
+          <p class="small text-body-secondary mb-0">No hosted domain yet.</p>
+          }
+        </div>
+      </a>
+    </div>
+
+    <!-- What the mail log says happened over the trailing window -->
+    <div class="col-lg-6">
+      <div class="card h-100 shadow-sm">
+        <div class="card-body">
+          <h6 class="card-title text-muted mb-3">
+            <i class="bi bi-graph-up me-1" aria-hidden="true"></i>
+            Mail activity @if (stats().data; as counters) {
+            <span class="text-body-secondary">— last {{ counters.period_hours }}h</span>
+            }
+          </h6>
+          @if (stats().loading) {
+          <p class="placeholder-glow mb-0">
+            <span class="placeholder col-12"></span>
+            <span class="placeholder col-7"></span>
+          </p>
+          } @else if (stats().error) {
+          <p class="small text-danger mb-0">
+            <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
+            {{ stats().error }}
+          </p>
+          } @else if (stats().data; as counters) { @if (!counters.parsed) {
+          <p class="small text-body-secondary mb-0">
+            No dated line in the mail log — nothing to report for this window.
+          </p>
+          } @else {
+          <div class="row text-center g-3">
+            <div class="col">
+              <div class="h4 mb-0 text-primary">{{ counters.received }}</div>
+              <div class="small text-body-secondary">Received</div>
+            </div>
+            <div class="col">
+              <div class="h4 mb-0 text-success">{{ counters.sent }}</div>
+              <div class="small text-body-secondary">Sent</div>
+            </div>
+            <div class="col">
+              <div
+                class="h4 mb-0"
+                [class.text-warning]="counters.deferred > 0"
+                [class.text-body-secondary]="counters.deferred === 0"
+              >
+                {{ counters.deferred }}
+              </div>
+              <div class="small text-body-secondary">Deferred</div>
+            </div>
+            <div class="col">
+              <div
+                class="h4 mb-0"
+                [class.text-danger]="counters.bounced > 0"
+                [class.text-body-secondary]="counters.bounced === 0"
+              >
+                {{ counters.bounced }}
+              </div>
+              <div class="small text-body-secondary">Bounced</div>
+            </div>
+            <div class="col">
+              <div class="h4 mb-0 text-body-secondary">{{ counters.rejected }}</div>
+              <div class="small text-body-secondary">Rejected</div>
+            </div>
+          </div>
+          <p class="small text-body-secondary mb-0 mt-3">
+            Parsed from the last {{ counters.scanned_lines }} mail log lines.
+          </p>
+          } }
+        </div>
+      </div>
+    </div>
+    } @if (canManageMailboxes()) {
+    <!-- Which mailboxes actually fill the disk -->
+    <div class="col-lg-6">
+      <div class="card h-100 shadow-sm">
+        <div class="card-body">
+          <h6 class="card-title text-muted mb-3">
+            <i class="bi bi-bar-chart-line me-1" aria-hidden="true"></i>
+            Largest mailboxes
+          </h6>
+          @if (usage().loading) {
+          <p class="placeholder-glow mb-0">
+            <span class="placeholder col-12"></span>
+            <span class="placeholder col-10"></span>
+            <span class="placeholder col-8"></span>
+          </p>
+          } @else if (usage().error) {
+          <p class="small text-danger mb-0">
+            <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
+            {{ usage().error }}
+          </p>
+          } @else if (topMailboxes().length === 0) {
+          <p class="small text-body-secondary mb-0">No mailbox yet.</p>
+          } @else {
+          <ul class="list-unstyled mb-0">
+            @for (mailbox of topMailboxes(); track mailbox.email) {
+            <li class="mb-3">
+              <div class="d-flex justify-content-between align-items-baseline gap-2">
+                <span class="text-truncate" [title]="mailbox.email">{{ mailbox.email }}</span>
+                <span class="small text-body-secondary text-nowrap">
+                  {{ formatBytes(mailbox.used_bytes) }} @if (mailbox.limit_bytes) { / {{
+                  formatBytes(mailbox.limit_bytes) }} }
+                </span>
+              </div>
+              @if (mailbox.percent !== null) {
+              <div
+                class="progress mt-1 dashboard-usage-bar"
+                role="progressbar"
+                [attr.aria-label]="'Quota used by ' + mailbox.email"
+                [attr.aria-valuenow]="mailbox.percent"
+                aria-valuemin="0"
+                aria-valuemax="100"
+              >
+                <div
+                  class="progress-bar"
+                  [class.bg-danger]="mailbox.percent >= 90"
+                  [class.bg-warning]="mailbox.percent >= 75 && mailbox.percent < 90"
+                  [class.bg-success]="mailbox.percent < 75"
+                  [style.width.%]="mailbox.percent"
+                ></div>
+              </div>
+              } @else {
+              <p class="small text-body-secondary mb-0">Unlimited</p>
+              }
+            </li>
+            }
+          </ul>
+          }
+        </div>
+      </div>
+    </div>
+    } @if (isAdmin()) {
+    <!-- How the container was started: explains why a feature is unavailable -->
+    <div class="col-lg-6">
+      <a class="card h-100 shadow-sm text-decoration-none text-reset" routerLink="/mailserver/environment">
+        <div class="card-body">
+          <h6 class="card-title text-muted mb-3">
+            <i class="bi bi-gear me-1" aria-hidden="true"></i>
+            Configuration
+          </h6>
+          @if (environment().loading) {
+          <p class="placeholder-glow mb-0">
+            <span class="placeholder col-12"></span>
+            <span class="placeholder col-9"></span>
+          </p>
+          } @else if (environment().error) {
+          <p class="small text-danger mb-0">
+            <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
+            {{ environment().error }}
+          </p>
+          } @else if (environment().data; as env) {
+          <dl class="row mb-0 small">
+            <dt class="col-5 fw-normal text-body-secondary">Postmaster</dt>
+            <dd class="col-7 text-truncate mb-2">{{ env.postmaster_address || '—' }}</dd>
+
+            <dt class="col-5 fw-normal text-body-secondary">TLS mode</dt>
+            <dd class="col-7 mb-2">{{ env.ssl_type || 'disabled' }}</dd>
+
+            <dt class="col-5 fw-normal text-body-secondary">DKIM backend</dt>
+            <dd class="col-7 mb-2">{{ env.dkim_backend }}</dd>
+
+            <dt class="col-5 fw-normal text-body-secondary">Global relay</dt>
+            <dd class="col-7 text-truncate mb-2">{{ env.global_relay_host || 'none' }}</dd>
+
+            <dt class="col-5 fw-normal text-body-secondary">Quotas</dt>
+            <dd class="col-7 mb-2">
+              <span
+                class="badge"
+                [class.text-bg-success]="env.quotas_enabled"
+                [class.text-bg-secondary]="!env.quotas_enabled"
+              >
+                {{ env.quotas_enabled ? 'enabled' : 'disabled' }}
+              </span>
+            </dd>
+
+            <dt class="col-5 fw-normal text-body-secondary">ManageSieve</dt>
+            <dd class="col-7 mb-0">
+              <span
+                class="badge"
+                [class.text-bg-success]="env.managesieve_enabled"
+                [class.text-bg-secondary]="!env.managesieve_enabled"
+              >
+                {{ env.managesieve_enabled ? 'enabled' : 'disabled' }}
+              </span>
+            </dd>
+          </dl>
+          }
+        </div>
+      </a>
+    </div>
+
+    <!-- Who can sign in to this UI -->
+    <div class="col-lg-6">
+      <a class="card h-100 shadow-sm text-decoration-none text-reset" routerLink="/users">
+        <div class="card-body">
+          <h6 class="card-title text-muted mb-3">
+            <i class="bi bi-people me-1" aria-hidden="true"></i>
+            Application accounts
+          </h6>
+          @if (accounts().loading) {
+          <p class="placeholder-glow mb-0">
+            <span class="placeholder col-12"></span>
+            <span class="placeholder col-6"></span>
+          </p>
+          } @else if (accounts().error) {
+          <p class="small text-danger mb-0">
+            <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
+            {{ accounts().error }}
+          </p>
+          } @else if (accounts().data; as overview) {
+          <div class="row text-center g-3">
+            <div class="col">
+              <div class="h4 mb-0 text-primary">{{ overview.users.length }}</div>
+              <div class="small text-body-secondary">Users</div>
+            </div>
+            <div class="col">
+              <div class="h4 mb-0 text-info">{{ oidcUserCount() }}</div>
+              <div class="small text-body-secondary">via OIDC</div>
+            </div>
+            <div class="col">
+              <div class="h4 mb-0 text-warning">{{ adminCount() }}</div>
+              <div class="small text-body-secondary">Administrators</div>
+            </div>
+            <div class="col">
+              <div class="h4 mb-0 text-body-secondary">{{ overview.groupCount }}</div>
+              <div class="small text-body-secondary">Groups</div>
+            </div>
+          </div>
+          }
+        </div>
+      </a>
     </div>
     } @if (!canManageMailboxes() && !isAdmin()) {
     <div class="col-12">
@@ -117,5 +541,4 @@
     </div>
     }
   </div>
-  }
 </main>

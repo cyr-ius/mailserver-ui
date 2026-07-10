@@ -8,6 +8,7 @@ import {
   Mailbox,
   MailboxCreateRequest,
   MailboxPasswordUpdateRequest,
+  MailboxUsageSummary,
   QuotaUpdateRequest,
 } from './mailbox.models';
 
@@ -23,6 +24,11 @@ export class MailboxesService {
   /** List all mail accounts. */
   async list(): Promise<Mailbox[]> {
     return firstValueFrom(this.http.get<Mailbox[]>('/api/mailboxes'));
+  }
+
+  /** Report the disk each mail account really occupies (asks Dovecot). */
+  async usage(): Promise<MailboxUsageSummary> {
+    return firstValueFrom(this.http.get<MailboxUsageSummary>('/api/mailboxes/usage'));
   }
 
   /** Create a new mail account, optionally with a quota. */

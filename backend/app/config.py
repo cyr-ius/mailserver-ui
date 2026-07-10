@@ -76,6 +76,11 @@ class Settings(BaseSettings):
     mailserver_command_timeout: int = 30
     # Number of trailing mail log lines returned by the mail log endpoint.
     mailserver_log_lines: int = 200
+    # Trailing time window the mail statistics endpoint reports on.
+    mailserver_stats_hours: int = 24
+    # Trailing mail log lines scanned to build those statistics. A busy server
+    # can overflow this window; the endpoint reports how many lines it read.
+    mailserver_stats_log_lines: int = 20000
 
     secret_key: str = "change-this-secret-key-in-production"
     auth_cookie_name: str = "pc_token"
@@ -112,34 +117,8 @@ class Settings(BaseSettings):
 
     oidc_restrict_to_groups: bool = False
 
-    syslog_enabled: bool = False
-    syslog_host: str = ""
-    syslog_port: int = 514
-    syslog_protocol: str = "udp"  # 'udp' | 'tcp' | 'tcp+tls'
-    syslog_rfc: str = "rfc5424"  # 'rfc3164' | 'rfc5424'
-    syslog_forward_audit: bool = True
-    syslog_forward_uvicorn: bool = False
-    syslog_tls_verify: bool = True
-    syslog_tls_ca_cert: str = ""
-    syslog_auth_enabled: bool = False
-    syslog_auth_username: str = ""
-    syslog_auth_password: str = ""
-
-    email_enabled: bool = False
-    email_host: str = ""
-    email_port: int = 587
-    email_security: str = "starttls"  # 'none' | 'starttls' | 'ssl'
-    email_username: str = ""
-    email_password: str = ""
-    email_from_address: str = ""
-    email_to_addresses: str = ""  # comma-separated recipients
-    email_subject: str = "Portalcrane audit log"
-
     # Logging level (DEBUG, INFO, WARNING, ERROR)
     log_level: str = "INFO"
-
-    # Audit retention
-    audit_max_events: int = 100
 
     # Swagger UI
     swagger_enabled: bool = False

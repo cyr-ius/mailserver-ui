@@ -10,6 +10,7 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
+from fastapi.concurrency import run_in_threadpool
 
 from ..auth import SessionUser
 from ..depends import require_mailbox_manager
@@ -19,6 +20,7 @@ from ..models.mailbox_models import (
     Mailbox,
     MailboxCreate,
     MailboxPasswordUpdate,
+    MailboxUsageSummary,
     QuotaUpdate,
 )
 from ..services import mailbox_service
@@ -37,6 +39,17 @@ ManagerDep = Annotated[SessionUser, Depends(require_mailbox_manager)]
 async def list_mailboxes(_manager: ManagerDep) -> list[Mailbox]:
     """List all mail accounts (mailbox manager)."""
     return mailbox_service.list_mailboxes()
+
+
+@router.get("/usage", response_model=MailboxUsageSummary)
+async def get_usage(_manager: ManagerDep) -> MailboxUsageSummary:
+    """Report the disk each mail account really occupies (mailbox manager).
+
+    Declared before ``/{email}`` so that "usage" is not read as an address.
+    Unlike the ``quota`` field of a mailbox — the configured limit — this asks
+    Dovecot what is actually stored, so it shells out to the container.
+    """
+    return await run_in_threadpool(mailbox_service.get_usage)
 
 
 @router.post("", response_model=Mailbox, status_code=status.HTTP_201_CREATED)

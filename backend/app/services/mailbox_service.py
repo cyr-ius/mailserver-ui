@@ -19,8 +19,9 @@ so the mailserver's file watcher never observes a half-written file.
 
 import logging
 
+from ..config import settings
 from ..exceptions import BadRequestException, ConflictException, NotFoundException
-from ..models.mailbox_models import Alias, Mailbox
+from ..models.mailbox_models import Alias, Mailbox, MailboxUsage, MailboxUsageSummary
 from ..services import container
 from ..services.passwords import hash_dovecot_password
 
@@ -30,6 +31,9 @@ logger = logging.getLogger(__name__)
 _ACCOUNTS_FILENAME = "postfix-accounts.cf"
 _VIRTUAL_FILENAME = "postfix-virtual.cf"
 _QUOTAS_FILENAME = "dovecot-quotas.cf"
+
+# ``doveadm quota get`` reports STORAGE in kibibytes and MESSAGE as a raw count.
+_DOVEADM_STORAGE_UNIT = 1024
 
 
 # ── Hashing ───────────────────────────────────────────────────────────────────
@@ -175,6 +179,69 @@ def _remove_quota_line(address: str) -> None:
     if quotas.pop(address, None) is None:
         return
     _write_lines(_QUOTAS_FILENAME, [f"{email}:{q}" for email, q in sorted(quotas.items())])
+
+
+def _parse_doveadm_amount(value: str) -> int | None:
+    """Return a ``doveadm`` numeric cell, or ``None`` for ``-`` (no limit)."""
+    cleaned = value.strip()
+    if not cleaned or cleaned == "-":
+        return None
+    try:
+        return int(cleaned)
+    except ValueError:
+        return None
+
+
+def get_usage() -> MailboxUsageSummary:
+    """Return the disk each mail account really occupies, via ``doveadm quota get``.
+
+    ``doveadm -f tab quota get -A`` prints a header row then two rows per account
+    (``STORAGE`` and ``MESSAGE``). An unlimited account carries ``-`` as its
+    limit. Accounts that have never been accessed have no maildir yet and are
+    reported with a zero usage rather than omitted, so every account is listed.
+
+    Dovecot also answers for addresses that are not accounts — an alias with a
+    maildir of its own, for one. ``postfix-accounts.cf`` is this app's source of
+    truth, so those rows are dropped: the usage list must hold exactly the
+    mailboxes :func:`list_mailboxes` returns, or the dashboard contradicts itself.
+    """
+    output = container.run_in_container(
+        ["doveadm", "-f", "tab", "quota", "get", "-A"],
+        timeout=settings.mailserver_command_timeout,
+    )
+
+    usages: dict[str, MailboxUsage] = {
+        mailbox.email: MailboxUsage(email=mailbox.email) for mailbox in list_mailboxes()
+    }
+    for line in output.splitlines()[1:]:  # Skip the header row.
+        fields = line.split("\t")
+        if len(fields) < 5:
+            continue
+        email, _quota_name, kind, raw_value, raw_limit = (f.strip() for f in fields[:5])
+        usage = usages.get(email.lower())
+        if usage is None:  # An alias or a stale maildir, not a mail account.
+            continue
+        value, limit = _parse_doveadm_amount(raw_value), _parse_doveadm_amount(raw_limit)
+        if kind == "STORAGE":
+            usage.used_bytes = (value or 0) * _DOVEADM_STORAGE_UNIT
+            usage.limit_bytes = limit * _DOVEADM_STORAGE_UNIT if limit else None
+        elif kind == "MESSAGE":
+            usage.message_count = value or 0
+
+    for usage in usages.values():
+        if usage.limit_bytes:
+            usage.percent = min(round(usage.used_bytes / usage.limit_bytes * 100), 100)
+
+    mailboxes = sorted(usages.values(), key=lambda u: u.used_bytes, reverse=True)
+    # A single unlimited account makes the overall limit meaningless.
+    every_account_capped = bool(mailboxes) and all(u.limit_bytes for u in mailboxes)
+    return MailboxUsageSummary(
+        mailboxes=mailboxes,
+        total_used_bytes=sum(u.used_bytes for u in mailboxes),
+        total_limit_bytes=sum(u.limit_bytes or 0 for u in mailboxes)
+        if every_account_capped
+        else None,
+    )
 
 
 def set_quota(email: str, quota: str | None) -> Mailbox:
