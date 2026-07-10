@@ -13,6 +13,8 @@ they live in flat files inside the shared docker-mailserver config volume
 * ``before.dovecot.sieve`` / ``after.dovecot.sieve`` — global Sieve scripts;
 * ``rspamd/custom-commands.conf`` — Rspamd module and worker overrides;
 * ``amavis.cf`` — Amavis overrides (see :class:`SpamConfig`);
+* ``ldap-{users,groups,aliases,domains}.cf`` — Postfix LDAP maps, read only when
+  ``ACCOUNT_PROVISIONER=LDAP``;
 * ``opendkim/keys/<domain>/<selector>.txt`` or ``rspamd/dkim/*.public.txt`` —
   generated DKIM public records (key generation requires the container).
 
@@ -307,6 +309,41 @@ class RspamdOverrides(BaseModel):
     restart_required: bool = True
 
 
+# ── LDAP provisioner maps ─────────────────────────────────────────────────────
+
+
+# Which Postfix LDAP map to edit. Each one answers a different lookup: the
+# mailboxes, the distribution groups, the aliases and the hosted domains.
+LdapScope = Literal["users", "groups", "aliases", "domains"]
+
+
+class LdapConfig(BaseModel):
+    """One ``ldap-<scope>.cf`` Postfix LDAP map from the config volume.
+
+    docker-mailserver copies the file to ``/etc/postfix/`` when it starts, then
+    overwrites every key for which a matching ``LDAP_<KEY>`` variable is set in
+    the container's environment. The keys it would overwrite are listed in
+    ``overridden_keys``: whatever this file says about them is discarded.
+    """
+
+    scope: LdapScope
+    content: str = ""
+    # False when no such file exists: docker-mailserver then uses its own default.
+    configured: bool = False
+    # ``ACCOUNT_PROVISIONER``; these maps are only read when it is ``LDAP``.
+    provisioner: str = ""
+    ldap_enabled: bool = False
+    # Keys of this file the environment overrides at startup, lower-cased.
+    overridden_keys: list[str] = Field(default_factory=list)
+    restart_required: bool = True
+
+
+class LdapConfigUpdate(BaseModel):
+    """Request schema replacing one Postfix LDAP map."""
+
+    content: str = Field(default="", max_length=65536)
+
+
 # ── Postfix mail queue ────────────────────────────────────────────────────────
 
 
@@ -412,7 +449,8 @@ class MailserverEnvironment(BaseModel):
     unavailable (for instance a Rspamd DKIM backend, or a global relay host).
     """
 
-    # Every ``KEY='value'`` pair the mailserver wrote at startup.
+    # Every ``KEY='value'`` pair the mailserver wrote at startup, except the ones
+    # holding a secret: those are redacted, as nothing here can be changed anyway.
     variables: dict[str, str] = Field(default_factory=dict)
     # Which implementation signs outgoing mail, and therefore where the DKIM
     # keys this app reads are stored.

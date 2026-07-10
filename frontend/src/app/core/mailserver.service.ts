@@ -10,6 +10,9 @@ import {
   DovecotConfigUpdateRequest,
   DovecotMaster,
   DovecotMasterCreateRequest,
+  LdapConfig,
+  LdapConfigUpdateRequest,
+  LdapScope,
   MailLog,
   MailserverEnvironment,
   MailStats,
@@ -269,6 +272,19 @@ export class MailserverService {
   async setRspamdOverrides(commands: RspamdCommand[]): Promise<RspamdOverrides> {
     const body: RspamdCommandsUpdateRequest = { commands };
     return firstValueFrom(this.http.put<RspamdOverrides>('/api/mailserver/rspamd', body));
+  }
+
+  // ── LDAP provisioner maps ───────────────────────────────────────────────────
+
+  /** Return one Postfix LDAP map, with the keys the environment overrides. */
+  async getLdapConfig(scope: LdapScope): Promise<LdapConfig> {
+    return firstValueFrom(this.http.get<LdapConfig>(`/api/mailserver/ldap/${scope}`));
+  }
+
+  /** Replace one Postfix LDAP map; takes effect when the mailserver restarts. */
+  async setLdapConfig(scope: LdapScope, content: string): Promise<LdapConfig> {
+    const body: LdapConfigUpdateRequest = { content };
+    return firstValueFrom(this.http.put<LdapConfig>(`/api/mailserver/ldap/${scope}`, body));
   }
 
   // ── Postfix mail queue ──────────────────────────────────────────────────────

@@ -3,6 +3,7 @@ import {
   Component,
   DOCUMENT,
   computed,
+  effect,
   inject,
   signal,
 } from '@angular/core';
@@ -10,6 +11,7 @@ import { CommonModule } from '@angular/common';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 
 import { AuthService } from './core/auth.service';
+import { MailserverService } from './core/mailserver.service';
 import { SessionExpiredModal } from './shared/session-expired-modal/session-expired-modal';
 import { UserMenu } from './shared/user-menu/user-menu';
 
@@ -34,11 +36,17 @@ const DESKTOP_MIN_WIDTH = 768;
 })
 export class App {
   private readonly auth = inject(AuthService);
+  private readonly mailserver = inject(MailserverService);
   private readonly window = inject(DOCUMENT).defaultView;
 
   protected readonly isAuthenticated = computed(() => this.auth.user() !== null);
   protected readonly isAdmin = this.auth.isAdmin;
   protected readonly canManageMailboxes = this.auth.canManageMailboxes;
+  /**
+   * Whether accounts come from a directory. The LDAP maps are inert under any
+   * other provisioner, so the link to them only appears when they are read.
+   */
+  protected readonly usesLdap = signal(false);
   protected readonly sections = signal({
     mailbox: true,
     mailserver: false,
@@ -46,6 +54,29 @@ export class App {
     settings: false,
   });
   protected readonly sidebarCollapsed = signal(this.readCollapsed());
+
+  constructor() {
+    effect(() => {
+      if (!this.isAdmin()) {
+        this.usesLdap.set(false);
+        return;
+      }
+      void this.loadProvisioner();
+    });
+  }
+
+  /**
+   * Read the provisioner once per session. It is baked into the mailserver
+   * container at startup, and an unreachable container simply hides the link.
+   */
+  private async loadProvisioner(): Promise<void> {
+    try {
+      const environment = await this.mailserver.getEnvironment();
+      this.usesLdap.set(environment.account_provisioner.toUpperCase() === 'LDAP');
+    } catch {
+      this.usesLdap.set(false);
+    }
+  }
 
   protected toggleSection(section: 'mailbox' | 'mailserver' | 'fail2ban' | 'settings'): void {
     // On the rail the submenu is a hover flyout, so toggling it would look inert.

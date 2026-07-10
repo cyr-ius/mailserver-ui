@@ -135,6 +135,17 @@
           >
             Rspamd
           </a>
+          <!-- The LDAP maps are only read under ACCOUNT_PROVISIONER=LDAP. -->
+          @if (usesLdap()) {
+          <a
+            class="nav-link"
+            routerLink="/mailserver/ldap"
+            routerLinkActive="active"
+            [routerLinkActiveOptions]="{ exact: true }"
+          >
+            LDAP maps
+          </a>
+          }
           <a
             class="nav-link"
             routerLink="/mailserver/dkim"

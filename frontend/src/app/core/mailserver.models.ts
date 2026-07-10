@@ -336,3 +336,29 @@ export interface RspamdOverrides {
 export interface RspamdCommandsUpdateRequest {
   commands: RspamdCommand[];
 }
+
+/** Which Postfix LDAP map to edit. */
+export type LdapScope = 'users' | 'groups' | 'aliases' | 'domains';
+
+/**
+ * One ldap-<scope>.cf Postfix LDAP map. docker-mailserver copies it to
+ * /etc/postfix/ at startup, then overwrites every key for which a matching
+ * LDAP_<KEY> variable is set — those keys are listed in `overridden_keys`.
+ */
+export interface LdapConfig {
+  scope: LdapScope;
+  content: string;
+  /** False when no such file exists: docker-mailserver uses its own default. */
+  configured: boolean;
+  /** ACCOUNT_PROVISIONER; these maps are only read when it is LDAP. */
+  provisioner: string;
+  ldap_enabled: boolean;
+  /** Keys of this file the environment overrides at startup, lower-cased. */
+  overridden_keys: string[];
+  restart_required: boolean;
+}
+
+/** Request schema replacing one Postfix LDAP map. */
+export interface LdapConfigUpdateRequest {
+  content: string;
+}

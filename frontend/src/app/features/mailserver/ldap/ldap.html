@@ -1,0 +1,87 @@
+<main class="container py-4">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h1 class="h4 mb-0">
+      <i class="bi bi-diagram-3 text-primary me-2" aria-hidden="true"></i>
+      LDAP maps
+    </h1>
+  </div>
+
+  <p class="text-body-secondary small">
+    The Postfix LDAP maps docker-mailserver reads when accounts come from a directory. Each file is copied to
+    <code>/etc/postfix/</code> when the container starts: restart it to apply a change. Deleting the contents of a map
+    restores the default one docker-mailserver ships with.
+  </p>
+
+  @if (success(); as msg) {
+  <div class="alert alert-success py-2" role="alert">{{ msg }}</div>
+  } @if (error(); as msg) {
+  <div class="alert alert-danger py-2" role="alert">{{ msg }}</div>
+  } @if (!loading() && !ldapEnabled()) {
+  <div class="alert alert-warning py-2" role="alert">
+    <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
+    Accounts are provisioned with
+    <code>ACCOUNT_PROVISIONER={{ provisioner() || 'FILE' }}</code>, not <code>LDAP</code>. These maps are stored but
+    never read.
+  </div>
+  }
+
+  <div class="btn-group btn-group-sm mb-3" role="group" aria-label="LDAP map">
+    @for (entry of scopes; track entry.scope) {
+    <button
+      type="button"
+      class="btn"
+      [class.btn-primary]="scope() === entry.scope"
+      [class.btn-outline-primary]="scope() !== entry.scope"
+      (click)="setScope(entry.scope)"
+    >
+      {{ entry.label }}
+    </button>
+    }
+  </div>
+
+  @if (loading()) {
+  <div class="text-center text-body-secondary py-5">
+    <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+    Loading the map…
+  </div>
+  } @else {
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <p class="form-text mt-0 mb-2">
+        <code>{{ current().filename }}</code> — {{ current().purpose }}. @if (!configured()) { No such file yet:
+        docker-mailserver uses its own default map. }
+      </p>
+
+      @if (overriddenKeys().length > 0) {
+      <div class="alert alert-warning py-2 small" role="alert">
+        <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
+        The container's environment overwrites <code>{{ overriddenList() }}</code> when the mailserver starts. Whatever
+        this file says about {{ overriddenKeys().length === 1 ? 'that key' : 'those keys' }} is discarded — change the
+        matching <code>LDAP_*</code> variable instead.
+      </div>
+      }
+
+      <textarea
+        class="form-control font-monospace"
+        rows="14"
+        spellcheck="false"
+        [attr.aria-label]="current().filename"
+        [placeholder]="current().placeholder"
+        [value]="content()"
+        (input)="onContent($event)"
+      ></textarea>
+      <div class="form-text">
+        One <code>key = value</code> per line, as Postfix's <code>ldap_table(5)</code> expects. A
+        <code>bind_pw</code> written here is stored in clear text in the config volume.
+      </div>
+      <div class="d-flex justify-content-end mt-3">
+        <button type="button" class="btn btn-sm btn-primary" (click)="onSave()" [disabled]="saving()">
+          @if (saving()) {
+          <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+          } Save map
+        </button>
+      </div>
+    </div>
+  </div>
+  }
+</main>

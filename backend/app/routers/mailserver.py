@@ -27,6 +27,9 @@ from ..models.mailserver_models import (
     DovecotConfigUpdate,
     DovecotMaster,
     DovecotMasterCreate,
+    LdapConfig,
+    LdapConfigUpdate,
+    LdapScope,
     MailLog,
     MailserverEnvironment,
     MailStats,
@@ -294,6 +297,23 @@ async def update_rspamd_overrides(
 ) -> RspamdOverrides:
     """Replace the Rspamd custom commands; takes effect on restart (admin only)."""
     return await run_in_threadpool(mailserver_service.set_rspamd_overrides, payload.commands)
+
+
+# ── LDAP provisioner maps ─────────────────────────────────────────────────────
+
+
+@router.get("/ldap/{scope}", response_model=LdapConfig)
+async def get_ldap_config(scope: LdapScope, _admin: AdminDep) -> LdapConfig:
+    """Return one Postfix LDAP map, with the keys the environment overrides (admin only)."""
+    return await run_in_threadpool(mailserver_service.get_ldap_config, scope)
+
+
+@router.put("/ldap/{scope}", response_model=LdapConfig)
+async def update_ldap_config(
+    scope: LdapScope, payload: LdapConfigUpdate, _admin: AdminDep
+) -> LdapConfig:
+    """Replace one Postfix LDAP map; takes effect on restart (admin only)."""
+    return await run_in_threadpool(mailserver_service.set_ldap_config, scope, payload.content)
 
 
 # ── Postfix mail queue ────────────────────────────────────────────────────────

@@ -63,6 +63,10 @@ export const routes: Routes = [
         loadComponent: () => import('./features/mailserver/rspamd/rspamd').then((m) => m.Rspamd),
       },
       {
+        path: 'ldap',
+        loadComponent: () => import('./features/mailserver/ldap/ldap').then((m) => m.Ldap),
+      },
+      {
         path: 'dkim',
         loadComponent: () => import('./features/mailserver/dkim/dkim').then((m) => m.Dkim),
       },

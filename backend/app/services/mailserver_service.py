@@ -18,6 +18,8 @@ mailbox-specific:
 * ``amavis.cf`` — Amavis overrides, replacing ``/etc/amavis/conf.d/50-user``;
 * ``whitelist_clients.local`` / ``whitelist_recipients`` — Postgrey whitelists;
 * ``rspamd/custom-commands.conf`` — Rspamd module and worker overrides;
+* ``ldap-{users,groups,aliases,domains}.cf`` — Postfix LDAP maps, only read when
+  the container runs with ``ACCOUNT_PROVISIONER=LDAP``;
 * ``opendkim/keys/<domain>/<selector>.txt`` or ``rspamd/dkim/*.public.txt`` —
   generated DKIM records (read-only; generation runs in the container).
 
@@ -53,6 +55,8 @@ from ..models.mailserver_models import (
     DovecotConfig,
     DovecotMaster,
     EnvironmentWarning,
+    LdapConfig,
+    LdapScope,
     MailLog,
     MailserverEnvironment,
     MailStats,
@@ -112,6 +116,33 @@ _SPAM_CONFIG_FILENAMES: dict[str, str] = {
 
 # Rspamd's simplified override file, applied after ``rspamd/override.d/``.
 _RSPAMD_COMMANDS_FILENAME = "rspamd/custom-commands.conf"
+
+# Postfix LDAP maps, copied to ``/etc/postfix/`` when ``ACCOUNT_PROVISIONER=LDAP``.
+_LDAP_FILENAMES: dict[str, str] = {
+    "users": "ldap-users.cf",
+    "groups": "ldap-groups.cf",
+    "aliases": "ldap-aliases.cf",
+    "domains": "ldap-domains.cf",
+}
+
+# Each map gets its ``query_filter`` from its own environment variable, which
+# docker-mailserver exports as ``LDAP_QUERY_FILTER`` just before rewriting it.
+_LDAP_QUERY_FILTER_VARIABLES: dict[str, str] = {
+    "users": "LDAP_QUERY_FILTER_USER",
+    "groups": "LDAP_QUERY_FILTER_GROUP",
+    "aliases": "LDAP_QUERY_FILTER_ALIAS",
+    "domains": "LDAP_QUERY_FILTER_DOMAIN",
+}
+
+# A Postfix LDAP map line: ``key = value``, the key a lower_snake identifier.
+_LDAP_LINE_RE = re.compile(r"^[A-Za-z0-9_]+\s*=")
+
+# Variables docker-mailserver writes to ``/etc/dms-settings`` that hold a secret.
+# They are read-only here, so their value is of no use to the UI.
+_SECRET_VARIABLES = frozenset({"LDAP_BIND_PW", "SRS_SECRET"})
+
+# What replaces a secret's value in the environment view.
+_REDACTED = "••••••••"
 
 # How many arguments each ``custom-commands.conf`` directive takes, and which of
 # ``target``/``option``/``value`` they land in. ``value`` always swallows the
@@ -1161,6 +1192,102 @@ def set_rspamd_overrides(commands: list[RspamdCommand]) -> RspamdOverrides:
     )
 
 
+# ── LDAP provisioner maps ─────────────────────────────────────────────────────
+
+
+def _ldap_filename(scope: str) -> str:
+    """Return the config-volume file name backing the LDAP map ``scope``."""
+    filename = _LDAP_FILENAMES.get(scope)
+    if filename is None:
+        scopes = ", ".join(sorted(_LDAP_FILENAMES))
+        raise BadRequestException(f"An LDAP map scope must be one of: {scopes}")
+    return filename
+
+
+def _ldap_file_keys(content: str) -> list[str]:
+    """Return the ``key`` of every ``key = value`` line of an LDAP map, in order."""
+    keys: list[str] = []
+    for line in content.splitlines():
+        stripped = line.strip()
+        if stripped and not stripped.startswith("#") and _LDAP_LINE_RE.match(stripped):
+            keys.append(stripped.partition("=")[0].strip().lower())
+    return keys
+
+
+def _ldap_overridden_keys(scope: str, content: str) -> list[str]:
+    """Return the keys of this map that the container's environment overwrites.
+
+    At startup docker-mailserver rewrites every ``key = value`` line for which an
+    ``LDAP_<KEY>`` variable is exported, and feeds each map its own
+    ``LDAP_QUERY_FILTER_<SCOPE>`` as ``query_filter``. A variable left empty is
+    treated as unset: ``/etc/dms-settings`` records the defaulted-to-empty ones
+    the same way it records those never given, and only an exported variable
+    reaches the rewrite.
+    """
+    variables = _dms_settings()
+    filter_variable = _LDAP_QUERY_FILTER_VARIABLES[scope]
+
+    overridden: list[str] = []
+    for key in _ldap_file_keys(content):
+        variable = filter_variable if key == "query_filter" else f"LDAP_{key.upper()}"
+        if variables.get(variable):
+            overridden.append(key)
+    return overridden
+
+
+def _ldap_view(scope: LdapScope, content: str) -> LdapConfig:
+    """Build the response for an LDAP map from its raw contents."""
+    provisioner = _dms_settings().get("ACCOUNT_PROVISIONER", "")
+    return LdapConfig(
+        scope=scope,
+        content=content,
+        configured=bool(content),
+        provisioner=provisioner,
+        ldap_enabled=provisioner.upper() == "LDAP",
+        overridden_keys=_ldap_overridden_keys(scope, content),
+    )
+
+
+def get_ldap_config(scope: LdapScope) -> LdapConfig:
+    """Return the Postfix LDAP map for ``scope`` (empty when absent).
+
+    The map may hold the LDAP bind password in clear text, exactly as the file on
+    disk does; it is returned as-is because an operator cannot edit a file whose
+    contents the editor hides from them.
+    """
+    return _ldap_view(scope, _read_managed_body(_ldap_filename(scope)))
+
+
+def set_ldap_config(scope: LdapScope, content: str) -> LdapConfig:
+    """Replace the Postfix LDAP map for ``scope``; applies once the container restarts.
+
+    An empty map deletes the file rather than leaving a comment-only one behind:
+    docker-mailserver would copy that into ``/etc/postfix/`` and point Postfix at
+    a map with no ``server_host``, which is worse than falling back to the
+    default map it ships.
+
+    Only the ``key = value`` shape is checked here. Postfix parses the map when
+    it starts, and an unknown key or a bad LDAP query only surfaces then.
+    """
+    body = content.strip()
+    if not body:
+        container.delete_config(_ldap_filename(scope))
+        logger.info("Removed the '%s' LDAP map", scope)
+        return _ldap_view(scope, "")
+
+    for line in body.splitlines():
+        stripped = line.strip()
+        if stripped and not stripped.startswith("#") and not _LDAP_LINE_RE.match(stripped):
+            raise BadRequestException(
+                f"Invalid LDAP map line: {stripped!r}. Expected 'key = value', "
+                "e.g. search_base = ou=people,dc=example,dc=com"
+            )
+
+    _write_managed_body(_ldap_filename(scope), body)
+    logger.info("Updated the '%s' LDAP map (%d bytes)", scope, len(body))
+    return _ldap_view(scope, body)
+
+
 # ── Postfix mail queue ────────────────────────────────────────────────────────
 
 
@@ -1430,7 +1557,19 @@ def _environment_warnings(variables: dict[str, str]) -> list[EnvironmentWarning]
     clamav = _flag(variables, "ENABLE_CLAMAV")
     warnings: list[EnvironmentWarning] = []
 
-    if variables.get("ACCOUNT_PROVISIONER", "") != "FILE":
+    provisioner = variables.get("ACCOUNT_PROVISIONER", "")
+    if provisioner.upper() == "LDAP":
+        warnings.append(
+            EnvironmentWarning(
+                level="danger",
+                variables=["ACCOUNT_PROVISIONER"],
+                message=(
+                    "Accounts come from LDAP, so the mailbox, alias and quota pages "
+                    "of this UI cannot manage them. Edit the LDAP maps instead."
+                ),
+            )
+        )
+    elif provisioner != "FILE":
         warnings.append(
             EnvironmentWarning(
                 level="danger",
@@ -1534,10 +1673,19 @@ def _environment_warnings(variables: dict[str, str]) -> list[EnvironmentWarning]
 
 
 def get_environment() -> MailserverEnvironment:
-    """Return the mailserver's effective environment (read-only, set at startup)."""
+    """Return the mailserver's effective environment (read-only, set at startup).
+
+    ``/etc/dms-settings`` holds the LDAP bind password and the SRS secret next to
+    the harmless toggles. Nothing here is editable, so their values are redacted
+    rather than echoed back to every administrator who opens the page.
+    """
     variables = _dms_settings()
+    redacted = {
+        name: (_REDACTED if name in _SECRET_VARIABLES and value else value)
+        for name, value in variables.items()
+    }
     return MailserverEnvironment(
-        variables=variables,
+        variables=redacted,
         dkim_backend="rspamd" if _flag(variables, "ENABLE_RSPAMD") else "opendkim",
         global_relay_host=variables.get("DEFAULT_RELAY_HOST") or variables.get("RELAY_HOST", ""),
         postmaster_address=variables.get("POSTMASTER_ADDRESS", ""),
