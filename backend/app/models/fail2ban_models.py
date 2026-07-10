@@ -81,3 +81,21 @@ class Fail2banPolicyUpdate(BaseModel):
     bantime: int = Field(ge=60, le=31_536_000)
     findtime: int = Field(ge=60, le=31_536_000)
     maxretry: int = Field(ge=1, le=100)
+
+
+class Fail2banConfig(BaseModel):
+    """The raw contents of ``fail2ban-fail2ban.cf``.
+
+    Tunes the fail2ban daemon itself — log level, database retention — rather
+    than any jail. docker-mailserver copies it to ``/etc/fail2ban/fail2ban.local``
+    when it starts, so a change only applies after a restart.
+    """
+
+    content: str = ""
+    restart_required: bool = True
+
+
+class Fail2banConfigUpdate(BaseModel):
+    """Request schema replacing the fail2ban daemon configuration."""
+
+    content: str = Field(default="", max_length=65536)

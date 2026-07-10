@@ -11,6 +11,9 @@ are read and written *inside* the mailserver container over the Docker socket
 * ``postfix-virtual.cf`` — aliases, one ``alias target`` (whitespace-separated)
   line each; a line may carry several comma-separated targets.
 * ``dovecot-quotas.cf`` — per-account quotas, one ``user@domain:5G`` line each.
+* ``<user@domain>.dovecot.sieve`` — the account's personal Sieve filter, one
+  file per account. Unlike the three above it is *not* watched: the mailserver
+  compiles it into the maildir at startup.
 
 docker-mailserver watches these files and reacts automatically, so editing them
 is all that is required. Writes are atomic (temp file + ``mv`` in the container)
@@ -18,10 +21,17 @@ so the mailserver's file watcher never observes a half-written file.
 """
 
 import logging
+import re
 
 from ..config import settings
 from ..exceptions import BadRequestException, ConflictException, NotFoundException
-from ..models.mailbox_models import Alias, Mailbox, MailboxUsage, MailboxUsageSummary
+from ..models.mailbox_models import (
+    Alias,
+    Mailbox,
+    MailboxSieveScript,
+    MailboxUsage,
+    MailboxUsageSummary,
+)
 from ..services import container
 from ..services.passwords import hash_dovecot_password
 
@@ -34,6 +44,9 @@ _QUOTAS_FILENAME = "dovecot-quotas.cf"
 
 # ``doveadm quota get`` reports STORAGE in kibibytes and MESSAGE as a raw count.
 _DOVEADM_STORAGE_UNIT = 1024
+
+# An address safe to build a file name from: no slash, no "..", no whitespace.
+_SIEVE_ADDRESS_RE = re.compile(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+$")
 
 
 # ── Hashing ───────────────────────────────────────────────────────────────────
@@ -118,7 +131,7 @@ def create_mailbox(email: str, password: str, quota: str | None = None) -> Mailb
 
 
 def delete_mailbox(email: str) -> None:
-    """Remove a mail account along with its quota and inbound aliases.
+    """Remove a mail account along with its quota, aliases and Sieve filter.
 
     The maildir itself is left untouched on disk.
     """
@@ -130,6 +143,8 @@ def delete_mailbox(email: str) -> None:
     _write_lines(_ACCOUNTS_FILENAME, remaining)
     _remove_quota_line(address)
     _remove_target_from_aliases(address)
+    if _SIEVE_ADDRESS_RE.match(address):
+        container.delete_config(_sieve_filename(address))
     logger.info("Deleted mailbox %s", address)
 
 
@@ -349,6 +364,61 @@ def _remove_target_from_aliases(target: str) -> None:
             rebuilt.append(line)
     if changed:
         _write_lines(_VIRTUAL_FILENAME, rebuilt)
+
+
+# ── Personal Sieve filter ─────────────────────────────────────────────────────
+
+
+def _sieve_filename(address: str) -> str:
+    """Return the config-volume file name holding ``address``'s Sieve filter."""
+    return f"{address}.dovecot.sieve"
+
+
+def _require_sieve_address(email: str) -> str:
+    """Return the normalised address, rejecting anything unsafe as a file name."""
+    address = _normalise_email(email)
+    if not _SIEVE_ADDRESS_RE.match(address):
+        raise BadRequestException(f"Invalid mailbox address: {email!r}")
+    return address
+
+
+def get_sieve_script(email: str) -> MailboxSieveScript:
+    """Return the personal Sieve filter of an account (empty when it has none)."""
+    address = _require_sieve_address(email)
+    _require_mailbox(address)
+    content = container.read_config(_sieve_filename(address)).strip()
+    return MailboxSieveScript(email=address, content=content, configured=bool(content))
+
+
+def set_sieve_script(email: str, content: str) -> MailboxSieveScript:
+    """Replace the personal Sieve filter of an account.
+
+    An empty script deletes the file rather than leaving an empty one behind:
+    Dovecot would compile it into an inert script that shadows nothing, but the
+    account would keep reporting a filter it does not have. The script itself is
+    compiled by ``sievec`` when the mailserver starts, so a syntax error surfaces
+    there rather than here.
+    """
+    address = _require_sieve_address(email)
+    _require_mailbox(address)
+
+    body = content.strip()
+    if not body:
+        container.delete_config(_sieve_filename(address))
+        logger.info("Removed the Sieve filter of %s", address)
+        return MailboxSieveScript(email=address, content="", configured=False)
+
+    container.write_config(_sieve_filename(address), f"{body}\n")
+    logger.info("Updated the Sieve filter of %s (%d bytes)", address, len(body))
+    return MailboxSieveScript(email=address, content=body, configured=True)
+
+
+def delete_sieve_script(email: str) -> None:
+    """Remove the personal Sieve filter of an account."""
+    address = _require_sieve_address(email)
+    _require_mailbox(address)
+    container.delete_config(_sieve_filename(address))
+    logger.info("Deleted the Sieve filter of %s", address)
 
 
 # ── Internal helpers ──────────────────────────────────────────────────────────

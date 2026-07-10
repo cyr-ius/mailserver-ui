@@ -18,6 +18,8 @@ from ..models.fail2ban_models import (
     BannedIp,
     BanRequest,
     Fail2banActionResult,
+    Fail2banConfig,
+    Fail2banConfigUpdate,
     Fail2banLog,
     Fail2banPolicy,
     Fail2banPolicyUpdate,
@@ -72,3 +74,15 @@ async def get_policy(_admin: AdminDep) -> Fail2banPolicy:
 async def set_policy(payload: Fail2banPolicyUpdate, _admin: AdminDep) -> Fail2banPolicy:
     """Replace the fail2ban ban policy; takes effect on restart (admin only)."""
     return await run_in_threadpool(fail2ban_service.set_policy, payload)
+
+
+@router.get("/config", response_model=Fail2banConfig)
+async def get_config(_admin: AdminDep) -> Fail2banConfig:
+    """Return the raw ``fail2ban-fail2ban.cf`` daemon configuration (admin only)."""
+    return await run_in_threadpool(fail2ban_service.get_config)
+
+
+@router.put("/config", response_model=Fail2banConfig)
+async def set_config(payload: Fail2banConfigUpdate, _admin: AdminDep) -> Fail2banConfig:
+    """Replace the fail2ban daemon configuration; applies on restart (admin only)."""
+    return await run_in_threadpool(fail2ban_service.set_config, payload.content)

@@ -6,7 +6,8 @@ common volume:
 
 * ``postfix-accounts.cf`` — one ``email|{scheme}hash`` line per account;
 * ``postfix-virtual.cf``  — one ``alias target`` line per alias mapping;
-* ``dovecot-quotas.cf``   — one ``email:quota`` line per quota-limited account.
+* ``dovecot-quotas.cf``   — one ``email:quota`` line per quota-limited account;
+* ``<email>.dovecot.sieve`` — the account's personal Sieve filter, if any.
 
 These Pydantic schemas describe the request/response shapes only; persistence is
 handled by :mod:`app.services.mailbox_service`.
@@ -88,3 +89,24 @@ class AliasCreate(BaseModel):
     """Request schema for adding an alias to a mailbox."""
 
     alias: EmailStr
+
+
+class MailboxSieveScript(BaseModel):
+    """The personal Sieve filter of one account (``<email>.dovecot.sieve``).
+
+    docker-mailserver compiles the script into the account's maildir when it
+    starts, so an edit only reaches Dovecot after the container restarts —
+    unless the user uploads it themselves over ManageSieve.
+    """
+
+    email: str
+    content: str = ""
+    # False when the account has no personal script yet.
+    configured: bool = False
+    restart_required: bool = True
+
+
+class MailboxSieveScriptUpdate(BaseModel):
+    """Request schema replacing the personal Sieve filter of an account."""
+
+    content: str = Field(default="", max_length=65536)

@@ -137,6 +137,14 @@ def write_config(rel_path: str, content: str) -> None:
     )
 
 
+def delete_config(rel_path: str) -> None:
+    """Delete ``<config_dir>/<rel_path>`` inside the container; absent is not an error."""
+    _docker_exec(
+        ["sh", "-c", 'rm -f -- "$1"', "sh", f"{_config_dir()}/{rel_path}"],
+        timeout=settings.mailserver_command_timeout,
+    )
+
+
 def list_config_files(rel_dir: str, suffix: str) -> list[str]:
     """Return the ``suffix`` files under ``<config_dir>/<rel_dir>``.
 

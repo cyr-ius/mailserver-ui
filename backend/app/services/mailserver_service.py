@@ -14,6 +14,10 @@ mailbox-specific:
 * ``dovecot.cf`` — extra Dovecot configuration (copied to ``local.conf``);
 * ``postfix-aliases.cf`` / ``postfix-regexp.cf`` — system and PCRE aliases;
 * ``before.dovecot.sieve`` / ``after.dovecot.sieve`` — global Sieve scripts;
+* ``spamassassin-rules.cf`` — custom SpamAssassin rules and scores;
+* ``amavis.cf`` — Amavis overrides, replacing ``/etc/amavis/conf.d/50-user``;
+* ``whitelist_clients.local`` / ``whitelist_recipients`` — Postgrey whitelists;
+* ``rspamd/custom-commands.conf`` — Rspamd module and worker overrides;
 * ``opendkim/keys/<domain>/<selector>.txt`` or ``rspamd/dkim/*.public.txt`` —
   generated DKIM records (read-only; generation runs in the container).
 
@@ -28,9 +32,10 @@ is a comment in every format involved, so it is inert.
 Only ``postfix-accounts.cf``, ``postfix-virtual.cf``, ``postfix-regexp.cf``,
 ``postfix-aliases.cf``, ``postfix-relaymap.cf``, ``postfix-sasl-password.cf``,
 ``dovecot-quotas.cf`` and ``dovecot-masters.cf`` are watched live. ``postfix-main.cf``,
-``postfix-master.cf``, ``dovecot.cf`` and the global Sieve scripts are read only when
-the mailserver starts, so changing them has no effect until the container is
-restarted; the schemas that carry a single such file set ``restart_required``.
+``postfix-master.cf``, ``dovecot.cf``, the global Sieve scripts and the spam-filtering
+files are read only when the mailserver starts, so changing them has no effect until
+the container is restarted; the schemas that carry a single such file set
+``restart_required``.
 """
 
 import json
@@ -47,6 +52,7 @@ from ..models.mailserver_models import (
     DomainDnsRecords,
     DovecotConfig,
     DovecotMaster,
+    EnvironmentWarning,
     MailLog,
     MailserverEnvironment,
     MailStats,
@@ -60,9 +66,14 @@ from ..models.mailserver_models import (
     RelayHost,
     RelayHostCreate,
     Restriction,
+    RspamdCommand,
+    RspamdOverrides,
     ServiceStatus,
     SieveScope,
     SieveScript,
+    SpamConfig,
+    SpamConfigScope,
+    SpamFilter,
     SystemAlias,
     TlsCertificate,
 )
@@ -87,6 +98,38 @@ _SIEVE_FILENAMES: dict[str, str] = {
     "before": "before.dovecot.sieve",
     "after": "after.dovecot.sieve",
 }
+
+# Spam-filtering files docker-mailserver copies out of the config volume at
+# startup: custom SpamAssassin rules, the two Postgrey whitelists that exempt a
+# client or a recipient from greylisting, and the Amavis overrides that replace
+# ``/etc/amavis/conf.d/50-user``.
+_SPAM_CONFIG_FILENAMES: dict[str, str] = {
+    "rules": "spamassassin-rules.cf",
+    "whitelist-clients": "whitelist_clients.local",
+    "whitelist-recipients": "whitelist_recipients",
+    "amavis": "amavis.cf",
+}
+
+# Rspamd's simplified override file, applied after ``rspamd/override.d/``.
+_RSPAMD_COMMANDS_FILENAME = "rspamd/custom-commands.conf"
+
+# How many arguments each ``custom-commands.conf`` directive takes, and which of
+# ``target``/``option``/``value`` they land in. ``value`` always swallows the
+# rest of the line, so it is the last field of every directive that has one.
+_RSPAMD_COMMAND_FIELDS: dict[str, tuple[str, ...]] = {
+    "set-common-option": ("option", "value"),
+    "set-option-for-controller": ("option", "value"),
+    "set-option-for-proxy": ("option", "value"),
+    "enable-module": ("target",),
+    "disable-module": ("target",),
+    "set-option-for-module": ("target", "option", "value"),
+    "add-line": ("target", "value"),
+}
+
+# An Rspamd module or option name, and an override file name. Neither may carry
+# a separator: they are pasted into a path under ``/etc/rspamd/override.d/``.
+_RSPAMD_NAME_RE = re.compile(r"^[A-Za-z0-9_-]+$")
+_RSPAMD_FILENAME_RE = re.compile(r"^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$")
 
 # The mailserver dumps its effective environment here when it starts.
 _DMS_SETTINGS_PATH = "/etc/dms-settings"
@@ -135,6 +178,22 @@ _QUEUE_ID_RE = re.compile(r"^[A-Za-z0-9]{1,32}$")
 # ``Jul 10 12:34:56`` — where a single-digit day is space-padded.
 _LOG_ISO_DATE_RE = re.compile(r"^(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\S+)?)")
 _LOG_BSD_DATE_RE = re.compile(r"^([A-Z][a-z]{2}\s+\d{1,2} \d{2}:\d{2}:\d{2})")
+
+# The message-id Postfix's ``cleanup`` prints, chevrons included, e.g.
+# ``message-id=<a@b>``. It identifies a message across the two cleanup lines an
+# Amavis round trip produces.
+_LOG_MESSAGE_ID_RE = re.compile(r"message-id=(<[^>]*>|\S+)")
+
+# Substrings marking a rejection that only defers the sender. Postgrey answers
+# with ``POSTGREY_TEXT`` (``Delayed by Postgrey``, reworded by some operators)
+# and Rspamd with ``Try again later``; both are matched lower-cased.
+_GREYLIST_MARKERS = ("greylist", "postgrey", "try again later")
+
+# Amavis prints ``Blocked INFECTED (Eicar-Test-Signature)`` for a virus, and
+# ``Blocked SPAM`` / ``Passed SPAMMY`` for spam. Rspamd rejects through the
+# milter with its own wording.
+_LOG_VIRUS_RE = re.compile(r"\bINFECTED\b")
+_LOG_SPAM_RE = re.compile(r"\b(?:Blocked|Passed) SPAM(?:MY)?\b|\bSpam message rejected\b")
 
 
 # ── Generic file access ───────────────────────────────────────────────────────
@@ -690,6 +749,19 @@ def _parse_log_timestamp(line: str, now: datetime) -> datetime | None:
     return parsed.replace(year=now.year - 1) if parsed > now else parsed
 
 
+def _is_greylisted(line: str) -> bool:
+    """Return whether a rejection line is a greylisting deferral, not a refusal.
+
+    Postgrey answers a temporary 4xx carrying ``POSTGREY_TEXT`` — ``Delayed by
+    Postgrey`` by default, but operators reword it — while Rspamd soft-rejects
+    with ``Try again later``. Postfix logs both as a rejection, yet the sender is
+    expected back: counting them as refused mail would slander every legitimate
+    stranger.
+    """
+    lowered = line.lower()
+    return any(marker in lowered for marker in _GREYLIST_MARKERS)
+
+
 def get_mail_stats() -> MailStats:
     """Count deliveries, rejections and bounces over the trailing stats window.
 
@@ -697,6 +769,13 @@ def get_mail_stats() -> MailStats:
     ``status=`` field it prints, plus the ``cleanup`` line every accepted message
     produces. Lines older than the window, or that carry no timestamp this app
     can read, are skipped.
+
+    Amavis reinjects each message it scanned into Postfix, which logs a second
+    ``cleanup`` line under a fresh queue ID but the same message-id, so
+    ``received`` counts distinct message-ids. Postfix synthesises one for the
+    rare message that arrives without: only a literal empty ``<>`` escapes the
+    deduplication, and it is counted every time rather than collapsing unrelated
+    messages into one.
     """
     hours = settings.mailserver_stats_hours
     output = container.run_in_container(
@@ -707,22 +786,38 @@ def get_mail_stats() -> MailStats:
     now = datetime.now(tz=UTC)
     cutoff = now - timedelta(hours=hours)
     stats = MailStats(period_hours=hours, scanned_lines=0)
+    seen_message_ids: set[str] = set()
     for line in output.splitlines():
         stats.scanned_lines += 1
         timestamp = _parse_log_timestamp(line, now)
         if timestamp is None or timestamp < cutoff:
             continue
         stats.parsed = True
+
+        # What became of this delivery attempt — one outcome per line.
         if "status=sent" in line:
             stats.sent += 1
         elif "status=deferred" in line:
             stats.deferred += 1
         elif "status=bounced" in line:
             stats.bounced += 1
-        elif " reject: " in line:
-            stats.rejected += 1
-        elif "postfix/cleanup" in line and "message-id=" in line:
-            stats.received += 1
+        elif " reject: " in line or "milter-reject:" in line:
+            if _is_greylisted(line):
+                stats.greylisted += 1
+            else:
+                stats.rejected += 1
+        elif "postfix/cleanup" in line:
+            match = _LOG_MESSAGE_ID_RE.search(line)
+            if match and (match.group(1) == "<>" or match.group(1) not in seen_message_ids):
+                seen_message_ids.add(match.group(1))
+                stats.received += 1
+
+        # Why it was refused — a second, independent axis: a rejected spam adds
+        # to both ``rejected`` and ``spam``.
+        if _LOG_VIRUS_RE.search(line):
+            stats.virus += 1
+        elif _LOG_SPAM_RE.search(line):
+            stats.spam += 1
     return stats
 
 
@@ -946,6 +1041,124 @@ def set_sieve_script(scope: SieveScope, content: str) -> SieveScript:
     _write_managed_body(_sieve_filename(scope), body)
     logger.info("Updated the global '%s' Sieve script (%d bytes)", scope, len(body))
     return SieveScript(scope=scope, content=body)
+
+
+# ── Spam filter configuration files ───────────────────────────────────────────
+
+
+def _spam_config_filename(scope: str) -> str:
+    """Return the config-volume filename backing the spam config ``scope``."""
+    filename = _SPAM_CONFIG_FILENAMES.get(scope)
+    if filename is None:
+        scopes = ", ".join(sorted(_SPAM_CONFIG_FILENAMES))
+        raise BadRequestException(f"A spam configuration scope must be one of: {scopes}")
+    return filename
+
+
+def get_spam_config(scope: SpamConfigScope) -> SpamConfig:
+    """Return the spam-filtering file for ``scope`` (empty when absent)."""
+    return SpamConfig(scope=scope, content=_read_managed_body(_spam_config_filename(scope)))
+
+
+def set_spam_config(scope: SpamConfigScope, content: str) -> SpamConfig:
+    """Replace the spam-filtering file for ``scope``.
+
+    docker-mailserver copies these files out of the config volume when it starts,
+    so the mailserver keeps using the previous contents until it is restarted.
+    SpamAssassin rules are only validated then, by ``spamassassin --lint``.
+    """
+    body = content.strip()
+    _write_managed_body(_spam_config_filename(scope), body)
+    logger.info("Updated the '%s' spam configuration (%d bytes)", scope, len(body))
+    return SpamConfig(scope=scope, content=body)
+
+
+# ── Rspamd overrides (custom-commands.conf) ───────────────────────────────────
+
+
+def _parse_rspamd_command(line: str) -> RspamdCommand | None:
+    """Build a :class:`RspamdCommand` from one ``custom-commands.conf`` line.
+
+    Returns ``None`` for a directive this app does not know, or one missing an
+    argument: the file may have been written by hand, and a line nobody can map
+    back to a form is better dropped from the view than shown mangled.
+    """
+    head = line.split(None, 1)
+    kind, remainder = head[0], head[1] if len(head) > 1 else ""
+    fields = _RSPAMD_COMMAND_FIELDS.get(kind)
+    if fields is None:
+        return None
+
+    # ``value`` is the rest of the line, so it never takes part in the split.
+    parts = remainder.split(None, len(fields) - 1)
+    if len(parts) != len(fields):
+        return None
+    return RspamdCommand(
+        kind=kind,  # type: ignore[arg-type]  # kind is a key of _RSPAMD_COMMAND_FIELDS
+        **dict(zip(fields, (part.strip() for part in parts), strict=True)),
+    )
+
+
+def _format_rspamd_command(command: RspamdCommand) -> str:
+    """Render a :class:`RspamdCommand` back to its ``custom-commands.conf`` line."""
+    fields = _RSPAMD_COMMAND_FIELDS[command.kind]
+    return " ".join([command.kind, *(getattr(command, field) for field in fields)])
+
+
+def _validate_rspamd_command(command: RspamdCommand) -> RspamdCommand:
+    """Return the trimmed command, rejecting names or arguments Rspamd would not take."""
+    fields = _RSPAMD_COMMAND_FIELDS[command.kind]
+    cleaned = RspamdCommand(
+        kind=command.kind,
+        **{field: getattr(command, field).strip() for field in fields},
+    )
+
+    for field in fields:
+        if not getattr(cleaned, field):
+            raise BadRequestException(f"{command.kind} requires a non-empty {field}")
+
+    # The value ends the line, so a newline in it would forge a second directive.
+    if "\n" in cleaned.value or "\r" in cleaned.value:
+        raise BadRequestException("An Rspamd option value must fit on a single line")
+
+    if cleaned.option and not _RSPAMD_NAME_RE.match(cleaned.option):
+        raise BadRequestException(f"Invalid Rspamd option name: {cleaned.option!r}")
+
+    if cleaned.target:
+        # ``add-line`` targets a file under override.d/, every other a module.
+        pattern = _RSPAMD_FILENAME_RE if cleaned.kind == "add-line" else _RSPAMD_NAME_RE
+        if not pattern.match(cleaned.target):
+            noun = "override file name" if cleaned.kind == "add-line" else "module name"
+            raise BadRequestException(f"Invalid Rspamd {noun}: {cleaned.target!r}")
+    return cleaned
+
+
+def get_rspamd_overrides() -> RspamdOverrides:
+    """Return the directives of ``rspamd/custom-commands.conf``, in file order."""
+    commands = [
+        command
+        for command in map(_parse_rspamd_command, _read_config_lines(_RSPAMD_COMMANDS_FILENAME))
+        if command is not None
+    ]
+    return RspamdOverrides(
+        commands=commands,
+        rspamd_enabled=_flag(_dms_settings(), "ENABLE_RSPAMD"),
+    )
+
+
+def set_rspamd_overrides(commands: list[RspamdCommand]) -> RspamdOverrides:
+    """Replace the full set of Rspamd custom commands, validating each directive.
+
+    Order is preserved and duplicates are kept: ``add-line`` is append-only, so
+    two identical lines are two lines.
+    """
+    cleaned = [_validate_rspamd_command(command) for command in commands]
+    _write_managed(_RSPAMD_COMMANDS_FILENAME, [_format_rspamd_command(c) for c in cleaned])
+    logger.info("Updated %d Rspamd command(s)", len(cleaned))
+    return RspamdOverrides(
+        commands=cleaned,
+        rspamd_enabled=_flag(_dms_settings(), "ENABLE_RSPAMD"),
+    )
 
 
 # ── Postfix mail queue ────────────────────────────────────────────────────────
@@ -1174,13 +1387,150 @@ def _dms_settings() -> dict[str, str]:
     return variables
 
 
+def _flag(variables: dict[str, str], name: str, *, default: str = "0") -> bool:
+    """Return whether the ``ENABLE_*`` toggle ``name`` is on.
+
+    docker-mailserver omits a variable from ``/etc/dms-settings`` only when it
+    never defaulted it, so ``default`` carries the value the mailserver would
+    have assumed — ``1`` for the features it ships enabled.
+    """
+    return variables.get(name, default) == "1"
+
+
 def dkim_backend() -> str:
     """Return which implementation signs outgoing mail: ``rspamd`` or ``opendkim``.
 
     The two store their generated keys in different directories, so every DKIM
     read has to pick a side.
     """
-    return "rspamd" if _dms_settings().get("ENABLE_RSPAMD") == "1" else "opendkim"
+    return "rspamd" if _flag(_dms_settings(), "ENABLE_RSPAMD") else "opendkim"
+
+
+def _spam_filter(variables: dict[str, str]) -> SpamFilter:
+    """Return the content filter in charge: ``rspamd``, ``spamassassin`` or ``none``.
+
+    Rspamd wins when both are on: docker-mailserver starts it either way, and it
+    is the one that ends up milting the mail.
+    """
+    if _flag(variables, "ENABLE_RSPAMD"):
+        return "rspamd"
+    return "spamassassin" if _flag(variables, "ENABLE_SPAMASSASSIN") else "none"
+
+
+def _environment_warnings(variables: dict[str, str]) -> list[EnvironmentWarning]:
+    """Return the contradictions in the environment the container started with.
+
+    docker-mailserver accepts these combinations and silently lets one side win,
+    so nothing else surfaces them. Rspamd reimplements the whole Amavis stack:
+    running both means two filters, two DKIM signers and two greylists.
+    """
+    rspamd = _flag(variables, "ENABLE_RSPAMD")
+    amavis = _flag(variables, "ENABLE_AMAVIS", default="1")
+    spamassassin = _flag(variables, "ENABLE_SPAMASSASSIN")
+    clamav = _flag(variables, "ENABLE_CLAMAV")
+    warnings: list[EnvironmentWarning] = []
+
+    if variables.get("ACCOUNT_PROVISIONER", "") != "FILE":
+        warnings.append(
+            EnvironmentWarning(
+                level="danger",
+                variables=["ACCOUNT_PROVISIONER"],
+                message=(
+                    "This UI writes the account files directly and needs "
+                    "ACCOUNT_PROVISIONER=FILE. Mailbox management will not work."
+                ),
+            )
+        )
+    if rspamd and spamassassin:
+        warnings.append(
+            EnvironmentWarning(
+                level="danger",
+                variables=["ENABLE_RSPAMD", "ENABLE_SPAMASSASSIN"],
+                message=(
+                    "Rspamd and SpamAssassin both filter incoming mail; running them "
+                    "together is unsupported. Disable one of the two."
+                ),
+            )
+        )
+    if spamassassin and not amavis:
+        warnings.append(
+            EnvironmentWarning(
+                level="danger",
+                variables=["ENABLE_SPAMASSASSIN", "ENABLE_AMAVIS"],
+                message=(
+                    "SpamAssassin runs inside Amavis. With ENABLE_AMAVIS=0 nothing "
+                    "scans incoming mail for spam."
+                ),
+            )
+        )
+    if clamav and not amavis and not rspamd:
+        warnings.append(
+            EnvironmentWarning(
+                level="danger",
+                variables=["ENABLE_CLAMAV", "ENABLE_AMAVIS"],
+                message=(
+                    "ClamAV is driven by Amavis or by Rspamd. With both disabled no "
+                    "message is ever scanned for viruses."
+                ),
+            )
+        )
+    if rspamd and _flag(variables, "ENABLE_OPENDKIM", default="1"):
+        warnings.append(
+            EnvironmentWarning(
+                level="warning",
+                variables=["ENABLE_RSPAMD", "ENABLE_OPENDKIM"],
+                message=(
+                    "Rspamd and OpenDKIM both sign outgoing mail, and they store their "
+                    "keys apart. This UI reads Rspamd's keys, so any key generated for "
+                    "OpenDKIM is invisible here."
+                ),
+            )
+        )
+    if rspamd and amavis:
+        warnings.append(
+            EnvironmentWarning(
+                level="warning",
+                variables=["ENABLE_RSPAMD", "ENABLE_AMAVIS"],
+                message="Rspamd replaces Amavis as the content filter; Amavis is redundant.",
+            )
+        )
+    if rspamd and _flag(variables, "ENABLE_POSTGREY"):
+        warnings.append(
+            EnvironmentWarning(
+                level="warning",
+                variables=["ENABLE_RSPAMD", "ENABLE_POSTGREY"],
+                message=(
+                    "Rspamd greylists on its own through RSPAMD_GREYLISTING; Postgrey "
+                    "greylists a second time."
+                ),
+            )
+        )
+    if rspamd and _flag(variables, "ENABLE_POLICYD_SPF", default="1"):
+        warnings.append(
+            EnvironmentWarning(
+                level="warning",
+                variables=["ENABLE_RSPAMD", "ENABLE_POLICYD_SPF"],
+                message=(
+                    "Rspamd checks SPF itself. docker-mailserver recommends "
+                    "ENABLE_POLICYD_SPF=0 alongside it."
+                ),
+            )
+        )
+    if _flag(variables, "ENABLE_UPDATE_CHECK", default="1") and not variables.get(
+        "POSTMASTER_ADDRESS"
+    ):
+        warnings.append(
+            EnvironmentWarning(
+                level="warning",
+                variables=["ENABLE_UPDATE_CHECK", "POSTMASTER_ADDRESS"],
+                message=(
+                    "Update notices are mailed to POSTMASTER_ADDRESS, which is unset: "
+                    "every check will bounce."
+                ),
+            )
+        )
+    # Dangers first: they break a feature, the rest only muddles one.
+    return sorted(warnings, key=lambda warning: warning.level != "danger")
 
 
 def get_environment() -> MailserverEnvironment:
@@ -1188,11 +1538,17 @@ def get_environment() -> MailserverEnvironment:
     variables = _dms_settings()
     return MailserverEnvironment(
         variables=variables,
-        dkim_backend="rspamd" if variables.get("ENABLE_RSPAMD") == "1" else "opendkim",
+        dkim_backend="rspamd" if _flag(variables, "ENABLE_RSPAMD") else "opendkim",
         global_relay_host=variables.get("DEFAULT_RELAY_HOST") or variables.get("RELAY_HOST", ""),
         postmaster_address=variables.get("POSTMASTER_ADDRESS", ""),
         ssl_type=variables.get("SSL_TYPE", ""),
         account_provisioner=variables.get("ACCOUNT_PROVISIONER", ""),
-        managesieve_enabled=variables.get("ENABLE_MANAGESIEVE") == "1",
-        quotas_enabled=variables.get("ENABLE_QUOTAS") == "1",
+        managesieve_enabled=_flag(variables, "ENABLE_MANAGESIEVE"),
+        quotas_enabled=_flag(variables, "ENABLE_QUOTAS"),
+        spam_filter=_spam_filter(variables),
+        amavis_enabled=_flag(variables, "ENABLE_AMAVIS", default="1"),
+        clamav_enabled=_flag(variables, "ENABLE_CLAMAV"),
+        postgrey_enabled=_flag(variables, "ENABLE_POSTGREY"),
+        update_check_enabled=_flag(variables, "ENABLE_UPDATE_CHECK", default="1"),
+        warnings=_environment_warnings(variables),
     )

@@ -11,6 +11,8 @@ they live in flat files inside the shared docker-mailserver config volume
 * ``postfix-aliases.cf`` / ``postfix-regexp.cf`` — system and regex aliases;
 * ``fail2ban-jail.cf`` — fail2ban ban policy (see :mod:`app.fail2ban_models`);
 * ``before.dovecot.sieve`` / ``after.dovecot.sieve`` — global Sieve scripts;
+* ``rspamd/custom-commands.conf`` — Rspamd module and worker overrides;
+* ``amavis.cf`` — Amavis overrides (see :class:`SpamConfig`);
 * ``opendkim/keys/<domain>/<selector>.txt`` or ``rspamd/dkim/*.public.txt`` —
   generated DKIM public records (key generation requires the container).
 
@@ -226,6 +228,85 @@ class SieveScriptUpdate(BaseModel):
     content: str = Field(default="", max_length=65536)
 
 
+# ── Spam filter configuration files ───────────────────────────────────────────
+
+
+# Which spam-filtering file to edit: custom SpamAssassin rules, the Postgrey
+# whitelists that exempt a client or a recipient from greylisting, or the Amavis
+# overrides replacing ``/etc/amavis/conf.d/50-user``.
+SpamConfigScope = Literal["rules", "whitelist-clients", "whitelist-recipients", "amavis"]
+
+
+class SpamConfig(BaseModel):
+    """A free-form spam-filtering file from the docker-mailserver config volume."""
+
+    scope: SpamConfigScope
+    content: str = ""
+    # docker-mailserver copies these files into place when it starts, so an edit
+    # only takes effect after the container is restarted.
+    restart_required: bool = True
+
+
+class SpamConfigUpdate(BaseModel):
+    """Request schema replacing a spam-filtering file."""
+
+    content: str = Field(default="", max_length=65536)
+
+
+# ── Rspamd overrides ──────────────────────────────────────────────────────────
+
+
+# The directives ``rspamd/custom-commands.conf`` accepts. Each one writes into a
+# file under ``/etc/rspamd/override.d/`` when the mailserver starts:
+#
+# * ``set-common-option``         — ``options.inc``
+# * ``set-option-for-controller`` — ``worker-controller.inc``
+# * ``set-option-for-proxy``      — ``worker-proxy.inc``
+# * ``enable-module`` / ``disable-module`` / ``set-option-for-module``
+#                                 — ``<module>.conf``
+# * ``add-line``                  — a verbatim line appended to ``<file>``
+RspamdCommandKind = Literal[
+    "set-common-option",
+    "set-option-for-controller",
+    "set-option-for-proxy",
+    "enable-module",
+    "disable-module",
+    "set-option-for-module",
+    "add-line",
+]
+
+
+class RspamdCommand(BaseModel):
+    """One directive of ``rspamd/custom-commands.conf``.
+
+    The three fields below carry whichever arguments the directive takes; the
+    unused ones stay empty. ``target`` is the module name (module directives) or
+    the override file name (``add-line``); ``value`` is the option value, or the
+    verbatim line for ``add-line``.
+    """
+
+    kind: RspamdCommandKind
+    target: str = Field(default="", max_length=255)
+    option: str = Field(default="", max_length=255)
+    value: str = Field(default="", max_length=4096)
+
+
+class RspamdCommandsUpdate(BaseModel):
+    """Request schema replacing the full set of Rspamd commands."""
+
+    commands: list[RspamdCommand] = Field(default_factory=list)
+
+
+class RspamdOverrides(BaseModel):
+    """The Rspamd custom commands, plus whether Rspamd is the active filter."""
+
+    commands: list[RspamdCommand] = Field(default_factory=list)
+    # False when ``ENABLE_RSPAMD=0``: the file is written but nothing reads it.
+    rspamd_enabled: bool = False
+    # ``custom-commands.conf`` is only applied when the mailserver starts.
+    restart_required: bool = True
+
+
 # ── Postfix mail queue ────────────────────────────────────────────────────────
 
 
@@ -300,6 +381,29 @@ class DomainDnsRecords(BaseModel):
 # ── Mailserver environment (read-only) ────────────────────────────────────────
 
 
+# Which content filter scans incoming mail. Rspamd is a whole stack of its own;
+# ``spamassassin`` means SpamAssassin driven by Amavis.
+SpamFilter = Literal["rspamd", "spamassassin", "none"]
+
+# How badly a misconfiguration bites: ``danger`` breaks a feature outright,
+# ``warning`` is a redundancy or an ambiguity the operator should resolve.
+WarningLevel = Literal["danger", "warning"]
+
+
+class EnvironmentWarning(BaseModel):
+    """One inconsistency found in the environment the container started with.
+
+    docker-mailserver accepts environments it cannot honour — Rspamd next to
+    SpamAssassin, ClamAV without Amavis to drive it — and simply lets the loser
+    sit idle. Nothing reports that, so these checks name the contradiction.
+    """
+
+    level: WarningLevel = "warning"
+    # The variables the message is about, so the UI can point at them.
+    variables: list[str] = Field(default_factory=list)
+    message: str
+
+
 class MailserverEnvironment(BaseModel):
     """The mailserver's effective environment, read from ``/etc/dms-settings``.
 
@@ -321,6 +425,14 @@ class MailserverEnvironment(BaseModel):
     account_provisioner: str = ""
     managesieve_enabled: bool = False
     quotas_enabled: bool = False
+    # Which content filter is in charge, and the services backing it.
+    spam_filter: SpamFilter = "none"
+    amavis_enabled: bool = False
+    clamav_enabled: bool = False
+    postgrey_enabled: bool = False
+    update_check_enabled: bool = False
+    # Contradictions between the toggles above, worst first.
+    warnings: list[EnvironmentWarning] = Field(default_factory=list)
 
 
 # ── Runtime health (read-only) ────────────────────────────────────────────────
@@ -352,20 +464,33 @@ class MailStats(BaseModel):
     The mail log is rotated and this app only reads its tail, so the counters
     describe what the log still holds inside the window — not the mailserver's
     whole history.
+
+    ``sent``/``deferred``/``bounced``/``rejected``/``greylisted`` are the
+    mutually exclusive outcomes of one delivery attempt. ``spam`` and ``virus``
+    are a separate axis — *why* a message was refused — so a rejected spam is
+    counted once in each, and they do not add up with the outcomes.
     """
 
     # Width of the window the counters cover.
     period_hours: int = 24
-    # Messages accepted by Postfix (one ``cleanup`` message-id line each).
+    # Distinct messages accepted by Postfix, deduplicated by message-id: Amavis
+    # reinjects every message it scanned, which logs a second ``cleanup`` line.
     received: int = 0
     # Deliveries Postfix completed (``status=sent``).
     sent: int = 0
-    # Connections Postfix turned away (``reject:``): spam, relaying attempts, …
+    # Connections Postfix turned away for good: relaying attempts, spam, …
     rejected: int = 0
+    # Senders Postgrey (or Rspamd) deferred on purpose, to be retried shortly.
+    # Split out of ``rejected``: the mail is not lost, only delayed.
+    greylisted: int = 0
     # Deliveries that permanently failed (``status=bounced``).
     bounced: int = 0
     # Deliveries postponed and still to be retried (``status=deferred``).
     deferred: int = 0
+    # Messages the content filter marked or blocked as spam.
+    spam: int = 0
+    # Messages ClamAV found a virus in.
+    virus: int = 0
     # False when the log held no line this app could date: every counter is then
     # zero because nothing could be attributed to the window, not because the
     # mailserver was idle.

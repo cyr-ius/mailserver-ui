@@ -1,9 +1,9 @@
 """Mailbox management endpoints (mailbox managers and administrators).
 
 Manages docker-mailserver mail accounts (``postfix-accounts.cf``), their quotas
-(``dovecot-quotas.cf``) and their inbound aliases (``postfix-virtual.cf``),
-stored in the shared config volume. Every operation requires at least the
-``mailbox_manager`` role.
+(``dovecot-quotas.cf``), their inbound aliases (``postfix-virtual.cf``) and their
+personal Sieve filter (``<email>.dovecot.sieve``), stored in the shared config
+volume. Every operation requires at least the ``mailbox_manager`` role.
 """
 
 import logging
@@ -20,6 +20,8 @@ from ..models.mailbox_models import (
     Mailbox,
     MailboxCreate,
     MailboxPasswordUpdate,
+    MailboxSieveScript,
+    MailboxSieveScriptUpdate,
     MailboxUsageSummary,
     QuotaUpdate,
 )
@@ -105,3 +107,31 @@ async def add_alias(email: str, payload: AliasCreate, _manager: ManagerDep) -> A
 async def delete_alias(email: str, alias: str, _manager: ManagerDep) -> None:
     """Remove an alias forwarding to a mail account (mailbox manager)."""
     mailbox_service.delete_alias(email, alias)
+
+
+# ── Personal Sieve filter ─────────────────────────────────────────────────────
+
+
+@router.get("/{email}/sieve", response_model=MailboxSieveScript)
+async def get_sieve_script(email: str, _manager: ManagerDep) -> MailboxSieveScript:
+    """Return the personal Sieve filter of a mail account (mailbox manager)."""
+    return await run_in_threadpool(mailbox_service.get_sieve_script, email)
+
+
+@router.put("/{email}/sieve", response_model=MailboxSieveScript)
+async def set_sieve_script(
+    email: str,
+    payload: MailboxSieveScriptUpdate,
+    _manager: ManagerDep,
+) -> MailboxSieveScript:
+    """Replace the personal Sieve filter of a mail account (mailbox manager).
+
+    An empty script removes the filter. It takes effect on the next restart.
+    """
+    return await run_in_threadpool(mailbox_service.set_sieve_script, email, payload.content)
+
+
+@router.delete("/{email}/sieve", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_sieve_script(email: str, _manager: ManagerDep) -> None:
+    """Remove the personal Sieve filter of a mail account (mailbox manager)."""
+    await run_in_threadpool(mailbox_service.delete_sieve_script, email)

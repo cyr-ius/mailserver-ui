@@ -2,9 +2,9 @@
 
 Exposes the parts of the docker-mailserver global configuration that live in the
 shared config volume — SMTP relays, Postfix and Dovecot overrides, aliases,
-global Sieve scripts, DKIM records — plus the read-only runtime views: the mail
-queue, the TLS certificate, the DNS records to publish and the container's
-effective environment.
+global Sieve scripts, DKIM records, Rspamd overrides, SpamAssassin rules and
+Postgrey whitelists — plus the read-only runtime views: the mail queue, the TLS
+certificate, the DNS records to publish and the container's effective environment.
 
 Every call shells out to ``docker exec`` and blocks, so it is offloaded to a
 threadpool. All operations require the admin role. See
@@ -44,10 +44,15 @@ from ..models.mailserver_models import (
     RelayHostCreate,
     Restriction,
     RestrictionCreate,
+    RspamdCommandsUpdate,
+    RspamdOverrides,
     ServiceStatus,
     SieveScope,
     SieveScript,
     SieveScriptUpdate,
+    SpamConfig,
+    SpamConfigScope,
+    SpamConfigUpdate,
     SystemAlias,
     SystemAliasCreate,
     TlsCertificate,
@@ -255,6 +260,40 @@ async def update_sieve_script(
 ) -> SieveScript:
     """Replace a global Sieve script; takes effect on restart (admin only)."""
     return await run_in_threadpool(mailserver_service.set_sieve_script, scope, payload.content)
+
+
+# ── Spam filter configuration files ───────────────────────────────────────────
+
+
+@router.get("/spam/{scope}", response_model=SpamConfig)
+async def get_spam_config(scope: SpamConfigScope, _admin: AdminDep) -> SpamConfig:
+    """Return the SpamAssassin rules or a Postgrey whitelist (admin only)."""
+    return await run_in_threadpool(mailserver_service.get_spam_config, scope)
+
+
+@router.put("/spam/{scope}", response_model=SpamConfig)
+async def update_spam_config(
+    scope: SpamConfigScope, payload: SpamConfigUpdate, _admin: AdminDep
+) -> SpamConfig:
+    """Replace a spam-filtering file; takes effect on restart (admin only)."""
+    return await run_in_threadpool(mailserver_service.set_spam_config, scope, payload.content)
+
+
+# ── Rspamd overrides ──────────────────────────────────────────────────────────
+
+
+@router.get("/rspamd", response_model=RspamdOverrides)
+async def get_rspamd_overrides(_admin: AdminDep) -> RspamdOverrides:
+    """Return the directives of ``rspamd/custom-commands.conf`` (admin only)."""
+    return await run_in_threadpool(mailserver_service.get_rspamd_overrides)
+
+
+@router.put("/rspamd", response_model=RspamdOverrides)
+async def update_rspamd_overrides(
+    payload: RspamdCommandsUpdate, _admin: AdminDep
+) -> RspamdOverrides:
+    """Replace the Rspamd custom commands; takes effect on restart (admin only)."""
+    return await run_in_threadpool(mailserver_service.set_rspamd_overrides, payload.commands)
 
 
 # ── Postfix mail queue ────────────────────────────────────────────────────────

@@ -1,13 +1,16 @@
 """Fail2ban service: drive docker-mailserver's fail2ban via ``docker exec``.
 
 Like every other mailserver action, fail2ban runs inside the mailserver
-container over the Docker socket — here as runtime commands rather than config
+container over the Docker socket — mostly as runtime commands rather than config
 files. It goes through the shared :func:`app.services.container.run_in_container`
 runner, so it needs ``MAILSERVER_EXEC_ENABLED`` (the master switch that allows
 exec at all) plus its own feature toggle ``FAIL2BAN_ENABLED``.
 
 * structured reads use ``fail2ban-client`` (stable, machine-friendly output);
-* ban/unban/log actions use docker-mailserver's ``setup fail2ban`` wrapper.
+* ban/unban/log actions use docker-mailserver's ``setup fail2ban`` wrapper;
+* ``fail2ban-jail.cf`` and ``fail2ban-fail2ban.cf`` are the two config files it
+  does read from the shared volume, the first for jails and the second for the
+  daemon itself. Both are only applied when the mailserver starts.
 
 Commands are executed with an argument list (never ``shell=True``) and every IP
 is validated with :mod:`ipaddress` before use, so no user input reaches a shell.
@@ -22,6 +25,7 @@ from ..exceptions import BadRequestException
 from ..models.fail2ban_models import (
     BannedIp,
     Fail2banActionResult,
+    Fail2banConfig,
     Fail2banJail,
     Fail2banLog,
     Fail2banPolicy,
@@ -36,6 +40,9 @@ logger = logging.getLogger(__name__)
 # Ban policy file in the shared config volume, copied to
 # ``/etc/fail2ban/jail.d/user-jail.local`` when the mailserver starts.
 _JAIL_FILENAME = "fail2ban-jail.cf"
+
+# Daemon-wide options, copied to ``/etc/fail2ban/fail2ban.local`` at startup.
+_CONFIG_FILENAME = "fail2ban-fail2ban.cf"
 
 # docker-mailserver's shipped defaults: six failures per week, banned a week.
 _DEFAULT_BANTIME = 604800
@@ -230,3 +237,36 @@ def set_policy(payload: Fail2banPolicyUpdate) -> Fail2banPolicy:
         maxretry=payload.maxretry,
         configured=True,
     )
+
+
+# ── Daemon configuration (fail2ban-fail2ban.cf) ───────────────────────────────
+
+
+def get_config() -> Fail2banConfig:
+    """Return the raw ``fail2ban-fail2ban.cf`` (empty when the file is absent)."""
+    _ensure_enabled()
+    content = container.read_config(_CONFIG_FILENAME)
+    if content.startswith(_MANAGED_HEADER):
+        content = content[len(_MANAGED_HEADER) :]
+    return Fail2banConfig(content=content.strip())
+
+
+def set_config(content: str) -> Fail2banConfig:
+    """Replace ``fail2ban-fail2ban.cf`` wholesale; applies once the container restarts.
+
+    The file is fail2ban's own INI dialect, so it is parsed here before being
+    written: a malformed one would otherwise keep the daemon from starting, and
+    nothing would say why.
+    """
+    _ensure_enabled()
+    body = content.strip()
+    if body:
+        parser = configparser.ConfigParser()
+        try:
+            parser.read_string(body)
+        except configparser.Error as exc:
+            raise BadRequestException(f"Invalid fail2ban configuration: {exc}") from exc
+
+    container.write_config(_CONFIG_FILENAME, f"{_MANAGED_HEADER}\n{body}\n" if body else "")
+    logger.info("Updated the fail2ban daemon configuration (%d bytes)", len(body))
+    return Fail2banConfig(content=body)
