@@ -66,8 +66,12 @@ warns that its file is stored but never read.
 
 ## Quick start (Docker)
 
+A ready-to-use [`docker-compose.yml`](docker-compose.yml) is provided at the
+root of the repository. It starts both docker-mailserver and the UI with a
+sensible default configuration.
+
 ```bash
-cp backend/.env.example .env   # then edit SECRET_KEY (at minimum)
+cp backend/.env.example .env   # sensible defaults; nothing is required
 docker compose up -d --build
 ```
 
@@ -78,90 +82,6 @@ logs for the generated admin password:
 docker compose logs mailserver-ui | grep "Generated password"
 ```
 
-## Example `docker-compose.yml`
-
-```yaml
----
-services:
-  mailserver:
-    image: mailserver/docker-mailserver:latest
-    container_name: mailserver # must match MAILSERVER_CONTAINER below
-    hostname: mail.example.com
-    environment:
-      # The UI writes postfix-accounts.cf / dovecot-quotas.cf directly, which
-      # only docker-mailserver's FILE provisioner reads. Quotas require it too.
-      - ACCOUNT_PROVISIONER=FILE
-      - ENABLE_QUOTAS=1
-      # OpenDKIM and Rspamd are mutually exclusive. The UI reads the DKIM keys
-      # of whichever one is on, and flags the contradiction if both are.
-      - ENABLE_OPENDKIM=1
-      - ENABLE_RSPAMD=0
-      # Required by the published 4190 port, otherwise nothing listens on it.
-      - ENABLE_MANAGESIEVE=1
-      - ENABLE_FAIL2BAN=1
-      # Optional spam and virus filtering. Amavis drives both SpamAssassin and
-      # ClamAV, and the whole stack is mutually exclusive with ENABLE_RSPAMD.
-      # ClamAV needs about 1 GB of RAM. The UI flags any contradiction here on
-      # its Environment page.
-      - ENABLE_AMAVIS=1
-      - ENABLE_SPAMASSASSIN=1
-      - ENABLE_CLAMAV=1
-      - ENABLE_POSTGREY=1
-      - POSTMASTER_ADDRESS=postmaster@example.com
-      - SSL_TYPE=
-    cap_add:
-      - NET_ADMIN # required by fail2ban
-    ports:
-      - "25:25" # SMTP
-      - "465:465" # SMTPS
-      - "587:587" # Submission
-      - "143:143" # IMAP
-      - "993:993" # IMAPS
-      - "4190:4190" # ManageSieve
-    volumes:
-      - mailserver-mail:/var/mail
-      - mailserver-config:/tmp/docker-mailserver/
-      # Postfix/Dovecot runtime state, including the fail2ban ban database the
-      # UI manages: without it every ban is lost when the container is recreated.
-      - mailserver-state:/var/mail-state
-      # The UI tails /var/log/mail/mail.log.
-      - mailserver-logs:/var/log/mail
-    restart: unless-stopped
-
-  mailserver-ui:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    depends_on:
-      - mailserver
-    environment:
-      - SECRET_KEY=${SECRET_KEY:?generate one with `openssl rand -hex 32`}
-      - LOG_LEVEL=INFO
-      - MAILSERVER_CONTAINER=mailserver
-      # Behind a reverse proxy, list its IPs so rate limiting and the cookie
-      # `Secure` flag see the real client request.
-      # - TRUSTED_PROXIES=10.0.0.0/8
-    ports:
-      - "8000:8000"
-    volumes:
-      - mailserver-ui:/var/lib/mailserver-ui
-      # Root-equivalent access to the host — required, see the section above.
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    restart: unless-stopped
-
-volumes:
-  mailserver-mail:
-  mailserver-config:
-  mailserver-state:
-  mailserver-logs:
-  mailserver-ui:
-```
-
 ## Configuration
 
 All settings are provided through environment variables (see
@@ -169,15 +89,15 @@ All settings are provided through environment variables (see
 
 ### Core
 
-| Variable          | Default                   | Description                                      |
-| ----------------- | ------------------------- | ------------------------------------------------ |
-| `SECRET_KEY`      | _(change me)_             | Signs session cookies — **must** be set in prod. |
-| `ADMIN_USERNAME`  | `admin`                   | Default admin account seeded on first boot.      |
-| `DATA_DIR`        | `/var/lib/mailserver-ui`  | Persistent directory for the SQLite database.    |
-| `DATABASE_URL`    | _(file under `DATA_DIR`)_ | SQLite connection string.                        |
-| `DATABASE_ECHO`   | `false`                   | Echo SQL statements to the logs (debug only).    |
-| `LOG_LEVEL`       | `INFO`                    | `DEBUG` \| `INFO` \| `WARNING` \| `ERROR`        |
-| `SWAGGER_ENABLED` | `false`                   | Expose the Swagger UI at `/api/docs`.            |
+| Variable          | Default                   | Description                                                                                                                                                        |
+| ----------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `SECRET_KEY`      | _(auto-generated)_        | Signs session cookies. If unset, a random key is generated and persisted to `DATA_DIR/secret_key` on first boot. Set it explicitly when running multiple replicas. |
+| `ADMIN_USERNAME`  | `admin`                   | Default admin account seeded on first boot.                                                                                                                        |
+| `DATA_DIR`        | `/var/lib/mailserver-ui`  | Persistent directory for the SQLite database.                                                                                                                      |
+| `DATABASE_URL`    | _(file under `DATA_DIR`)_ | SQLite connection string.                                                                                                                                          |
+| `DATABASE_ECHO`   | `false`                   | Echo SQL statements to the logs (debug only).                                                                                                                      |
+| `LOG_LEVEL`       | `INFO`                    | `DEBUG` \| `INFO` \| `WARNING` \| `ERROR`                                                                                                                          |
+| `SWAGGER_ENABLED` | `false`                   | Expose the Swagger UI at `/api/docs`.                                                                                                                              |
 
 ### Mailserver (`docker exec`)
 

@@ -5,9 +5,11 @@ All settings loaded from environment variables
 
 import logging
 import os
+import secrets
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings
 
 logger = logging.getLogger(__name__)
@@ -34,6 +36,17 @@ MAILSERVER_CONFIG_DIR = "/tmp/docker-mailserver"
 # The docker CLI used to exec into the mailserver container. Resolved through
 # ``PATH`` inside this container.
 DOCKER_BINARY = "docker"
+
+# File under ``DATA_DIR`` where a self-generated ``SECRET_KEY`` is persisted when
+# none is supplied via the environment. Persisting it keeps issued cookies/JWTs
+# valid across restarts (a freshly generated key on every boot would log
+# everyone out).
+SECRET_KEY_FILENAME = "secret_key"
+
+
+def _open_0600(path: str, flags: int) -> int:
+    """``open`` opener that creates files with 0600 permissions (owner-only)."""
+    return os.open(path, flags, 0o600)
 
 
 # ── Settings ─────────────────────────────────────────────────────────────────
@@ -82,7 +95,9 @@ class Settings(BaseSettings):
     # Number of trailing fail2ban log lines returned by the log endpoint.
     fail2ban_log_lines: int = 200
 
-    secret_key: str = "change-this-secret-key-in-production"
+    # Signs the session/JWT cookies. Leave unset to have a random key generated
+    # and persisted under ``DATA_DIR`` on first startup (see the validator below).
+    secret_key: str = ""
     auth_cookie_name: str = "pc_token"
     # Session lifetime for the local/OIDC JWT stored in the auth cookie.
     auth_token_ttl_seconds: int = 8 * 3600
@@ -136,6 +151,53 @@ class Settings(BaseSettings):
     rate_limit_login_path: str = "/api/auth/login"
 
     # ── Internal helpers ─────────────────────────────────────────────────────────
+
+    @model_validator(mode="after")
+    def _ensure_secret_key(self) -> Settings:
+        """Generate and persist a random ``secret_key`` when none is provided.
+
+        When ``SECRET_KEY`` is not set in the environment, a random key is read
+        from (or written to) ``DATA_DIR/secret_key`` so it stays stable across
+        restarts. This lets the app boot securely out of the box without a
+        hard-coded default, while keeping issued cookies/JWTs valid.
+        """
+        if self.secret_key:
+            return self
+
+        key_file = Path(DATA_DIR) / SECRET_KEY_FILENAME
+        try:
+            existing = key_file.read_text(encoding="utf-8").strip()
+        except OSError:
+            existing = ""
+
+        if existing:
+            self.secret_key = existing
+            return self
+
+        key = secrets.token_hex(32)
+        try:
+            key_file.parent.mkdir(parents=True, exist_ok=True)
+            # Create exclusively so concurrent workers don't clobber each other's
+            # key on first boot: whoever loses the race reads the winner's key.
+            with open(key_file, "x", encoding="utf-8", opener=_open_0600) as fh:
+                fh.write(key)
+            logger.warning(
+                "SECRET_KEY not set; generated a random one and persisted it to %s. "
+                "Set SECRET_KEY explicitly to control it.",
+                key_file,
+            )
+        except FileExistsError:
+            key = key_file.read_text(encoding="utf-8").strip()
+        except OSError:
+            # Read-only data dir: fall back to an ephemeral key so the app still
+            # boots. Sessions will not survive a restart until SECRET_KEY is set.
+            logger.warning(
+                "SECRET_KEY not set and %s is not writable; using an ephemeral "
+                "key. Sessions will be invalidated on restart — set SECRET_KEY.",
+                key_file,
+            )
+        self.secret_key = key
+        return self
 
     class Config:
         env_file = ".env"
