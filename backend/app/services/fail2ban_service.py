@@ -3,8 +3,8 @@
 Like every other mailserver action, fail2ban runs inside the mailserver
 container over the Docker socket — mostly as runtime commands rather than config
 files. It goes through the shared :func:`app.services.container.run_in_container`
-runner, so it needs ``MAILSERVER_EXEC_ENABLED`` (the master switch that allows
-exec at all) plus its own feature toggle ``FAIL2BAN_ENABLED``.
+runner. Whether it is available at all is decided by the container itself: the
+mailserver's ``ENABLE_FAIL2BAN`` toggle, read from ``/etc/dms-settings``.
 
 * structured reads use ``fail2ban-client`` (stable, machine-friendly output);
 * ban/unban/log actions use docker-mailserver's ``setup fail2ban`` wrapper;
@@ -61,25 +61,26 @@ _MANAGED_HEADER = "# Managed by Mailserver UI — manual edits may be overwritte
 
 
 def _ensure_enabled() -> None:
-    """Raise unless the fail2ban feature toggle is on.
+    """Raise unless the mailserver started with ``ENABLE_FAIL2BAN=1``.
 
-    The Docker socket / exec prerequisite (``MAILSERVER_EXEC_ENABLED``) is
-    enforced separately by :func:`app.services.container.run_in_container`.
+    With the toggle off no daemon runs, ``fail2ban-client`` has no socket to talk
+    to, and the two config files below are stored in the volume but never copied
+    into place — so every action here would be a no-op at best.
     """
-    if not settings.fail2ban_enabled:
+    if not mailserver_service.feature_enabled(_FEATURE_VARIABLE):
         raise BadRequestException(
-            "Fail2ban management is disabled. Set FAIL2BAN_ENABLED=true (and "
-            "MAILSERVER_EXEC_ENABLED=true, with the Docker socket mounted) to enable it."
+            "Fail2ban is disabled in the mailserver container. Restart it with "
+            "ENABLE_FAIL2BAN=1 to manage it from here."
         )
 
 
 def _run(args: list[str]) -> str:
     """Run a fail2ban command inside the mailserver container and return stdout.
 
-    Ensures the fail2ban feature is enabled, then delegates to the shared
-    ``docker exec`` runner. See :func:`app.services.container.run_in_container`.
+    Callers guard the feature with :func:`_ensure_enabled` once per action, since
+    reading the toggle costs a ``docker exec`` of its own. See
+    :func:`app.services.container.run_in_container`.
     """
-    _ensure_enabled()
     return run_in_container(args, timeout=settings.fail2ban_command_timeout)
 
 
@@ -141,7 +142,6 @@ def get_status() -> Fail2banStatus:
     ``fail2ban-client`` would fail against its missing socket. Report the
     disabled feature instead, so the UI can say so rather than show an error.
     """
-    _ensure_enabled()
     if not mailserver_service.feature_enabled(_FEATURE_VARIABLE):
         return Fail2banStatus()
     jail_names = _parse_jail_names(_run(["fail2ban-client", "status"]))
@@ -159,6 +159,7 @@ def list_banned_ips() -> list[BannedIp]:
 
 def ban_ip(ip: str) -> Fail2banActionResult:
     """Ban an IP address across the mailserver's active jails."""
+    _ensure_enabled()
     address = _validate_ip(ip)
     output = _run(["setup", "fail2ban", "ban", address])
     logger.info("Banned IP %s via fail2ban", address)
@@ -167,6 +168,7 @@ def ban_ip(ip: str) -> Fail2banActionResult:
 
 def unban_ip(ip: str) -> Fail2banActionResult:
     """Remove any ban for an IP address across all jails."""
+    _ensure_enabled()
     address = _validate_ip(ip)
     output = _run(["setup", "fail2ban", "unban", address])
     logger.info("Unbanned IP %s via fail2ban", address)
@@ -175,6 +177,7 @@ def unban_ip(ip: str) -> Fail2banActionResult:
 
 def get_log() -> Fail2banLog:
     """Return the trailing lines of the fail2ban log file."""
+    _ensure_enabled()
     output = _run(["setup", "fail2ban", "log"])
     lines = output.splitlines()
     return Fail2banLog(lines=lines[-settings.fail2ban_log_lines :])

@@ -2,7 +2,7 @@
 
 Unlike mailboxes, these settings are not stored in the application database:
 they live in flat files inside the shared docker-mailserver config volume
-(``settings.mailserver_config_dir``):
+(``config.MAILSERVER_CONFIG_DIR``):
 
 * ``postfix-relaymap.cf`` / ``postfix-sasl-password.cf`` — SMTP relay
   (smarthost) per sender domain, with optional SASL credentials;

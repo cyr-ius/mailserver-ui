@@ -5,8 +5,7 @@ mailserver container — no host directory is bind-mounted. The docker-mailserve
 flat config files (``postfix-accounts.cf`` and friends) are read and written
 *inside* the container, and runtime-only actions (fail2ban, DKIM generation,
 reading the mail log) run there too. This requires the Docker socket to be
-mounted into this container and ``MAILSERVER_EXEC_ENABLED=true`` (see the
-``mailserver_*`` settings).
+mounted into this container: without it every command fails with a bad gateway.
 
 Commands always use a fixed argument list (never ``shell=True`` on our side).
 When a POSIX shell is needed inside the container, user-influenced data is
@@ -17,19 +16,10 @@ the script string — so nothing reaches a shell for evaluation.
 import logging
 import subprocess
 
-from ..config import settings
-from ..exceptions import BadGatewayException, BadRequestException
+from ..config import DOCKER_BINARY, MAILSERVER_CONFIG_DIR, settings
+from ..exceptions import BadGatewayException
 
 logger = logging.getLogger(__name__)
-
-
-def _ensure_enabled() -> None:
-    """Raise unless ``docker exec`` into the mailserver container is enabled."""
-    if not settings.mailserver_exec_enabled:
-        raise BadRequestException(
-            "Mailserver management runs inside the mailserver container. Set "
-            "MAILSERVER_EXEC_ENABLED=true and mount the Docker socket to enable it."
-        )
 
 
 def _docker_exec(
@@ -50,8 +40,7 @@ def _docker_exec(
     their answer. A failure that printed *nothing* — an unreachable container,
     say — is still raised, so a silent empty result cannot pass for data.
     """
-    _ensure_enabled()
-    cmd = [settings.docker_binary, "exec"]
+    cmd = [DOCKER_BINARY, "exec"]
     if stdin is not None:
         cmd.append("-i")
     cmd += [settings.mailserver_container, *args]
@@ -82,19 +71,17 @@ def _docker_exec(
 def run_in_container(args: list[str], *, timeout: int, check: bool = True) -> str:
     """Run ``docker exec <container> <args…>`` and return stdout (see module docs).
 
-    Enabling ``docker exec`` is handled here; validating any user-provided token
-    before it reaches this function is the caller's responsibility. Pass
-    ``check=False`` to accept a non-zero exit status *that produced output*.
+    Validating any user-provided token before it reaches this function is the
+    caller's responsibility. Pass ``check=False`` to accept a non-zero exit
+    status *that produced output*.
     """
     return _docker_exec(args, timeout=timeout, check=check)
 
 
 # ── Config files inside the container ─────────────────────────────────────────
 
-
-def _config_dir() -> str:
-    """Return the docker-mailserver config directory path *inside* the container."""
-    return settings.mailserver_config_dir.rstrip("/")
+# The config directory path inside the container, without its trailing slash.
+_CONFIG_DIR = MAILSERVER_CONFIG_DIR.rstrip("/")
 
 
 def read_file(path: str) -> str:
@@ -116,7 +103,7 @@ def read_config(rel_path: str) -> str:
     A missing file reads as an empty string rather than an error, mirroring the
     "no file yet" case of the previous filesystem-backed implementation.
     """
-    return read_file(f"{_config_dir()}/{rel_path}")
+    return read_file(f"{_CONFIG_DIR}/{rel_path}")
 
 
 def write_config(rel_path: str, content: str) -> None:
@@ -125,7 +112,7 @@ def write_config(rel_path: str, content: str) -> None:
     ``content`` is streamed on stdin to a temp file that is ``mv``-ed into place,
     so docker-mailserver's file watcher never observes a half-written file.
     """
-    path = f"{_config_dir()}/{rel_path}"
+    path = f"{_CONFIG_DIR}/{rel_path}"
     script = (
         'dir=$(dirname -- "$1"); mkdir -p -- "$dir"; '
         'tmp="$1.tmp"; cat > "$tmp" && mv -- "$tmp" "$1"'
@@ -140,7 +127,7 @@ def write_config(rel_path: str, content: str) -> None:
 def delete_config(rel_path: str) -> None:
     """Delete ``<config_dir>/<rel_path>`` inside the container; absent is not an error."""
     _docker_exec(
-        ["sh", "-c", 'rm -f -- "$1"', "sh", f"{_config_dir()}/{rel_path}"],
+        ["sh", "-c", 'rm -f -- "$1"', "sh", f"{_CONFIG_DIR}/{rel_path}"],
         timeout=settings.mailserver_command_timeout,
     )
 
@@ -151,7 +138,7 @@ def list_config_files(rel_dir: str, suffix: str) -> list[str]:
     Paths are returned relative to ``rel_dir`` and sorted; an empty list is
     returned when the directory does not exist.
     """
-    base = f"{_config_dir()}/{rel_dir}"
+    base = f"{_CONFIG_DIR}/{rel_dir}"
     out = _docker_exec(
         [
             "sh",

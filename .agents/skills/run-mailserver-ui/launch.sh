@@ -72,8 +72,6 @@ JSON
   ( cd "$REPO/backend" && \
     DATABASE_URL="sqlite:///$RUN_DIR/app.db" \
     SECRET_KEY="local-run-only-not-a-production-secret" \
-    MAILSERVER_EXEC_ENABLED=true \
-    FAIL2BAN_ENABLED=true \
     MAILSERVER_CONTAINER="$CONTAINER" \
     RATE_LIMIT_ENABLED=false \
     spawn "$RUN_DIR/backend.pid" "$RUN_DIR/backend.log" \

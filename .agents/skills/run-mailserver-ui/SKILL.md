@@ -163,9 +163,10 @@ There are no backend tests. Exercise services by patching `container.run_in_cont
   A healthy container reports ~10 `STOPPED "Not started"` processes.
 - **Dovecot answers for addresses that are not mailboxes** (an alias with its own
   maildir). `postfix-accounts.cf` is the source of truth.
-- **`MAILSERVER_EXEC_ENABLED=true` and `FAIL2BAN_ENABLED=true` are mandatory**, or
-  every mailserver/fail2ban endpoint returns 400 with "set MAILSERVER_EXEC_ENABLED".
-  `launch.sh` sets both.
+- **The fail2ban endpoints return 400 unless the container runs with
+  `ENABLE_FAIL2BAN=1`**: the backend reads the toggle from `/etc/dms-settings`,
+  there is no app-side switch. The mailserver management itself is always on and
+  only needs a reachable Docker socket.
 
 ## Troubleshooting
 

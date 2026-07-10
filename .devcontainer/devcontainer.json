@@ -100,11 +100,7 @@
     // The dev mailserver runs on the in-container Docker daemon, so the backend
     // drives everything through `docker exec mailserver ...`: mailboxes, aliases,
     // relays, DKIM, fail2ban and the config files (no bind-mount).
-    "MAILSERVER_EXEC_ENABLED": "true",
-    "FAIL2BAN_ENABLED": "true",
-    "MAILSERVER_CONTAINER": "mailserver",
-    // docker-mailserver config dir *inside* the container (image default).
-    "MAILSERVER_CONFIG_DIR": "/tmp/docker-mailserver"
+    "MAILSERVER_CONTAINER": "mailserver"
   },
 
   // ─── Cycle de vie ──────────────────────────────────────────────────────

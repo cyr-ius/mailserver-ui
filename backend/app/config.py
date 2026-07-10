@@ -25,6 +25,16 @@ INDEX_HTML = FRONTEND_DIR / "index.html"
 # HTTP client timeout for GitHub API calls (in seconds)
 DEFAULT_TIMEOUT: float = 10.0
 
+# Path of the docker-mailserver configuration directory *inside* the mailserver
+# container. The flat config files (``postfix-accounts.cf`` and friends) are read
+# and written there over the Docker socket via ``docker exec`` — no host
+# directory is bind-mounted. This is the docker-mailserver image default.
+MAILSERVER_CONFIG_DIR = "/tmp/docker-mailserver"
+
+# The docker CLI used to exec into the mailserver container. Resolved through
+# ``PATH`` inside this container.
+DOCKER_BINARY = "docker"
+
 
 # ── Settings ─────────────────────────────────────────────────────────────────
 
@@ -43,35 +53,14 @@ class Settings(BaseSettings):
     # password is generated randomly and printed once to the logs.
     admin_username: str = "admin"
 
-    # Path of the docker-mailserver configuration directory *inside* the
-    # mailserver container. The flat config files (``postfix-accounts.cf`` and
-    # friends) are read and written there over the Docker socket via
-    # ``docker exec`` — no host directory is bind-mounted. Rarely needs changing
-    # from the docker-mailserver image default.
-    mailserver_config_dir: str = "/tmp/docker-mailserver"
-
-    # ── Fail2ban (docker-mailserver) ──────────────────────────────────────────
-    # Fail2ban lives inside the mailserver container and cannot be driven through
-    # the shared config files, so it is managed with ``docker exec``. This
-    # requires the Docker socket to be mounted into this container. Disabled by
-    # default; enable it explicitly once the socket and container name are set.
-    fail2ban_enabled: bool = False
-    # Name (or ID) of the docker-mailserver container to exec into.
-    mailserver_container: str = "mailserver"
-    # Path to the docker CLI used to exec into the container.
-    docker_binary: str = "docker"
-    # Timeout (seconds) for a single fail2ban command.
-    fail2ban_command_timeout: int = 15
-    # Number of trailing fail2ban log lines returned by the log endpoint.
-    fail2ban_log_lines: int = 200
-
     # ── Mailserver docker exec (docker-mailserver) ────────────────────────────
     # All mailserver management (mailboxes, aliases, relays, DKIM, mail log, …)
     # runs inside the mailserver container via ``docker exec`` — reading and
     # writing its config files as well as runtime-only actions. This requires the
-    # Docker socket to be mounted into this container. Disabled by default;
-    # enable it once the socket is mounted and the container name is set.
-    mailserver_exec_enabled: bool = False
+    # Docker socket to be mounted into this container.
+    #
+    # Name (or ID) of the docker-mailserver container to exec into.
+    mailserver_container: str = "mailserver"
     # Timeout (seconds) for a single mailserver ``docker exec`` command.
     mailserver_command_timeout: int = 30
     # Number of trailing mail log lines returned by the mail log endpoint.
@@ -81,6 +70,17 @@ class Settings(BaseSettings):
     # Trailing mail log lines scanned to build those statistics. A busy server
     # can overflow this window; the endpoint reports how many lines it read.
     mailserver_stats_log_lines: int = 20000
+
+    # ── Fail2ban (docker-mailserver) ──────────────────────────────────────────
+    # Fail2ban lives inside the mailserver container and cannot be driven through
+    # the shared config files, so it is managed with ``docker exec`` too. Whether
+    # the views are usable is decided by the container's own ``ENABLE_FAIL2BAN``
+    # toggle, not by a setting of ours.
+    #
+    # Timeout (seconds) for a single fail2ban command.
+    fail2ban_command_timeout: int = 15
+    # Number of trailing fail2ban log lines returned by the log endpoint.
+    fail2ban_log_lines: int = 200
 
     secret_key: str = "change-this-secret-key-in-production"
     auth_cookie_name: str = "pc_token"

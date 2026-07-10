@@ -21,8 +21,7 @@
     <div class="card-body">
       <h2 class="h6 text-uppercase text-body-secondary mb-3">Generate keys</h2>
       <p class="text-body-secondary small">
-        Runs <code>setup config dkim</code> inside the mailserver container. Requires
-        <code>MAILSERVER_EXEC_ENABLED=true</code> and a mounted Docker socket.
+        Runs <code>setup config dkim</code> inside the mailserver container. Requires a mounted Docker socket.
       </p>
       <form (submit)="onGenerate(); $event.preventDefault()" novalidate>
         <div class="row g-3">

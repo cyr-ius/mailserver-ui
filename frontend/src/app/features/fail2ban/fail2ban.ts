@@ -368,7 +368,7 @@ export class Fail2ban {
   private messageFor(err: unknown): string {
     if (err instanceof HttpErrorResponse) {
       if (err.status === 400) {
-        return 'Invalid request. Fail2ban may be disabled — check FAIL2BAN_ENABLED and the IP.';
+        return 'Invalid request. Fail2ban may be disabled — check ENABLE_FAIL2BAN and the IP.';
       }
       if (err.status === 502) {
         return 'The mailserver container could not be reached. Check the Docker socket mount.';
