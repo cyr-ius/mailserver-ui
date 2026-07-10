@@ -81,6 +81,15 @@ class Settings(BaseSettings):
     auth_cookie_name: str = "pc_token"
     # Session lifetime for the local/OIDC JWT stored in the auth cookie.
     auth_token_ttl_seconds: int = 8 * 3600
+
+    # ── Personal API keys ─────────────────────────────────────────────────────
+    # Users issue keys from their profile to call the REST API without a browser
+    # session. A key carries the effective role of the account that owns it.
+    api_keys_enabled: bool = True
+    # Header carrying the key. ``Authorization: Bearer <key>`` is accepted too.
+    api_key_header: str = "X-API-Key"
+    # Upper bound on the number of live keys a single account may own.
+    api_key_max_per_user: int = 10
     # The auth cookie ``Secure`` flag is detected per request from the scheme
     # (honouring ``X-Forwarded-Proto`` behind trusted proxies), not configured.
 

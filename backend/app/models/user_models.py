@@ -75,3 +75,14 @@ class PasswordChangeRequest(SQLModel):
     """Request schema for changing a local user's password."""
 
     new_password: str = Field(min_length=8, max_length=1024)
+
+
+class SelfPasswordChangeRequest(SQLModel):
+    """Request schema for a user changing their own password.
+
+    Unlike the administrative reset, the current password is required: an
+    unattended session must not be enough to take over the account.
+    """
+
+    current_password: str = Field(min_length=1, max_length=1024)
+    new_password: str = Field(min_length=8, max_length=1024)

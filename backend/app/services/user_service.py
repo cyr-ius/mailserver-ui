@@ -20,9 +20,9 @@ from ..auth import (
     verify_password,
 )
 from ..config import settings
-from ..exceptions import BadRequestException, ConflictException
+from ..exceptions import BadRequestException, ConflictException, NotFoundException
 from ..models.user_models import User, UserPublic
-from ..services import group_service
+from ..services import api_key_service, group_service
 
 logger = logging.getLogger(__name__)
 
@@ -187,13 +187,37 @@ def is_last_admin(session: Session, user: User) -> bool:
 
 
 def delete_user(session: Session, user: User) -> None:
-    """Delete a user along with every group membership it holds."""
+    """Delete a user along with every group membership and API key it holds."""
     if user.id is not None:
         group_service.remove_user_memberships(session, user.id)
+        api_key_service.delete_for_user(session, user.id)
     username = user.username
     session.delete(user)
     session.commit()
     logger.info("Deleted user %s", username)
+
+
+def change_own_password(
+    session: Session,
+    username: str,
+    current_password: str,
+    new_password: str,
+) -> User:
+    """Let a local user rotate their own password after proving the current one.
+
+    OIDC accounts have no local hash to replace: their credentials live in the
+    identity provider.
+    """
+    user = get_by_username(session, username)
+    if user is None:
+        raise NotFoundException("User", username)
+    if user.provider != "local" or not user.password_hash:
+        raise ConflictException("Password is managed by the identity provider for OIDC users")
+    if not verify_password(current_password, user.password_hash):
+        raise BadRequestException("The current password is incorrect")
+    if current_password == new_password:
+        raise BadRequestException("The new password must differ from the current one")
+    return set_password(session, user, new_password)
 
 
 def set_password(session: Session, user: User, new_password: str) -> User:

@@ -90,7 +90,7 @@ def create_db_and_tables() -> None:
     """Create all tables declared by ``table=True`` SQLModel models."""
     _ensure_sqlite_dir()
     # Import models so their tables are registered on SQLModel.metadata.
-    from .models import user_models  # noqa: F401
+    from .models import api_key_models, user_models  # noqa: F401
 
     SQLModel.metadata.create_all(engine)
     _migrate_schema()
