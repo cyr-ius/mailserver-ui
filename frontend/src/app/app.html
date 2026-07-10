@@ -1,35 +1,84 @@
 @if (isAuthenticated()) {
 <div class="app-root d-flex">
-  <aside class="sidebar bg-body-tertiary border-end" [class.collapsed]="sidebarCollapsed()">
-    <div class="sidebar-top d-flex align-items-center justify-content-between px-3 py-3 border-bottom">
-      <div class="sidebar-brand d-flex align-items-center gap-2">
+  <aside id="app-sidebar" class="sidebar" [class.collapsed]="sidebarCollapsed()">
+    <div class="sidebar-top d-flex align-items-center py-3">
+      <a class="sidebar-brand d-flex align-items-center gap-2 text-decoration-none text-reset" routerLink="/">
         <i class="bi bi-envelope-paper-fill text-primary" aria-hidden="true"></i>
-        <span class="fw-semibold">Mailserver UI</span>
-      </div>
+        <span class="sidebar-label fw-semibold">Mailserver UI</span>
+      </a>
       <button
         type="button"
-        class="btn btn-sm btn-outline-secondary d-md-none"
+        class="btn btn-sm btn-outline-secondary sidebar-close d-md-none"
         aria-label="Close navigation"
         (click)="toggleSidebar()"
       >
-        <i class="bi bi-x-lg"></i>
+        <i class="bi bi-x-lg" aria-hidden="true"></i>
       </button>
     </div>
 
     <div class="sidebar-body px-2 py-3">
-      @if (isAdmin()) {
+      <!-- Top level: the dashboard is open to every signed-in user. -->
+      <div class="sidebar-section mb-3">
+        <a
+          class="sidebar-link rounded"
+          routerLink="/dashboard"
+          routerLinkActive="active"
+          [routerLinkActiveOptions]="{ exact: true }"
+        >
+          <i class="bi bi-speedometer2" aria-hidden="true"></i>
+          <span class="sidebar-label">Dashboard</span>
+        </a>
+      </div>
+
+      @if (canManageMailboxes()) {
       <div class="sidebar-section mb-3">
         <button
           type="button"
           class="btn btn-toggle align-items-center rounded w-100"
+          aria-label="Mailbox"
+          (click)="toggleSection('mailbox')"
+          [attr.aria-expanded]="sections().mailbox"
+        >
+          <i class="bi bi-inbox" aria-hidden="true"></i>
+          <span class="sidebar-label">Mailbox</span>
+          <i class="bi bi-chevron-down sidebar-chevron ms-auto" aria-hidden="true"></i>
+        </button>
+        <div class="sidebar-submenu" [class.show]="sections().mailbox">
+          <a
+            class="nav-link"
+            routerLink="/mailboxes"
+            routerLinkActive="active"
+            [routerLinkActiveOptions]="{ exact: true }"
+          >
+            Mailboxes
+          </a>
+          <!-- The queue endpoints are admin-only, so a mailbox manager never sees the link. -->
+          @if (isAdmin()) {
+          <a
+            class="nav-link"
+            routerLink="/mailserver/queue"
+            routerLinkActive="active"
+            [routerLinkActiveOptions]="{ exact: true }"
+          >
+            Mail queue
+          </a>
+          }
+        </div>
+      </div>
+      } @if (isAdmin()) {
+      <div class="sidebar-section mb-3">
+        <button
+          type="button"
+          class="btn btn-toggle align-items-center rounded w-100"
+          aria-label="Mailserver"
           (click)="toggleSection('mailserver')"
           [attr.aria-expanded]="sections().mailserver"
         >
-          <i class="bi bi-hdd-network me-2" aria-hidden="true"></i>
-          Mailserver
-          <i class="bi bi-chevron-down ms-auto"></i>
+          <i class="bi bi-hdd-network" aria-hidden="true"></i>
+          <span class="sidebar-label">Mailserver</span>
+          <i class="bi bi-chevron-down sidebar-chevron ms-auto" aria-hidden="true"></i>
         </button>
-        <div class="sidebar-submenu mt-2 ps-3" [class.show]="sections().mailserver">
+        <div class="sidebar-submenu" [class.show]="sections().mailserver">
           <a
             class="nav-link"
             routerLink="/mailserver/relay"
@@ -96,14 +145,6 @@
           </a>
           <a
             class="nav-link"
-            routerLink="/mailserver/queue"
-            routerLinkActive="active"
-            [routerLinkActiveOptions]="{ exact: true }"
-          >
-            Mail queue
-          </a>
-          <a
-            class="nav-link"
             routerLink="/mailserver/tls"
             routerLinkActive="active"
             [routerLinkActiveOptions]="{ exact: true }"
@@ -128,42 +169,20 @@
           </a>
         </div>
       </div>
-      } @if (canManageMailboxes()) {
-      <div class="sidebar-section mb-3">
-        <button
-          type="button"
-          class="btn btn-toggle align-items-center rounded w-100"
-          (click)="toggleSection('mailbox')"
-          [attr.aria-expanded]="sections().mailbox"
-        >
-          <i class="bi bi-inbox me-2" aria-hidden="true"></i>
-          Mailbox
-          <i class="bi bi-chevron-down ms-auto"></i>
-        </button>
-        <div class="sidebar-submenu mt-2 ps-3" [class.show]="sections().mailbox">
-          <a
-            class="nav-link"
-            routerLink="/mailboxes"
-            routerLinkActive="active"
-            [routerLinkActiveOptions]="{ exact: true }"
-          >
-            Mailboxes
-          </a>
-        </div>
-      </div>
       } @if (isAdmin()) {
       <div class="sidebar-section mb-3">
         <button
           type="button"
           class="btn btn-toggle align-items-center rounded w-100"
+          aria-label="Fail2ban"
           (click)="toggleSection('fail2ban')"
           [attr.aria-expanded]="sections().fail2ban"
         >
-          <i class="bi bi-shield-lock me-2" aria-hidden="true"></i>
-          Fail2ban
-          <i class="bi bi-chevron-down ms-auto"></i>
+          <i class="bi bi-shield-lock" aria-hidden="true"></i>
+          <span class="sidebar-label">Fail2ban</span>
+          <i class="bi bi-chevron-down sidebar-chevron ms-auto" aria-hidden="true"></i>
         </button>
-        <div class="sidebar-submenu mt-2 ps-3" [class.show]="sections().fail2ban">
+        <div class="sidebar-submenu" [class.show]="sections().fail2ban">
           <a
             class="nav-link"
             routerLink="/fail2ban"
@@ -179,14 +198,15 @@
         <button
           type="button"
           class="btn btn-toggle align-items-center rounded w-100"
+          aria-label="Settings"
           (click)="toggleSection('settings')"
           [attr.aria-expanded]="sections().settings"
         >
-          <i class="bi bi-gear me-2" aria-hidden="true"></i>
-          Settings
-          <i class="bi bi-chevron-down ms-auto"></i>
+          <i class="bi bi-gear" aria-hidden="true"></i>
+          <span class="sidebar-label">Settings</span>
+          <i class="bi bi-chevron-down sidebar-chevron ms-auto" aria-hidden="true"></i>
         </button>
-        <div class="sidebar-submenu mt-2 ps-3" [class.show]="sections().settings">
+        <div class="sidebar-submenu" [class.show]="sections().settings">
           <a
             class="nav-link"
             routerLink="/settings/oidc"
@@ -195,36 +215,25 @@
           >
             OIDC / SSO
           </a>
-          <a
-            class="nav-link"
-            routerLink="/settings/appearance"
-            routerLinkActive="active"
-            [routerLinkActiveOptions]="{ exact: true }"
-          >
-            Appearance
-          </a>
-          <a
-            class="nav-link"
-            routerLink="/settings/syslog"
-            routerLinkActive="active"
-            [routerLinkActiveOptions]="{ exact: true }"
-          >
-            Syslog
-          </a>
-          <a
-            class="nav-link"
-            routerLink="/settings/email"
-            routerLinkActive="active"
-            [routerLinkActiveOptions]="{ exact: true }"
-          >
-            Email
-          </a>
           <a class="nav-link" routerLink="/users" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
             Users
           </a>
         </div>
       </div>
       }
+
+      <!-- Top level, outside the admin block: About is open to every signed-in user. -->
+      <div class="sidebar-section mb-3">
+        <a
+          class="sidebar-link rounded"
+          routerLink="/about"
+          routerLinkActive="active"
+          [routerLinkActiveOptions]="{ exact: true }"
+        >
+          <i class="bi bi-info-circle" aria-hidden="true"></i>
+          <span class="sidebar-label">About</span>
+        </a>
+      </div>
     </div>
   </aside>
 
@@ -233,30 +242,18 @@
       <div class="d-flex align-items-center gap-2">
         <button
           type="button"
-          class="btn btn-sm btn-outline-secondary d-md-none"
-          aria-label="Open navigation"
+          class="btn btn-sm btn-outline-secondary"
+          aria-controls="app-sidebar"
+          [attr.aria-expanded]="!sidebarCollapsed()"
+          [attr.aria-label]="sidebarCollapsed() ? 'Expand navigation' : 'Collapse navigation'"
+          [title]="sidebarCollapsed() ? 'Expand navigation' : 'Collapse navigation'"
           (click)="toggleSidebar()"
         >
-          <i class="bi bi-list"></i>
+          <i class="bi bi-list" aria-hidden="true"></i>
         </button>
-        <a class="text-decoration-none text-reset fw-semibold" routerLink="/dashboard">
-          <i class="bi bi-speedometer2 me-1" aria-hidden="true"></i>
-          Dashboard
-        </a>
       </div>
 
-      <div class="d-flex align-items-center gap-3">
-        @if (user(); as u) {
-        <span class="text-body-secondary small d-none d-sm-inline">
-          <i class="bi bi-person-circle me-1" aria-hidden="true"></i>
-          {{ u.display_name }}
-        </span>
-        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="onLogout()">
-          <i class="bi bi-box-arrow-right me-1" aria-hidden="true"></i>
-          Logout
-        </button>
-        }
-      </div>
+      <app-user-menu />
     </header>
 
     <main class="app-main flex-fill p-4">
@@ -265,7 +262,10 @@
   </div>
 </div>
 } @else {
-<main class="login-main p-4">
+<main class="login-main">
   <router-outlet />
 </main>
 }
+
+<!-- Outside the shell: an expiry can surface from any route, authenticated or not. -->
+<app-session-expired-modal />
