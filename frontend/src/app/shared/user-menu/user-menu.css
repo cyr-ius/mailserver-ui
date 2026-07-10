@@ -4,10 +4,12 @@
   color: var(--bs-body-color);
 }
 
+/* A neutral wash, not `--bs-secondary-bg`: that token is lighter than the
+   header chrome and would punch a pale hole in it. */
 .user-menu-trigger:hover,
 .user-menu-trigger:focus-visible,
 .user-menu-trigger.show {
-  background-color: var(--bs-secondary-bg);
+  background-color: var(--app-hover);
   color: var(--bs-body-color);
 }
 

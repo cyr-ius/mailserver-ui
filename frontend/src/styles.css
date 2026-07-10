@@ -13,41 +13,47 @@
 [data-bs-theme="light"] {
   color-scheme: light;
 
-  /* Surfaces */
-  --app-canvas: #eef1f6;
+  /* Surfaces — the canvas carries a distinct blue tint so white cards read as
+     raised rather than dissolving into the page. */
+  --app-canvas: #dfe6f2;
   --app-surface: #ffffff;
-  --app-surface-muted: #f6f8fb;
-  --app-surface-sunken: #eaeef4;
+  --app-surface-muted: #edf1f8;
+  --app-surface-sunken: #d5deec;
+
+  /* Chrome — sidebar and header. Recessed below the canvas so the shell frames
+     the content instead of merging with the cards it contains. */
+  --app-chrome: #cfd9e9;
+  --app-chrome-border: #b0bfd5;
 
   /* Borders */
-  --app-border: #dde2ea;
-  --app-border-strong: #c3cbd8;
+  --app-border: #c5cfe0;
+  --app-border-strong: #9aa9c1;
 
   /* Text */
-  --app-text: #1f2937;
-  --app-text-strong: #0f172a;
+  --app-text: #1b2534;
+  --app-text-strong: #0b1220;
   /* Darker than slate-500: secondary text sits on the tinted canvas too. */
-  --app-text-muted: #5b6a80;
+  --app-text-muted: #4d5c73;
 
   /* Accent — `solid` backs filled buttons, `accent` tints text and links */
-  --app-accent: #2563eb;
-  --app-accent-hover: #1d4ed8;
+  --app-accent: #1d4ed8;
+  --app-accent-hover: #1e40af;
   --app-accent-solid: #2563eb;
   --app-accent-solid-hover: #1d4ed8;
   --app-accent-solid-active: #1e40af;
   --app-accent-contrast: #ffffff;
-  --app-accent-soft: #e7effd;
-  --app-accent-soft-border: #c3d7fb;
-  --app-focus-ring: rgb(37 99 235 / 22%);
+  --app-accent-soft: #dbe7fe;
+  --app-accent-soft-border: #a9c5f8;
+  --app-focus-ring: rgb(29 78 216 / 25%);
 
   /* Elevation */
-  --app-shadow-sm: 0 1px 2px rgb(15 23 42 / 6%), 0 1px 3px rgb(15 23 42 / 7%);
-  --app-shadow-md: 0 4px 14px rgb(15 23 42 / 8%);
-  --app-shadow-lg: 0 16px 40px rgb(15 23 42 / 12%);
+  --app-shadow-sm: 0 1px 2px rgb(15 23 42 / 8%), 0 1px 3px rgb(15 23 42 / 10%);
+  --app-shadow-md: 0 4px 14px rgb(15 23 42 / 12%);
+  --app-shadow-lg: 0 16px 40px rgb(15 23 42 / 18%);
 
   /* Interaction wash — neutral hover/active fills */
-  --app-hover: rgb(15 23 42 / 4%);
-  --app-active: rgb(15 23 42 / 7%);
+  --app-hover: rgb(15 23 42 / 6%);
+  --app-active: rgb(15 23 42 / 10%);
 
   /* Shape */
   --app-radius-sm: 0.375rem;
@@ -66,6 +72,11 @@
   --app-surface: #151c2b;
   --app-surface-muted: #1b2333;
   --app-surface-sunken: #0a0f1b;
+
+  /* Dark inverts the light scheme's logic: elevation reads as lighter, so the
+     chrome sits just above the canvas rather than below it. */
+  --app-chrome: #121a29;
+  --app-chrome-border: #2f3a4f;
 
   --app-border: #2a3346;
   --app-border-strong: #3c4860;
@@ -98,34 +109,34 @@
 :root,
 [data-bs-theme="light"] {
   --bs-body-bg: var(--app-canvas);
-  --bs-body-bg-rgb: 238, 241, 246;
+  --bs-body-bg-rgb: 223, 230, 242;
   --bs-body-color: var(--app-text);
-  --bs-body-color-rgb: 31, 41, 55;
+  --bs-body-color-rgb: 27, 37, 52;
 
   --bs-emphasis-color: var(--app-text-strong);
-  --bs-emphasis-color-rgb: 15, 23, 42;
+  --bs-emphasis-color-rgb: 11, 18, 32;
   --bs-heading-color: var(--app-text-strong);
 
   --bs-secondary-color: var(--app-text-muted);
-  --bs-secondary-color-rgb: 91, 106, 128;
+  --bs-secondary-color-rgb: 77, 92, 115;
   --bs-secondary-bg: var(--app-surface-muted);
   --bs-tertiary-color: var(--app-text-muted);
   --bs-tertiary-bg: var(--app-surface-muted);
 
   --bs-border-color: var(--app-border);
-  --bs-border-color-translucent: rgb(15 23 42 / 10%);
+  --bs-border-color-translucent: rgb(15 23 42 / 14%);
 
   --bs-primary: var(--app-accent);
-  --bs-primary-rgb: 37, 99, 235;
+  --bs-primary-rgb: 29, 78, 216;
   --bs-primary-bg-subtle: var(--app-accent-soft);
   --bs-primary-border-subtle: var(--app-accent-soft-border);
   --bs-primary-text-emphasis: var(--app-accent-hover);
 
   --bs-link-color: var(--app-accent);
-  --bs-link-color-rgb: 37, 99, 235;
+  --bs-link-color-rgb: 29, 78, 216;
   --bs-link-hover-color: var(--app-accent-hover);
 
-  --bs-code-color: #b3246b;
+  --bs-code-color: #a3175f;
 }
 
 [data-bs-theme="dark"] {

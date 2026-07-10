@@ -24,7 +24,8 @@
 .sidebar {
   width: 260px;
   min-width: 260px;
-  background-color: var(--app-surface);
+  background-color: var(--app-chrome);
+  border-right: 1px solid var(--app-chrome-border);
   /* `align-self` opts out of the flex stretch that would defeat `sticky`. */
   position: sticky;
   top: 0;
@@ -172,8 +173,8 @@
 
 .app-header {
   min-height: 64px;
-  background-color: var(--app-surface);
-  border-color: var(--app-border) !important;
+  background-color: var(--app-chrome);
+  border-color: var(--app-chrome-border) !important;
   position: sticky;
   top: 0;
   z-index: 1020;
