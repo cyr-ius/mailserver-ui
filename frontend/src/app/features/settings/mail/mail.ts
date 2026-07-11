@@ -1,9 +1,9 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
-import { form, FormField } from '@angular/forms/signals';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { form, FormField, max, min } from '@angular/forms/signals';
 
-import { SettingsService } from '../../../core/settings.service';
 import { MailSettings, MailSettingsUpdate } from '../../../core/settings.models';
+import { SettingsService } from '../../../core/settings.service';
 
 /** Form shape for the mail page (mirrors MailSettingsUpdate). */
 interface MailForm {
@@ -62,7 +62,10 @@ export class Mail {
   protected readonly testResult = signal<{ sent: boolean; detail: string } | null>(null);
 
   protected readonly model = signal<MailForm>({ ...EMPTY_MAIL });
-  protected readonly mailForm = form(this.model);
+  protected readonly mailForm = form(this.model, (schemaPath) => {
+    min(schemaPath.port, 1);
+    max(schemaPath.port, 65535);
+  });
 
   /** Testing an unsaved form would test the *stored* config, which misleads. */
   protected readonly canTest = computed(() => this.model().enabled && !this.saving());
