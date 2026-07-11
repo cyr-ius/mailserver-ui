@@ -11,7 +11,7 @@
       "source": "cyr-ius/angular-fastapi-scaffold",
       "sourceType": "github",
       "skillPath": ".agents/skills/development-standards/SKILL.md",
-      "computedHash": "cefb8cef8451faa5e47043109810c0e5fafa6a8995ddcdcc7b35a40af27227de"
+      "computedHash": "878173767d44529a9a1ab24c41f8373142f9b4a5d75713f119e7d31f053ff93e"
     },
     "fastapi": {
       "source": "fastapi/fastapi",

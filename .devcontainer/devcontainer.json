@@ -30,7 +30,6 @@
         "streetsidesoftware.code-spell-checker",
         "editorconfig.editorconfig",
         "anthropic.claude-code",
-        "alexcvzz.vscode-sqlite",
         "bowlerr.sqlite-intelliview-vscode"
       ],
       "settings": {
