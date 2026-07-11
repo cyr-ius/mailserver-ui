@@ -17,11 +17,12 @@ from ..config import settings
 from ..depends import get_session, require_user
 from ..exceptions import (
     BadGatewayException,
+    ConflictException,
     ForbiddenException,
     NotFoundException,
     UnauthorizedException,
 )
-from ..services import oidc, settings_service, user_service
+from ..services import audit_service, oidc, settings_service, user_service
 
 SessionDep = Annotated[Session, Depends(get_session)]
 
@@ -43,10 +44,13 @@ class LoginRequest(BaseModel):
 
 
 class AuthConfig(BaseModel):
-    """Public auth capabilities, consumed by the login page."""
+    """Public auth capabilities, consumed by the login page and the profile page."""
 
     local_enabled: bool
     oidc_enabled: bool
+    # When false, the profile page hides the personal API key section entirely:
+    # the backend rejects keys, so offering to mint one would be a dead end.
+    api_keys_enabled: bool
 
 
 # ── Cookie helpers ───────────────────────────────────────────────────────────
@@ -78,6 +82,7 @@ async def auth_config(session: SessionDep) -> AuthConfig:
     return AuthConfig(
         local_enabled=not cfg.oidc_only,
         oidc_enabled=cfg.enabled,
+        api_keys_enabled=settings.api_keys_enabled,
     )
 
 
@@ -88,11 +93,34 @@ async def login(
     """Authenticate local credentials against the database and start a session."""
     if settings_service.get_oidc_settings(session).oidc_only:
         raise ForbiddenException("Local login is disabled")
+
     user = user_service.authenticate_local(session, payload.username, payload.password)
     if user is None:
+        # The audit trail names the account that was attempted — a burst of
+        # failures against one username is exactly what it exists to surface.
+        await audit_service.record(
+            session,
+            request=request,
+            category="auth",
+            action="auth.login",
+            actor=payload.username,
+            target=payload.username,
+            status="failure",
+            detail="Invalid credentials, or the account is deactivated",
+        )
         raise UnauthorizedException("Invalid username or password")
+
     _set_session_cookie(response, create_session_token(user), secure=is_secure_request(request))
     logger.info("Local login succeeded for %s", user.username)
+    await audit_service.record(
+        session,
+        request=request,
+        category="auth",
+        action="auth.login",
+        actor=user.username,
+        target=user.username,
+        detail="provider=local",
+    )
     return user
 
 
@@ -103,9 +131,23 @@ async def me(user: Annotated[SessionUser, Depends(require_user)]) -> SessionUser
 
 
 @router.post("/logout")
-async def logout(response: Response) -> dict[str, str]:
+async def logout(
+    request: Request,
+    response: Response,
+    session: SessionDep,
+    user: Annotated[SessionUser, Depends(require_user)],
+) -> dict[str, str]:
     """Clear the session cookie."""
     _clear_cookie(response, settings.auth_cookie_name)
+    await audit_service.record(
+        session,
+        request=request,
+        category="auth",
+        action="auth.logout",
+        actor=user.username,
+        target=user.username,
+        detail=f"provider={user.provider}",
+    )
     return {"detail": "Logged out"}
 
 
@@ -194,11 +236,36 @@ async def oidc_callback(
         return RedirectResponse("/login?error=forbidden", status_code=status.HTTP_302_FOUND)
 
     # Persist/refresh the OIDC account so it appears in the users list, and pick
-    # up any role granted by the local groups it belongs to.
-    user = user_service.upsert_oidc_user(session, principal)
+    # up any role granted by the local groups it belongs to. Refuses to take over
+    # a local account of the same name, and to sign in a deactivated one.
+    try:
+        user = user_service.upsert_oidc_user(session, principal)
+    except (ConflictException, ForbiddenException) as exc:
+        logger.warning("OIDC login refused for %s: %s", principal.username, exc.detail)
+        await audit_service.record(
+            session,
+            request=request,
+            category="auth",
+            action="auth.login",
+            actor=principal.username,
+            target=principal.username,
+            status="failure",
+            detail=f"OIDC sign-in refused: {exc.detail}",
+        )
+        reason = "conflict" if isinstance(exc, ConflictException) else "disabled"
+        return RedirectResponse(f"/login?error={reason}", status_code=status.HTTP_302_FOUND)
 
     response = RedirectResponse("/welcome", status_code=status.HTTP_302_FOUND)
     _set_session_cookie(response, create_session_token(user), secure=is_secure_request(request))
     _clear_cookie(response, _OIDC_STATE_COOKIE)
     logger.info("OIDC login succeeded for %s", user.username)
+    await audit_service.record(
+        session,
+        request=request,
+        category="auth",
+        action="auth.login",
+        actor=user.username,
+        target=user.username,
+        detail="provider=oidc",
+    )
     return response

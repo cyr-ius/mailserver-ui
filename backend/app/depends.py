@@ -14,7 +14,7 @@ from collections.abc import Generator
 from typing import Annotated
 
 from fastapi import Depends, Request, Security
-from fastapi.security import APIKeyHeader
+from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials, HTTPBearer
 from sqlmodel import Session
 
 from .auth import SessionUser, decode_session_token, role_grants
@@ -26,6 +26,14 @@ from .services import api_key_service, user_service
 logger = logging.getLogger(__name__)
 
 _api_key_header = APIKeyHeader(name=settings.api_key_header, auto_error=False)
+#: Declared so Swagger's *Authorize* dialog offers the bearer form of a personal
+#: API key. Both schemes resolve to the same credential; neither errors on its
+#: own, because a request may authenticate with the session cookie instead.
+_api_key_bearer = HTTPBearer(
+    auto_error=False,
+    scheme_name="PersonalAccessToken",
+    description="A personal API key issued from the profile page.",
+)
 
 
 def get_session() -> Generator[Session]:
@@ -34,7 +42,10 @@ def get_session() -> Generator[Session]:
         yield session
 
 
-def _presented_api_key(request: Request, header_key: str | None) -> str | None:
+def _presented_api_key(
+    header_key: str | None,
+    bearer: HTTPAuthorizationCredentials | None,
+) -> str | None:
     """Return the API key carried by the request, from either accepted location.
 
     The bearer form is only considered when the token looks like an API key, so
@@ -42,9 +53,8 @@ def _presented_api_key(request: Request, header_key: str | None) -> str | None:
     """
     if header_key:
         return header_key
-    scheme, _, token = request.headers.get("authorization", "").partition(" ")
-    if scheme.lower() == "bearer" and token.startswith(api_key_service.KEY_PREFIX):
-        return token
+    if bearer and bearer.credentials.startswith(api_key_service.KEY_PREFIX):
+        return bearer.credentials
     return None
 
 
@@ -52,25 +62,34 @@ def current_user_optional(
     request: Request,
     session: Annotated[Session, Depends(get_session)],
     header_key: Annotated[str | None, Security(_api_key_header)] = None,
+    bearer: Annotated[HTTPAuthorizationCredentials | None, Security(_api_key_bearer)] = None,
 ) -> SessionUser | None:
     """Return the authenticated principal, from the session cookie or an API key.
 
     The cookie wins when both are present: a browser session is the more
     specific credential, and re-resolving the key would cost a query for nothing.
+
+    A cookie is not trusted on its own: the account behind it is re-read on every
+    request, so a session held by an account that has since been deactivated (or
+    deleted) stops working immediately instead of surviving until the JWT expires.
     """
     token = request.cookies.get(settings.auth_cookie_name)
     if token:
         user = decode_session_token(token)
         if user is not None:
-            return user
+            account = user_service.get_by_username(session, user.username)
+            if account is not None and account.is_active:
+                return user_service.to_session_user(session, account)
+            logger.info("Rejected session of unknown or deactivated account %s", user.username)
+            return None
 
     if not settings.api_keys_enabled:
         return None
-    raw_key = _presented_api_key(request, header_key)
+    raw_key = _presented_api_key(header_key, bearer)
     if not raw_key:
         return None
     account = api_key_service.authenticate(session, raw_key)
-    if account is None:
+    if account is None or not account.is_active:
         return None
     return user_service.to_session_user(session, account)
 

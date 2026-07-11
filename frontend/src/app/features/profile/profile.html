@@ -117,6 +117,9 @@
       </div>
     </div>
 
+    <!-- API keys are hidden entirely when disabled server-side: the backend
+         rejects them, so offering to mint one would lead nowhere. -->
+    @if (apiKeysEnabled()) {
     <div class="col-12">
       <div class="card shadow-sm">
         <div class="card-body">
@@ -271,6 +274,7 @@
         </div>
       </div>
     </div>
+    }
   </div>
   }
 </main>

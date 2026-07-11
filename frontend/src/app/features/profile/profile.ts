@@ -4,6 +4,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { form, FormField, required, submit } from '@angular/forms/signals';
 
 import { ApiKeysService } from '../../core/api-keys.service';
+import { AuthService } from '../../core/auth.service';
 import { UsersService } from '../../core/users.service';
 import { API_KEY_HEADER, ApiKey, ApiKeyCreated } from '../../core/api-key.models';
 import { Role, User, roleLabel } from '../../core/auth.models';
@@ -35,6 +36,10 @@ const ROLE_BADGE: Record<Role, string> = {
 export class Profile {
   private readonly usersService = inject(UsersService);
   private readonly apiKeysService = inject(ApiKeysService);
+  private readonly auth = inject(AuthService);
+
+  /** API keys are hidden when the backend rejects them (API_KEYS_ENABLED=false). */
+  protected readonly apiKeysEnabled = this.auth.apiKeysEnabled;
 
   protected readonly profile = signal<User | null>(null);
   protected readonly loading = signal(true);
@@ -83,7 +88,9 @@ export class Profile {
 
   constructor() {
     void this.loadProfile();
-    void this.loadApiKeys();
+    if (this.apiKeysEnabled()) {
+      void this.loadApiKeys();
+    }
   }
 
   /** An expired key is kept in the list, greyed out, until its owner revokes it. */

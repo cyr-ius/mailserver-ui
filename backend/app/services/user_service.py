@@ -20,7 +20,12 @@ from ..auth import (
     verify_password,
 )
 from ..config import settings
-from ..exceptions import BadRequestException, ConflictException, NotFoundException
+from ..exceptions import (
+    BadRequestException,
+    ConflictException,
+    ForbiddenException,
+    NotFoundException,
+)
 from ..models.user_models import User, UserPublic
 from ..services import api_key_service, group_service
 
@@ -95,13 +100,20 @@ def get_by_username(session: Session, username: str) -> User | None:
 
 
 def authenticate_local(session: Session, username: str, password: str) -> SessionUser | None:
-    """Validate local credentials against the stored hash."""
+    """Validate local credentials against the stored hash.
+
+    A deactivated account is refused exactly like a wrong password: the caller
+    gets no signal about which of the two it was.
+    """
     user = get_by_username(session, username)
     if user is None or user.provider != "local" or not user.password_hash:
         # Run a dummy hash comparison to keep timing roughly uniform.
         verify_password(password, "$2b$12$" + "." * 53)
         return None
     if not verify_password(password, user.password_hash):
+        return None
+    if not user.is_active:
+        logger.warning("Login refused for deactivated account %s", user.username)
         return None
     _touch_login(session, user)
     return to_session_user(session, user)
@@ -114,8 +126,20 @@ def upsert_oidc_user(session: Session, principal: SessionUser) -> SessionUser:
     overwrites the account role on every sign-in. The returned principal carries
     the effective role, so a guest promoted through a local group keeps the
     privileges the administrator granted them.
+
+    An identity provider is free to assert any username, including one that
+    already belongs to a *local* account — the seeded administrator being the
+    obvious target. Converting that account would hand its privileges to whoever
+    controls the provider, so the sign-in is refused instead: the two namespaces
+    stay separate, and an administrator who wants the account on SSO deletes the
+    local one first.
     """
     user = get_by_username(session, principal.username)
+    if user is not None and user.provider != "oidc":
+        raise ConflictException(
+            f"A local account named {principal.username} already exists; "
+            "an OIDC identity cannot take it over"
+        )
     if user is None:
         user = User(
             username=principal.username,
@@ -125,9 +149,10 @@ def upsert_oidc_user(session: Session, principal: SessionUser) -> SessionUser:
             password_hash=None,
         )
     else:
+        if not user.is_active:
+            raise ForbiddenException(f"The account {principal.username} is deactivated")
         user.display_name = principal.display_name
         user.role = principal.role
-        user.provider = "oidc"
     user.last_login_at = _now()
     user.updated_at = _now()
     session.add(user)
@@ -171,19 +196,39 @@ def create_local_user(
 
 
 def is_last_admin(session: Session, user: User) -> bool:
-    """Return True when ``user`` is the only account with an effective admin role.
+    """Return True when ``user`` is the only *active* account with an admin role.
 
-    Deleting it would leave the instance with no way to administer itself, so
-    callers reject the operation.
+    Deleting or deactivating it would leave the instance with no way to
+    administer itself, so callers reject the operation. A deactivated
+    administrator does not count: it cannot sign in, so it cannot be the one that
+    keeps the instance administrable.
     """
-    if resolve_role(session, user) != "admin":
+    if not user.is_active or resolve_role(session, user) != "admin":
         return False
-    admins = [
+    active_admins = [
         public
         for public in to_public_many(session, list_users(session))
-        if public.effective_role == "admin"
+        if public.effective_role == "admin" and public.is_active
     ]
-    return len(admins) <= 1
+    return len(active_admins) <= 1
+
+
+def set_active(session: Session, user: User, is_active: bool) -> User:
+    """Activate or deactivate an account, local or OIDC.
+
+    Deactivating the last active administrator is refused: it would lock the
+    instance out of its own administration.
+    """
+    if not is_active and is_last_admin(session, user):
+        raise ConflictException("The last active administrator account cannot be deactivated")
+
+    user.is_active = is_active
+    user.updated_at = _now()
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    logger.info("User %s %s", user.username, "activated" if is_active else "deactivated")
+    return user
 
 
 def delete_user(session: Session, user: User) -> None:

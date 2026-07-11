@@ -29,6 +29,10 @@ class UserBase(SQLModel):
     # ``user_service.resolve_role``).
     role: str = Field(default="guest")
     provider: str = Field(default="local")
+    # A deactivated account keeps its data, group memberships and API keys, but
+    # cannot authenticate — neither locally, through OIDC, nor with one of its
+    # keys — and any session it still holds is rejected on the next request.
+    is_active: bool = Field(default=True)
 
 
 # ── Table model ───────────────────────────────────────────────────────────────
@@ -69,6 +73,12 @@ class UserCreate(SQLModel):
     username: str = Field(min_length=1, max_length=255)
     display_name: str = Field(default="", max_length=255)
     password: str = Field(min_length=8, max_length=1024)
+
+
+class UserStatusUpdate(SQLModel):
+    """Request schema for activating or deactivating an account."""
+
+    is_active: bool
 
 
 class PasswordChangeRequest(SQLModel):

@@ -28,6 +28,8 @@ _ADDED_COLUMNS: dict[str, dict[str, str]] = {
         "manager_group_claim": "VARCHAR NOT NULL DEFAULT ''",
         "manager_group": "VARCHAR NOT NULL DEFAULT ''",
     },
+    # Accounts that predate deactivation are active, which is what they were.
+    "user": {"is_active": "BOOLEAN NOT NULL DEFAULT 1"},
 }
 
 # Columns renamed as part of the three-role model, as ``(table, old, new)``. The
@@ -90,7 +92,12 @@ def create_db_and_tables() -> None:
     """Create all tables declared by ``table=True`` SQLModel models."""
     _ensure_sqlite_dir()
     # Import models so their tables are registered on SQLModel.metadata.
-    from .models import api_key_models, user_models  # noqa: F401
+    from .models import (  # noqa: F401
+        api_key_models,
+        audit_models,
+        mail_models,
+        user_models,
+    )
 
     SQLModel.metadata.create_all(engine)
     _migrate_schema()

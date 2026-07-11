@@ -23,6 +23,8 @@ export class AuthService {
   /** True once the initial session probe has completed. */
   readonly loaded = this._loaded.asReadonly();
   readonly isAuthenticated = computed(() => this._user() !== null);
+  /** False when API keys are disabled server-side: the UI must not offer them. */
+  readonly apiKeysEnabled = computed(() => this._config()?.api_keys_enabled ?? false);
   /** Administrators reach every section of the application. */
   readonly isAdmin = computed(() => roleGrants(this._user()?.role, 'admin'));
   /** Mailbox managers reach the Mailbox section; administrators do too. */

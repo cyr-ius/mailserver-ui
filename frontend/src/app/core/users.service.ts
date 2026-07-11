@@ -7,6 +7,7 @@ import {
   SelfPasswordChangeRequest,
   User,
   UserCreateRequest,
+  UserStatusUpdate,
 } from './auth.models';
 
 /**
@@ -56,5 +57,15 @@ export class UsersService {
   async changePassword(userId: number, newPassword: string): Promise<User> {
     const body: PasswordChangeRequest = { new_password: newPassword };
     return firstValueFrom(this.http.patch<User>(`/api/users/${userId}/password`, body));
+  }
+
+  /**
+   * Activate or deactivate an account, local or OIDC. A deactivated account keeps
+   * its data but can no longer sign in, and its sessions and API keys stop
+   * working immediately.
+   */
+  async setActive(userId: number, isActive: boolean): Promise<User> {
+    const body: UserStatusUpdate = { is_active: isActive };
+    return firstValueFrom(this.http.patch<User>(`/api/users/${userId}/status`, body));
   }
 }

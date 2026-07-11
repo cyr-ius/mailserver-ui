@@ -53,6 +53,7 @@ export class Users {
   protected readonly creatingUser = signal(false);
   protected readonly userCreationError = signal<string | null>(null);
   protected readonly deletingUserId = signal<number | null>(null);
+  protected readonly togglingUserId = signal<number | null>(null);
   protected readonly userModel = signal({
     username: '',
     display_name: '',
@@ -364,6 +365,38 @@ export class Users {
       this.loadError.set(this.apiErrorFor(err, `Unable to delete "${user.username}".`));
     } finally {
       this.deletingUserId.set(null);
+    }
+  }
+
+  /**
+   * Activate or deactivate an account. The backend refuses to deactivate the last
+   * active administrator, so the error it returns is surfaced as-is rather than
+   * second-guessed here.
+   */
+  protected async toggleActive(user: User): Promise<void> {
+    const target = !user.is_active;
+    if (
+      !target &&
+      !confirm(`Deactivate "${user.username}"? They will no longer be able to sign in.`)
+    ) {
+      return;
+    }
+    this.loadError.set(null);
+    this.successMessage.set(null);
+    this.togglingUserId.set(user.id);
+    try {
+      await this.usersService.setActive(user.id, target);
+      this.successMessage.set(`User "${user.username}" ${target ? 'activated' : 'deactivated'}.`);
+      await this.loadUsers();
+    } catch (err) {
+      this.loadError.set(
+        this.apiErrorFor(
+          err,
+          `Unable to ${target ? 'activate' : 'deactivate'} "${user.username}".`,
+        ),
+      );
+    } finally {
+      this.togglingUserId.set(null);
     }
   }
 

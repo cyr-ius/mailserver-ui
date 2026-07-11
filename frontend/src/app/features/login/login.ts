@@ -55,6 +55,8 @@ export class Login {
       oidc: 'OIDC sign-in failed. Please try again.',
       state: 'OIDC session expired. Please retry.',
       forbidden: 'Your account is not allowed to access this application.',
+      conflict: 'A local account already uses this username. Contact an administrator.',
+      disabled: 'Your account has been deactivated. Contact an administrator.',
     };
     this.error.set(messages[reason] ?? 'Sign-in failed.');
   }

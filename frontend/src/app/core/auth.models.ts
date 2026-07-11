@@ -32,6 +32,8 @@ export interface SessionUser {
 export interface AuthConfig {
   local_enabled: boolean;
   oidc_enabled: boolean;
+  /** When false the backend rejects API keys, so the profile page hides them. */
+  api_keys_enabled: boolean;
 }
 
 export interface LoginRequest {
@@ -49,12 +51,19 @@ export interface User {
   /** Role actually enforced, raised by the roles of the user's local groups. */
   effective_role: Role;
   provider: AuthProvider;
+  /** A deactivated account keeps its data but can no longer authenticate. */
+  is_active: boolean;
   created_at: string;
   last_login_at: string | null;
 }
 
 export interface PasswordChangeRequest {
   new_password: string;
+}
+
+/** Payload activating or deactivating an account. */
+export interface UserStatusUpdate {
+  is_active: boolean;
 }
 
 /** Payload for a user rotating their own password; the current one is required. */
