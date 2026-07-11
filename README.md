@@ -19,8 +19,18 @@ OIDC/SSO authentication.
 - **OIDC / SSO** — Keycloak, Authentik, etc. **Configured entirely from the web
   UI** (Settings → OIDC / SSO) and stored in the database. No redeploy needed to
   change the SSO configuration.
-- **User management** — list local & OIDC accounts, reset local passwords
-  (admin only), personal API keys issued from the profile page.
+- **User management** — list local & OIDC accounts, create and delete local ones,
+  deactivate any of them (a deactivated account keeps its data but can no longer
+  sign in, and its sessions and API keys stop working at once), reset local
+  passwords (admin only), personal API keys issued from the profile page. The
+  last active administrator can neither be deleted nor deactivated, and an OIDC
+  identity can never take over a local account of the same name.
+- **Audit log** — every sign-in, sign-out, account change, settings change and
+  API-key operation is appended to an immutable trail, browsable under
+  Settings → Audit log with filters on the actor, the category and the outcome.
+- **Mail connector** — an SMTP server configured from the web UI (Settings → Mail
+  connector), notifying on sign-in/sign-out alone or on every audit event, with a
+  test button to check the configuration.
 - **Mailbox management** — create, reset the password of, and delete
   docker-mailserver accounts, with per-mailbox quotas.
 - **Mailserver administration** — aliases (system & regex), relay hosts and
@@ -127,17 +137,45 @@ offering actions that would do nothing. Nothing to enable on this side.
 
 ### Authentication & API keys
 
-| Variable                 | Default     | Description                                            |
-| ------------------------ | ----------- | ------------------------------------------------------ |
-| `AUTH_COOKIE_NAME`       | `pc_token`  | Name of the session cookie.                            |
-| `AUTH_TOKEN_TTL_SECONDS` | `28800`     | Session lifetime (8 h).                                |
-| `API_KEYS_ENABLED`       | `true`      | Let users issue personal API keys from their profile.  |
-| `API_KEY_HEADER`         | `X-API-Key` | Header carrying the key (`Authorization: Bearer` too). |
-| `API_KEY_MAX_PER_USER`   | `10`        | Upper bound on live keys per account.                  |
+| Variable                 | Default     | Description                                                                                                                                                  |
+| ------------------------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `AUTH_COOKIE_NAME`       | `pc_token`  | Name of the session cookie.                                                                                                                                  |
+| `AUTH_TOKEN_TTL_SECONDS` | `28800`     | Session lifetime (8 h).                                                                                                                                      |
+| `API_KEYS_ENABLED`       | `true`      | Let users issue personal API keys from their profile. Set to `false` and the backend rejects every key, while the profile page hides the section altogether. |
+| `API_KEY_HEADER`         | `X-API-Key` | Header carrying the key (`Authorization: Bearer` too).                                                                                                       |
+| `API_KEY_MAX_PER_USER`   | `10`        | Upper bound on live keys per account.                                                                                                                        |
 
 > The auth cookie `Secure` flag is detected automatically from the request
 > scheme (HTTPS), honouring `X-Forwarded-Proto` when the request comes through a
 > trusted proxy. No manual `COOKIE_SECURE` toggle is needed.
+
+A personal API key authenticates a REST call either as `X-API-Key: <key>` or as
+`Authorization: Bearer <key>`. Both are declared in the OpenAPI schema, so the
+Swagger UI's _Authorize_ dialog offers them when `SWAGGER_ENABLED=true`.
+
+### Mail connector
+
+Seeded on first boot, then edited from the UI (Settings → Mail connector).
+
+| Variable                   | Default   | Description                                                   |
+| -------------------------- | --------- | ------------------------------------------------------------- |
+| `SMTP_ENABLED`             | `false`   | Master switch for the connector.                              |
+| `SMTP_HOST`                | _(empty)_ | SMTP server.                                                  |
+| `SMTP_PORT`                | `587`     | 587 (STARTTLS), 465 (implicit TLS) or 25 (plaintext).         |
+| `SMTP_USERNAME`            | _(empty)_ | Leave empty for a server that needs no authentication.        |
+| `SMTP_PASSWORD`            | _(empty)_ | Stored in the database; never returned by the API.            |
+| `SMTP_USE_TLS`             | `true`    | STARTTLS on a plaintext connection. Exclusive with `USE_SSL`. |
+| `SMTP_USE_SSL`             | `false`   | Implicit TLS. Exclusive with `USE_TLS`.                       |
+| `SMTP_FROM`                | _(empty)_ | Sender address.                                               |
+| `SMTP_RECIPIENTS`          | _(empty)_ | Comma-separated notification recipients.                      |
+| `SMTP_NOTIFY_AUTH_EVENTS`  | `false`   | Notify on sign-in and sign-out only.                          |
+| `SMTP_NOTIFY_AUDIT_EVENTS` | `false`   | Notify on every audit event (sign-in and sign-out included).  |
+
+### Audit trail
+
+| Variable               | Default | Description                                                       |
+| ---------------------- | ------- | ----------------------------------------------------------------- |
+| `AUDIT_RETENTION_DAYS` | `0`     | Purge entries older than this on startup. `0` keeps them forever. |
 
 ### Reverse proxy & rate limiting
 
