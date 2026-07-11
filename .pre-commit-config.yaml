@@ -1,7 +1,7 @@
 # ─── Pre-commit Configuration ──────────────────────────────────────────────
 # Standards: PEP8 (Ruff + Black), TypeScript (Prettier + ESLint)
-# Install: pre-commit install --install-hooks
-# Run manually: pre-commit run --all-files
+# Install: prek install --install-hooks
+# Run manually: prek run --all-files
 
 repos:
   # ── General ──────────────────────────────────────────────────────────────
