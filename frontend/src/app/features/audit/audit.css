@@ -1,0 +1,5 @@
+/* Long free-form details must not stretch the table beyond the viewport. */
+.audit-detail {
+  max-width: 28rem;
+  overflow-wrap: anywhere;
+}

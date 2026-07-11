@@ -110,6 +110,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/users/users').then((m) => m.Users),
   },
   {
+    path: 'audit',
+    canActivate: [adminGuard],
+    loadComponent: () => import('./features/audit/audit').then((m) => m.Audit),
+  },
+  {
     path: 'settings',
     canActivate: [adminGuard],
     children: [
@@ -121,6 +126,10 @@ export const routes: Routes = [
       {
         path: 'oidc',
         loadComponent: () => import('./features/settings/oidc/oidc').then((m) => m.Oidc),
+      },
+      {
+        path: 'mail',
+        loadComponent: () => import('./features/settings/mail/mail').then((m) => m.Mail),
       },
       { path: '**', redirectTo: 'oidc' },
     ],

@@ -1,3 +1,46 @@
+/** Mail connector configuration as returned by GET /api/settings/mail. */
+export interface MailSettings {
+  enabled: boolean;
+  host: string;
+  port: number;
+  username: string;
+  /** STARTTLS on a plaintext connection (587). Exclusive with `use_ssl`. */
+  use_tls: boolean;
+  /** Implicit TLS (465). Exclusive with `use_tls`. */
+  use_ssl: boolean;
+  from_address: string;
+  /** Comma-separated recipients of the notifications. */
+  recipients: string;
+  notify_auth_events: boolean;
+  notify_audit_events: boolean;
+  /** Whether an SMTP password is stored; the value itself is never returned. */
+  password_set: boolean;
+}
+
+/**
+ * Payload for PUT /api/settings/mail. Leave `password` empty/undefined to keep
+ * the stored one unchanged.
+ */
+export interface MailSettingsUpdate {
+  enabled: boolean;
+  host: string;
+  port: number;
+  username: string;
+  use_tls: boolean;
+  use_ssl: boolean;
+  from_address: string;
+  recipients: string;
+  notify_auth_events: boolean;
+  notify_audit_events: boolean;
+  password?: string;
+}
+
+/** Outcome of POST /api/settings/mail/test. */
+export interface MailTestResult {
+  sent: boolean;
+  detail: string;
+}
+
 /** OIDC configuration as returned by GET /api/settings/oidc. */
 export interface OidcSettings {
   enabled: boolean;

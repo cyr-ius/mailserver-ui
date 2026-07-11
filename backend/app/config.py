@@ -132,6 +132,27 @@ class Settings(BaseSettings):
 
     oidc_restrict_to_groups: bool = False
 
+    # ── Mail connector (first-boot seed only) ─────────────────────────────────
+    # Like OIDC, the connector is configured from the UI and stored in the
+    # database; these variables seed the row the first time it is read.
+    smtp_enabled: bool = False
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
+    # STARTTLS (port 587) vs implicit TLS (port 465) — set one, not both.
+    smtp_use_tls: bool = True
+    smtp_use_ssl: bool = False
+    smtp_from: str = ""
+    # Comma-separated list of notification recipients.
+    smtp_recipients: str = ""
+    smtp_notify_auth_events: bool = False
+    smtp_notify_audit_events: bool = False
+
+    # ── Audit trail ───────────────────────────────────────────────────────────
+    # Entries older than this are purged on startup. 0 keeps them forever.
+    audit_retention_days: int = 0
+
     # Logging level (DEBUG, INFO, WARNING, ERROR)
     log_level: str = "INFO"
 

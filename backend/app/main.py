@@ -17,10 +17,10 @@ from sqlmodel import Session
 from .config import settings
 from .database import create_db_and_tables, engine
 from .exceptions import BaseAPIException
-from .routers import auth, fail2ban, groups, mailboxes, mailserver, users
+from .routers import audit, auth, fail2ban, groups, mailboxes, mailserver, users
 from .routers import settings as settings_router
 from .security import RateLimitMiddleware, SecurityHeadersMiddleware
-from .services import user_service
+from .services import audit_service, user_service
 from .utils import resolve_safe_path
 
 logger = logging.getLogger(__name__)
@@ -32,10 +32,11 @@ logging.basicConfig(
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Initialise the database and seed the default admin on startup."""
+    """Initialise the database, seed the default admin and trim the audit trail."""
     create_db_and_tables()
     with Session(engine) as session:
         user_service.ensure_default_admin(session)
+        audit_service.purge(session, settings.audit_retention_days)
     yield
 
 
@@ -82,6 +83,7 @@ app.include_router(mailboxes.router)
 app.include_router(mailserver.router)
 app.include_router(fail2ban.router)
 app.include_router(settings_router.router)
+app.include_router(audit.router)
 
 # ── Self-hosted static assets (Swagger UI, no Internet dependency) ─────────────
 static_dir = Path(__file__).resolve().parent / "static"

@@ -242,8 +242,19 @@
           >
             OIDC / SSO
           </a>
+          <a
+            class="nav-link"
+            routerLink="/settings/mail"
+            routerLinkActive="active"
+            [routerLinkActiveOptions]="{ exact: true }"
+          >
+            Mail connector
+          </a>
           <a class="nav-link" routerLink="/users" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
             Users
+          </a>
+          <a class="nav-link" routerLink="/audit" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
+            Audit log
           </a>
         </div>
       </div>

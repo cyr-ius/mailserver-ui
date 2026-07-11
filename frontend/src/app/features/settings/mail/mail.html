@@ -1,0 +1,228 @@
+<main class="container py-4">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h1 class="h4 mb-0">
+      <i class="bi bi-envelope-at text-primary me-2" aria-hidden="true"></i>
+      Mail connector
+    </h1>
+  </div>
+
+  @if (successMessage(); as msg) {
+  <div class="alert alert-success py-2" role="alert">{{ msg }}</div>
+  } @if (loadError(); as msg) {
+  <div class="alert alert-danger py-2" role="alert">{{ msg }}</div>
+  } @if (loading()) {
+  <div class="text-center text-body-secondary py-5">
+    <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+    Loading configuration…
+  </div>
+  } @else {
+  <div class="card shadow-sm settings-card">
+    <div class="card-body">
+      <form (submit)="onSubmit(); $event.preventDefault()" novalidate>
+        <div class="form-check form-switch mb-4">
+          <input id="mail-enabled" type="checkbox" class="form-check-input" [formField]="mailForm.enabled" />
+          <label for="mail-enabled" class="form-check-label fw-medium">Enable the outgoing mail connector</label>
+        </div>
+
+        <h2 class="h6 text-uppercase text-body-secondary mb-3">SMTP server</h2>
+        <div class="row g-3 mb-4">
+          <div class="col-12 col-lg-8">
+            <label for="mail-host" class="form-label small mb-1">Host</label>
+            <input
+              id="mail-host"
+              type="text"
+              class="form-control form-control-sm"
+              placeholder="smtp.example.com"
+              [formField]="mailForm.host"
+            />
+          </div>
+          <div class="col-12 col-lg-4">
+            <label for="mail-port" class="form-label small mb-1">Port</label>
+            <input
+              id="mail-port"
+              type="number"
+              min="1"
+              max="65535"
+              class="form-control form-control-sm"
+              [formField]="mailForm.port"
+            />
+            <div class="form-text">587 for STARTTLS, 465 for implicit TLS, 25 for plaintext.</div>
+          </div>
+
+          <div class="col-12">
+            <span class="form-label small mb-1 d-block">Encryption</span>
+            <div class="btn-group btn-group-sm" role="group" aria-label="Encryption mode">
+              <input
+                type="radio"
+                class="btn-check"
+                name="tls-mode"
+                id="tls-starttls"
+                [checked]="tlsMode() === 'starttls'"
+                (change)="onTlsModeChange('starttls')"
+              />
+              <label class="btn btn-outline-secondary" for="tls-starttls">STARTTLS</label>
+
+              <input
+                type="radio"
+                class="btn-check"
+                name="tls-mode"
+                id="tls-ssl"
+                [checked]="tlsMode() === 'ssl'"
+                (change)="onTlsModeChange('ssl')"
+              />
+              <label class="btn btn-outline-secondary" for="tls-ssl">Implicit TLS (SSL)</label>
+
+              <input
+                type="radio"
+                class="btn-check"
+                name="tls-mode"
+                id="tls-none"
+                [checked]="tlsMode() === 'none'"
+                (change)="onTlsModeChange('none')"
+              />
+              <label class="btn btn-outline-secondary" for="tls-none">None</label>
+            </div>
+          </div>
+
+          <div class="col-12 col-lg-6">
+            <label for="mail-username" class="form-label small mb-1">Username</label>
+            <input
+              id="mail-username"
+              type="text"
+              autocomplete="off"
+              class="form-control form-control-sm"
+              [formField]="mailForm.username"
+            />
+            <div class="form-text">Leave empty for a server that does not require authentication.</div>
+          </div>
+          <div class="col-12 col-lg-6">
+            <label for="mail-password" class="form-label small mb-1">Password</label>
+            <input
+              id="mail-password"
+              type="password"
+              autocomplete="new-password"
+              class="form-control form-control-sm"
+              [placeholder]="passwordStored() ? '•••••••• (unchanged)' : 'Enter SMTP password'"
+              [formField]="mailForm.password"
+            />
+            <div class="form-text">Leave empty to keep the current password.</div>
+          </div>
+        </div>
+
+        <h2 class="h6 text-uppercase text-body-secondary mb-3">Messages</h2>
+        <div class="row g-3 mb-4">
+          <div class="col-12 col-lg-6">
+            <label for="mail-from" class="form-label small mb-1">Sender address</label>
+            <input
+              id="mail-from"
+              type="email"
+              class="form-control form-control-sm"
+              placeholder="mailserver-ui@example.com"
+              [formField]="mailForm.from_address"
+            />
+          </div>
+          <div class="col-12 col-lg-6">
+            <label for="mail-recipients" class="form-label small mb-1">Recipients</label>
+            <input
+              id="mail-recipients"
+              type="text"
+              class="form-control form-control-sm"
+              placeholder="admin@example.com, security@example.com"
+              [formField]="mailForm.recipients"
+            />
+            <div class="form-text">Comma-separated list.</div>
+          </div>
+        </div>
+
+        <h2 class="h6 text-uppercase text-body-secondary mb-3">Notify on</h2>
+        <div class="mb-4">
+          <div class="form-check form-switch mb-2">
+            <input
+              id="mail-auth-events"
+              type="checkbox"
+              class="form-check-input"
+              [formField]="mailForm.notify_auth_events"
+            />
+            <label for="mail-auth-events" class="form-check-label">
+              Sign-in and sign-out
+              <span class="form-text d-block mt-0">Successful and refused sign-ins, and sign-outs.</span>
+            </label>
+          </div>
+          <div class="form-check form-switch">
+            <input
+              id="mail-audit-events"
+              type="checkbox"
+              class="form-check-input"
+              [formField]="mailForm.notify_audit_events"
+            />
+            <label for="mail-audit-events" class="form-check-label">
+              Audit events
+              <span class="form-text d-block mt-0">
+                Every entry of the audit trail, sign-in and sign-out included.
+              </span>
+            </label>
+          </div>
+        </div>
+
+        @if (formError(); as msg) {
+        <div class="alert alert-danger py-2" role="alert">{{ msg }}</div>
+        }
+
+        <div class="d-flex justify-content-end">
+          <button type="submit" class="btn btn-primary" [disabled]="saving()">
+            @if (saving()) {
+            <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+            } Save configuration
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Sends with the stored configuration, so it only makes sense once saved. -->
+  <div class="card shadow-sm settings-card mt-4">
+    <div class="card-body">
+      <h2 class="h6 text-uppercase text-body-secondary mb-3">Test</h2>
+      <p class="text-body-secondary small">
+        Sends a test message using the <strong>saved</strong> configuration. Save your changes first.
+      </p>
+
+      <div class="row g-2 align-items-end">
+        <div class="col-12 col-lg-6">
+          <label for="mail-test-recipient" class="form-label small mb-1">Recipient (optional)</label>
+          <input
+            id="mail-test-recipient"
+            type="email"
+            class="form-control form-control-sm"
+            placeholder="Defaults to the configured recipients"
+            [value]="testRecipient()"
+            (input)="testRecipient.set($any($event.target).value)"
+          />
+        </div>
+        <div class="col-12 col-lg-auto">
+          <button type="button" class="btn btn-outline-primary" [disabled]="!canTest() || testing()" (click)="onTest()">
+            @if (testing()) {
+            <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+            }
+            <i class="bi bi-send me-1" aria-hidden="true"></i>
+            Send a test message
+          </button>
+        </div>
+      </div>
+
+      @if (!canTest()) {
+      <div class="form-text mt-2">Enable and save the connector to send a test message.</div>
+      } @if (testResult(); as result) {
+      <div
+        class="alert py-2 mt-3 mb-0"
+        [class.alert-success]="result.sent"
+        [class.alert-danger]="!result.sent"
+        role="alert"
+      >
+        {{ result.detail }}
+      </div>
+      }
+    </div>
+  </div>
+  }
+</main>
