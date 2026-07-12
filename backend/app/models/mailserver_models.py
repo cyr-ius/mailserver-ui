@@ -236,7 +236,9 @@ class SieveScriptUpdate(BaseModel):
 # Which spam-filtering file to edit: custom SpamAssassin rules, the Postgrey
 # whitelists that exempt a client or a recipient from greylisting, or the Amavis
 # overrides replacing ``/etc/amavis/conf.d/50-user``.
-SpamConfigScope = Literal["rules", "whitelist-clients", "whitelist-recipients", "amavis"]
+SpamConfigScope = Literal[
+    "rules", "whitelist-clients", "whitelist-recipients", "amavis"
+]
 
 
 class SpamConfig(BaseModel):

@@ -227,7 +227,9 @@ _QUEUE_ID_RE = re.compile(r"^[A-Za-z0-9]{1,32}$")
 # The two timestamps rsyslog may open a mail log line with: RFC 3339
 # (``2026-07-10T12:34:56.123456+00:00``) and the traditional, year-less
 # ``Jul 10 12:34:56`` — where a single-digit day is space-padded.
-_LOG_ISO_DATE_RE = re.compile(r"^(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\S+)?)")
+_LOG_ISO_DATE_RE = re.compile(
+    r"^(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\S+)?)"
+)
 _LOG_BSD_DATE_RE = re.compile(r"^([A-Z][a-z]{2}\s+\d{1,2} \d{2}:\d{2}:\d{2})")
 
 # The message-id Postfix's ``cleanup`` prints, chevrons included, e.g.
@@ -244,7 +246,9 @@ _GREYLIST_MARKERS = ("greylist", "postgrey", "try again later")
 # ``Blocked SPAM`` / ``Passed SPAMMY`` for spam. Rspamd rejects through the
 # milter with its own wording.
 _LOG_VIRUS_RE = re.compile(r"\bINFECTED\b")
-_LOG_SPAM_RE = re.compile(r"\b(?:Blocked|Passed) SPAM(?:MY)?\b|\bSpam message rejected\b")
+_LOG_SPAM_RE = re.compile(
+    r"\b(?:Blocked|Passed) SPAM(?:MY)?\b|\bSpam message rejected\b"
+)
 
 
 # ── Generic file access ───────────────────────────────────────────────────────
@@ -277,7 +281,9 @@ def _read_managed_body(filename: str) -> str:
 def _write_managed_body(filename: str, content: str) -> None:
     """Atomically (re)write ``filename`` with the managed header and free-form text."""
     body = content.strip()
-    container.write_config(filename, f"{_MANAGED_HEADER}{body}\n" if body else _MANAGED_HEADER)
+    container.write_config(
+        filename, f"{_MANAGED_HEADER}{body}\n" if body else _MANAGED_HEADER
+    )
 
 
 def _normalise_sender(sender: str) -> str:
@@ -501,7 +507,9 @@ def set_postfix_overrides(overrides: list[PostfixOverride]) -> list[PostfixOverr
             raise BadRequestException(f"Invalid Postfix parameter name: {key!r}")
         cleaned[key] = override.value.strip()
 
-    _write_managed(_POSTFIX_MAIN_FILENAME, [f"{key} = {value}" for key, value in cleaned.items()])
+    _write_managed(
+        _POSTFIX_MAIN_FILENAME, [f"{key} = {value}" for key, value in cleaned.items()]
+    )
     logger.info("Updated %d Postfix override(s)", len(cleaned))
     return [PostfixOverride(key=key, value=value) for key, value in cleaned.items()]
 
@@ -540,9 +548,13 @@ def set_postfix_master_overrides(
             )
         cleaned[key] = override.value.strip()
 
-    _write_managed(_POSTFIX_MASTER_FILENAME, [f"{key}={value}" for key, value in cleaned.items()])
+    _write_managed(
+        _POSTFIX_MASTER_FILENAME, [f"{key}={value}" for key, value in cleaned.items()]
+    )
     logger.info("Updated %d Postfix master override(s)", len(cleaned))
-    return [PostfixMasterOverride(key=key, value=value) for key, value in cleaned.items()]
+    return [
+        PostfixMasterOverride(key=key, value=value) for key, value in cleaned.items()
+    ]
 
 
 # ── Dovecot configuration override (dovecot.cf) ───────────────────────────────
@@ -650,7 +662,15 @@ def generate_dkim(payload: DkimGenerateRequest) -> list[DkimKey]:
     if not _DKIM_TOKEN_RE.match(selector):
         raise BadRequestException(f"Invalid DKIM selector: {selector!r}")
 
-    args = ["setup", "config", "dkim", "keysize", str(payload.key_size), "selector", selector]
+    args = [
+        "setup",
+        "config",
+        "dkim",
+        "keysize",
+        str(payload.key_size),
+        "selector",
+        selector,
+    ]
     if payload.domain:
         domain = payload.domain.strip().lower()
         if not _DKIM_TOKEN_RE.match(domain):
@@ -658,7 +678,11 @@ def generate_dkim(payload: DkimGenerateRequest) -> list[DkimKey]:
         args += ["domain", domain]
 
     container.run_in_container(args, timeout=settings.mailserver_command_timeout)
-    logger.info("Generated DKIM keys (selector=%s, domain=%s)", selector, payload.domain or "all")
+    logger.info(
+        "Generated DKIM keys (selector=%s, domain=%s)",
+        selector,
+        payload.domain or "all",
+    )
     return list_dkim_keys()
 
 
@@ -696,14 +720,18 @@ def add_restriction(kind: str, address: str) -> Restriction:
     filename = _restriction_filename(kind)
     entry = address.strip().lower()
     if "@" not in entry:
-        raise BadRequestException("A restriction must target an address or a domain (@example.com)")
+        raise BadRequestException(
+            "A restriction must target an address or a domain (@example.com)"
+        )
 
     addresses = _restriction_addresses(kind)
     if entry in addresses:
         raise ConflictException(f"{entry} is already restricted")
 
     addresses.append(entry)
-    _write_managed(filename, [f"{addr}\t{_RESTRICTION_ACTION}" for addr in sorted(set(addresses))])
+    _write_managed(
+        filename, [f"{addr}\t{_RESTRICTION_ACTION}" for addr in sorted(set(addresses))]
+    )
     logger.info("Added %s restriction for %s", kind, entry)
     return Restriction(kind=kind, address=entry)
 
@@ -716,7 +744,9 @@ def delete_restriction(kind: str, address: str) -> None:
     if entry not in addresses:
         raise NotFoundException("Restriction", entry)
     remaining = [addr for addr in addresses if addr != entry]
-    _write_managed(filename, [f"{addr}\t{_RESTRICTION_ACTION}" for addr in sorted(set(remaining))])
+    _write_managed(
+        filename, [f"{addr}\t{_RESTRICTION_ACTION}" for addr in sorted(set(remaining))]
+    )
     logger.info("Removed %s restriction for %s", kind, entry)
 
 
@@ -766,7 +796,9 @@ def list_services() -> list[ServiceStatus]:
         check=False,
     )
     services = [
-        service for service in map(_parse_service_line, output.splitlines()) if service is not None
+        service
+        for service in map(_parse_service_line, output.splitlines())
+        if service is not None
     ]
     return sorted(services, key=lambda service: service.name)
 
@@ -859,7 +891,9 @@ def get_mail_stats() -> MailStats:
                 stats.rejected += 1
         elif "postfix/cleanup" in line:
             match = _LOG_MESSAGE_ID_RE.search(line)
-            if match and (match.group(1) == "<>" or match.group(1) not in seen_message_ids):
+            if match and (
+                match.group(1) == "<>" or match.group(1) not in seen_message_ids
+            ):
                 seen_message_ids.add(match.group(1))
                 stats.received += 1
 
@@ -883,7 +917,9 @@ def _split_master(line: str) -> str:
 def _master_names() -> list[str]:
     """Return every existing Dovecot master account name."""
     return [
-        name for name in map(_split_master, _read_config_lines(_DOVECOT_MASTERS_FILENAME)) if name
+        name
+        for name in map(_split_master, _read_config_lines(_DOVECOT_MASTERS_FILENAME))
+        if name
     ]
 
 
@@ -933,7 +969,9 @@ def list_system_aliases() -> list[SystemAlias]:
     """Return the local aliases appended to ``/etc/aliases``, ordered by name."""
     aliases = [
         SystemAlias(name=name, targets=targets)
-        for name, targets in map(_parse_system_alias, _read_config_lines(_SYSTEM_ALIASES_FILENAME))
+        for name, targets in map(
+            _parse_system_alias, _read_config_lines(_SYSTEM_ALIASES_FILENAME)
+        )
         if name and targets
     ]
     return sorted(aliases, key=lambda alias: alias.name)
@@ -1007,7 +1045,9 @@ def list_regex_aliases() -> list[RegexAlias]:
     """Return the PCRE aliases of ``postfix-regexp.cf``, ordered by pattern."""
     aliases = [
         RegexAlias(pattern=pattern, targets=targets)
-        for pattern, targets in map(_parse_regex_alias, _read_config_lines(_REGEX_ALIASES_FILENAME))
+        for pattern, targets in map(
+            _parse_regex_alias, _read_config_lines(_REGEX_ALIASES_FILENAME)
+        )
         if pattern and targets
     ]
     return sorted(aliases, key=lambda alias: alias.pattern)
@@ -1051,7 +1091,9 @@ def create_regex_alias(pattern: str, targets: list[str]) -> RegexAlias:
     alias = RegexAlias(pattern=cleaned_pattern, targets=cleaned_targets)
     aliases.append(alias)
     _write_regex_aliases(aliases)
-    logger.info("Added regex alias %s -> %s", cleaned_pattern, ", ".join(cleaned_targets))
+    logger.info(
+        "Added regex alias %s -> %s", cleaned_pattern, ", ".join(cleaned_targets)
+    )
     return alias
 
 
@@ -1102,7 +1144,9 @@ def _spam_config_filename(scope: str) -> str:
     filename = _SPAM_CONFIG_FILENAMES.get(scope)
     if filename is None:
         scopes = ", ".join(sorted(_SPAM_CONFIG_FILENAMES))
-        raise BadRequestException(f"A spam configuration scope must be one of: {scopes}")
+        raise BadRequestException(
+            f"A spam configuration scope must be one of: {scopes}"
+        )
     return filename
 
 
@@ -1199,7 +1243,9 @@ def get_rspamd_overrides() -> RspamdOverrides:
     """Return the directives of ``rspamd/custom-commands.conf``, in file order."""
     commands = [
         command
-        for command in map(_parse_rspamd_command, _read_config_lines(_RSPAMD_COMMANDS_FILENAME))
+        for command in map(
+            _parse_rspamd_command, _read_config_lines(_RSPAMD_COMMANDS_FILENAME)
+        )
         if command is not None
     ]
     return RspamdOverrides(
@@ -1215,7 +1261,9 @@ def set_rspamd_overrides(commands: list[RspamdCommand]) -> RspamdOverrides:
     two identical lines are two lines.
     """
     cleaned = [_validate_rspamd_command(command) for command in commands]
-    _write_managed(_RSPAMD_COMMANDS_FILENAME, [_format_rspamd_command(c) for c in cleaned])
+    _write_managed(
+        _RSPAMD_COMMANDS_FILENAME, [_format_rspamd_command(c) for c in cleaned]
+    )
     logger.info("Updated %d Rspamd command(s)", len(cleaned))
     return RspamdOverrides(
         commands=cleaned,
@@ -1308,7 +1356,11 @@ def set_ldap_config(scope: LdapScope, content: str) -> LdapConfig:
 
     for line in body.splitlines():
         stripped = line.strip()
-        if stripped and not stripped.startswith("#") and not _LDAP_LINE_RE.match(stripped):
+        if (
+            stripped
+            and not stripped.startswith("#")
+            and not _LDAP_LINE_RE.match(stripped)
+        ):
             raise BadRequestException(
                 f"Invalid LDAP map line: {stripped!r}. Expected 'key = value', "
                 "e.g. search_base = ou=people,dc=example,dc=com"
@@ -1418,7 +1470,9 @@ def _postconf(parameter: str) -> str:
 def _parse_openssl_date(value: str) -> datetime | None:
     """Parse an ``openssl -dateopt iso_8601`` timestamp (``2026-07-09 10:50:07Z``)."""
     try:
-        return datetime.strptime(value.strip(), "%Y-%m-%d %H:%M:%SZ").replace(tzinfo=UTC)
+        return datetime.strptime(value.strip(), "%Y-%m-%d %H:%M:%SZ").replace(
+            tzinfo=UTC
+        )
     except ValueError:
         logger.warning("Unparsable certificate date: %r", value)
         return None
@@ -1524,7 +1578,9 @@ def list_dns_records() -> list[DomainDnsRecords]:
             ),
         ]
         records += [
-            DnsRecord(name=key.record_name, type="TXT", value=key.txt_value, suggested=False)
+            DnsRecord(
+                name=key.record_name, type="TXT", value=key.txt_value, suggested=False
+            )
             for key in dkim_by_domain.get(domain, [])
         ]
         entries.append(DomainDnsRecords(domain=domain, records=records))
@@ -1696,7 +1752,9 @@ def _environment_warnings(variables: dict[str, str]) -> list[EnvironmentWarning]
                 ),
             )
         )
-    if _flag(variables, "ENABLE_UPDATE_CHECK") and not variables.get("POSTMASTER_ADDRESS"):
+    if _flag(variables, "ENABLE_UPDATE_CHECK") and not variables.get(
+        "POSTMASTER_ADDRESS"
+    ):
         warnings.append(
             EnvironmentWarning(
                 level="warning",
@@ -1726,7 +1784,8 @@ def get_environment() -> MailserverEnvironment:
     return MailserverEnvironment(
         variables=redacted,
         dkim_backend="rspamd" if _flag(variables, "ENABLE_RSPAMD") else "opendkim",
-        global_relay_host=variables.get("DEFAULT_RELAY_HOST") or variables.get("RELAY_HOST", ""),
+        global_relay_host=variables.get("DEFAULT_RELAY_HOST")
+        or variables.get("RELAY_HOST", ""),
         postmaster_address=variables.get("POSTMASTER_ADDRESS", ""),
         ssl_type=variables.get("SSL_TYPE", ""),
         account_provisioner=variables.get("ACCOUNT_PROVISIONER", ""),

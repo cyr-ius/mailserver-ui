@@ -26,7 +26,7 @@ export const appConfig: ApplicationConfig = {
     provideAppInitializer(() => {
       inject(ThemeService);
     }),
-    // The auth capabilities gate what the UI may offer (API keys, login methods),
+    // The auth capabilities gate what the UI may offer (tokens, login methods),
     // so they are fetched once at bootstrap rather than by the login page alone:
     // landing straight on /profile must know them too. A failure here is not
     // fatal — the guards still decide what the user can reach.

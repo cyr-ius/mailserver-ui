@@ -67,7 +67,9 @@ async def get_usage(_manager: ManagerDep) -> MailboxUsageSummary:
 @router.post("", response_model=Mailbox, status_code=status.HTTP_201_CREATED)
 async def create_mailbox(payload: MailboxCreate, _manager: ManagerDep) -> Mailbox:
     """Create a new mail account, optionally with a quota (mailbox manager)."""
-    return mailbox_service.create_mailbox(str(payload.email), payload.password, payload.quota)
+    return mailbox_service.create_mailbox(
+        str(payload.email), payload.password, payload.quota
+    )
 
 
 @router.patch("/{email}/password", response_model=Mailbox)
@@ -107,7 +109,9 @@ async def list_aliases(email: str, _manager: ManagerDep) -> list[Alias]:
     return mailbox_service.list_aliases_for(email)
 
 
-@router.post("/{email}/aliases", response_model=Alias, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{email}/aliases", response_model=Alias, status_code=status.HTTP_201_CREATED
+)
 async def add_alias(email: str, payload: AliasCreate, _manager: ManagerDep) -> Alias:
     """Add an alias forwarding to a mail account (mailbox manager)."""
     return mailbox_service.add_alias(email, str(payload.alias))
@@ -138,7 +142,9 @@ async def set_sieve_script(
 
     An empty script removes the filter. It takes effect on the next restart.
     """
-    return await run_in_threadpool(mailbox_service.set_sieve_script, email, payload.content)
+    return await run_in_threadpool(
+        mailbox_service.set_sieve_script, email, payload.content
+    )
 
 
 @router.delete("/{email}/sieve", status_code=status.HTTP_204_NO_CONTENT)

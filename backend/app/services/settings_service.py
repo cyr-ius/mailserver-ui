@@ -94,7 +94,9 @@ def update_mail_settings(session: Session, payload: MailSettingsUpdate) -> MailS
     session.add(config)
     session.commit()
     session.refresh(config)
-    logger.info("Mail settings updated (enabled=%s host=%s)", config.enabled, config.host)
+    logger.info(
+        "Mail settings updated (enabled=%s host=%s)", config.enabled, config.host
+    )
     return config
 
 
@@ -106,13 +108,19 @@ def _validate_mail(payload: MailSettingsUpdate) -> None:
     if not payload.enabled:
         return
     if not payload.host:
-        raise BadRequestException("An SMTP host is required when the mail connector is enabled")
+        raise BadRequestException(
+            "An SMTP host is required when the mail connector is enabled"
+        )
     if not payload.from_address:
-        raise BadRequestException("A sender address is required when the mail connector is enabled")
+        raise BadRequestException(
+            "A sender address is required when the mail connector is enabled"
+        )
     if not 1 <= payload.port <= 65535:
         raise BadRequestException("The SMTP port must be between 1 and 65535")
     if payload.use_ssl and payload.use_tls:
-        raise BadRequestException("Choose either implicit TLS (SSL) or STARTTLS, not both")
+        raise BadRequestException(
+            "Choose either implicit TLS (SSL) or STARTTLS, not both"
+        )
 
 
 def _seed_mail_from_env() -> MailSettings:
@@ -136,7 +144,9 @@ def _seed_mail_from_env() -> MailSettings:
 def _validate(payload: OidcSettingsUpdate) -> None:
     """Reject configurations that cannot work once enabled."""
     if payload.enabled and not (payload.issuer and payload.client_id):
-        raise BadRequestException("Issuer and Client ID are required when OIDC is enabled")
+        raise BadRequestException(
+            "Issuer and Client ID are required when OIDC is enabled"
+        )
 
 
 def _seed_from_env() -> OidcSettings:

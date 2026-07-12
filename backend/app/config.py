@@ -16,32 +16,14 @@ logger = logging.getLogger(__name__)
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
-# Default data directory (can be overridden by DATA_DIR env variable for debugging)
 DATA_DIR = os.getenv("DATA_DIR", "/var/lib/mailserver-ui")
-
-# Default directory for ui
+DEFAULT_DATABASE_URL = f"sqlite+aiosqlite:///{DATA_DIR}/mailserver-ui.db"
 FRONTEND_DIR = Path("/app/ui").resolve()
 INDEX_HTML = FRONTEND_DIR / "index.html"
-
-
-# HTTP client timeout for GitHub API calls (in seconds)
 DEFAULT_TIMEOUT: float = 10.0
-
-# Path of the docker-mailserver configuration directory *inside* the mailserver
-# container. The flat config files (``postfix-accounts.cf`` and friends) are read
-# and written there over the Docker socket via ``docker exec`` — no host
-# directory is bind-mounted. This is the docker-mailserver image default.
 MAILSERVER_CONFIG_DIR = "/tmp/docker-mailserver"
-
-# The docker CLI used to exec into the mailserver container. Resolved through
-# ``PATH`` inside this container.
 DOCKER_BINARY = "docker"
-
-# File under ``DATA_DIR`` where a self-generated ``SECRET_KEY`` is persisted when
-# none is supplied via the environment. Persisting it keeps issued cookies/JWTs
-# valid across restarts (a freshly generated key on every boot would log
-# everyone out).
-SECRET_KEY_FILENAME = "secret_key"
+SECRET_KEY_FILE = "secret_key"
 
 
 def _open_0600(path: str, flags: int) -> int:
@@ -55,16 +37,16 @@ def _open_0600(path: str, flags: int) -> int:
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
-    app_version: str = "0.1.0"
-
-    # SQLite database storing local/OIDC users. Defaults to a file under
-    # ``DATA_DIR``; override with the ``DATABASE_URL`` env variable if needed.
-    database_url: str = f"sqlite:///{Path(DATA_DIR) / 'mailserver-ui.db'}"
-    database_echo: bool = False
-
-    # Username of the default admin account seeded on first startup. Its
-    # password is generated randomly and printed once to the logs.
+    access_token_expire_minutes: int = 8 * 60
     admin_username: str = "admin"
+    app_version: str = "Development"
+    audit_retention_days: int = 0
+    auth_cookie_name: str = "pc_token"
+    database_echo: bool = False
+    database_url: str = DEFAULT_DATABASE_URL
+    log_level: str = "INFO"
+    secret_key: str = ""
+    swagger_enabled: bool = False
 
     # ── Mailserver docker exec (docker-mailserver) ────────────────────────────
     # All mailserver management (mailboxes, aliases, relays, DKIM, mail log, …)
@@ -95,21 +77,13 @@ class Settings(BaseSettings):
     # Number of trailing fail2ban log lines returned by the log endpoint.
     fail2ban_log_lines: int = 200
 
-    # Signs the session/JWT cookies. Leave unset to have a random key generated
-    # and persisted under ``DATA_DIR`` on first startup (see the validator below).
-    secret_key: str = ""
-    auth_cookie_name: str = "pc_token"
-    # Session lifetime for the local/OIDC JWT stored in the auth cookie.
-    auth_token_ttl_seconds: int = 8 * 3600
-
-    # ── Personal API keys ─────────────────────────────────────────────────────
-    # Users issue keys from their profile to call the REST API without a browser
-    # session. A key carries the effective role of the account that owns it.
-    api_keys_enabled: bool = True
-    # Header carrying the key. ``Authorization: Bearer <key>`` is accepted too.
-    api_key_header: str = "X-API-Key"
-    # Upper bound on the number of live keys a single account may own.
-    api_key_max_per_user: int = 10
+    # ── Personal access tokens (PAT) ──────────────────────────────────────────
+    # Users issue tokens from their profile to call the REST API without a
+    # browser session. A token carries the effective role of the account that
+    # owns it, and is presented as ``Authorization: Bearer <token>``.
+    pats_enabled: bool = True
+    # Upper bound on the number of live tokens a single account may own.
+    pat_max_per_user: int = 10
     # The auth cookie ``Secure`` flag is detected per request from the scheme
     # (honouring ``X-Forwarded-Proto`` behind trusted proxies), not configured.
 
@@ -122,14 +96,11 @@ class Settings(BaseSettings):
     oidc_post_logout_redirect_uri: str = ""
     oidc_response_type: str = "code"
     oidc_scope: str = "openid profile email groups"
-
     oidc_only: bool = False
     oidc_admin_group_claim: str = ""
     oidc_admin_group: str = ""
-
     oidc_manager_group_claim: str = ""
     oidc_manager_group: str = ""
-
     oidc_restrict_to_groups: bool = False
 
     # ── Mail connector (first-boot seed only) ─────────────────────────────────
@@ -140,33 +111,21 @@ class Settings(BaseSettings):
     smtp_port: int = 587
     smtp_username: str = ""
     smtp_password: str = ""
-    # STARTTLS (port 587) vs implicit TLS (port 465) — set one, not both.
     smtp_use_tls: bool = True
     smtp_use_ssl: bool = False
     smtp_from: str = ""
-    # Comma-separated list of notification recipients.
-    smtp_recipients: str = ""
+    smtp_recipients: str = ""  # Comma-separated list of notification recipients.
     smtp_notify_auth_events: bool = False
     smtp_notify_audit_events: bool = False
 
-    # ── Audit trail ───────────────────────────────────────────────────────────
-    # Entries older than this are purged on startup. 0 keeps them forever.
-    audit_retention_days: int = 0
-
-    # Logging level (DEBUG, INFO, WARNING, ERROR)
-    log_level: str = "INFO"
-
-    # Swagger UI
-    swagger_enabled: bool = False
-
+    # Reverse proxy: comma-separated trusted proxy IPs/CIDRs (e.g.
+    # "10.0.0.0/8,172.16.0.0/12"). X-Forwarded-For is honoured only when the
+    # direct peer matches one of these; otherwise it is ignored to prevent
+    # client IP spoofing. Leave empty when not behind a proxy.
     trusted_proxies: str = ""
-
     rate_limit_enabled: bool = True
-    rate_limit_window_seconds: int = 60
     rate_limit_max_requests: int = 100  # per IP per window, all /api/* routes
-    rate_limit_auth_max_requests: int = 5  # per IP per window, login/token only
-
-    # Stricter budget for the login endpoint to slow credential brute-forcing.
+    rate_limit_window_seconds: int = 60
     rate_limit_login_max_attempts: int = 5
     rate_limit_login_window_seconds: int = 300
     rate_limit_login_path: str = "/api/auth/login"
@@ -185,7 +144,7 @@ class Settings(BaseSettings):
         if self.secret_key:
             return self
 
-        key_file = Path(DATA_DIR) / SECRET_KEY_FILENAME
+        key_file = Path(DATA_DIR) / SECRET_KEY_FILE
         try:
             existing = key_file.read_text(encoding="utf-8").strip()
         except OSError:

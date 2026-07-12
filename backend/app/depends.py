@@ -4,9 +4,9 @@ Centralises everything injected via ``Depends()`` so routers stay declarative
 and the authentication rules live in one place.
 
 A request authenticates either with the session cookie issued by the login flow,
-or with a personal API key presented in the ``X-API-Key`` header (or as a bearer
-token). Both resolve to the same :class:`~app.auth.SessionUser` principal, so
-every route enforces roles identically whichever credential was used.
+or with a personal access token presented as ``Authorization: Bearer``. Both
+resolve to the same :class:`~app.auth.SessionUser` principal, so every route
+enforces roles identically whichever credential was used.
 """
 
 import logging
@@ -14,25 +14,24 @@ from collections.abc import Generator
 from typing import Annotated
 
 from fastapi import Depends, Request, Security
-from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials, HTTPBearer
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlmodel import Session
 
 from .auth import SessionUser, decode_session_token, role_grants
 from .config import settings
 from .database import engine
 from .exceptions import ForbiddenException, UnauthorizedException
-from .services import api_key_service, user_service
+from .services import pat_service, user_service
 
 logger = logging.getLogger(__name__)
 
-_api_key_header = APIKeyHeader(name=settings.api_key_header, auto_error=False)
-#: Declared so Swagger's *Authorize* dialog offers the bearer form of a personal
-#: API key. Both schemes resolve to the same credential; neither errors on its
-#: own, because a request may authenticate with the session cookie instead.
-_api_key_bearer = HTTPBearer(
+#: Declared so Swagger's *Authorize* dialog offers a personal access token. It
+#: does not error on its own, because a request may authenticate with the
+#: session cookie instead.
+_pat_bearer = HTTPBearer(
     auto_error=False,
     scheme_name="PersonalAccessToken",
-    description="A personal API key issued from the profile page.",
+    description="A personal access token (pat_…) issued from the profile page.",
 )
 
 
@@ -42,32 +41,18 @@ def get_session() -> Generator[Session]:
         yield session
 
 
-def _presented_api_key(
-    header_key: str | None,
-    bearer: HTTPAuthorizationCredentials | None,
-) -> str | None:
-    """Return the API key carried by the request, from either accepted location.
-
-    The bearer form is only considered when the token looks like an API key, so
-    a session JWT sent as a bearer token is never mistaken for one.
-    """
-    if header_key:
-        return header_key
-    if bearer and bearer.credentials.startswith(api_key_service.KEY_PREFIX):
-        return bearer.credentials
-    return None
-
-
 def current_user_optional(
     request: Request,
     session: Annotated[Session, Depends(get_session)],
-    header_key: Annotated[str | None, Security(_api_key_header)] = None,
-    bearer: Annotated[HTTPAuthorizationCredentials | None, Security(_api_key_bearer)] = None,
+    bearer: Annotated[
+        HTTPAuthorizationCredentials | None, Security(_pat_bearer)
+    ] = None,
 ) -> SessionUser | None:
-    """Return the authenticated principal, from the session cookie or an API key.
+    """Return the authenticated principal, from the session cookie or a PAT.
 
     The cookie wins when both are present: a browser session is the more
-    specific credential, and re-resolving the key would cost a query for nothing.
+    specific credential, and re-resolving the token would cost a query for
+    nothing.
 
     A cookie is not trusted on its own: the account behind it is re-read on every
     request, so a session held by an account that has since been deactivated (or
@@ -80,15 +65,18 @@ def current_user_optional(
             account = user_service.get_by_username(session, user.username)
             if account is not None and account.is_active:
                 return user_service.to_session_user(session, account)
-            logger.info("Rejected session of unknown or deactivated account %s", user.username)
+            logger.info(
+                "Rejected session of unknown or deactivated account %s", user.username
+            )
             return None
 
-    if not settings.api_keys_enabled:
+    if not settings.pats_enabled or bearer is None:
         return None
-    raw_key = _presented_api_key(header_key, bearer)
-    if not raw_key:
+    # Only a credential that looks like a PAT is resolved, so a session JWT sent
+    # as a bearer token is never mistaken for one.
+    if not bearer.credentials.startswith(pat_service.TOKEN_PREFIX):
         return None
-    account = api_key_service.authenticate(session, raw_key)
+    account = pat_service.authenticate(session, bearer.credentials)
     if account is None or not account.is_active:
         return None
     return user_service.to_session_user(session, account)
@@ -107,14 +95,16 @@ def require_session_login(
     request: Request,
     _user: Annotated[SessionUser, Depends(require_user)],
 ) -> SessionUser:
-    """Dependency enforcing an interactive session, rejecting API-key callers.
+    """Dependency enforcing an interactive session, rejecting PAT callers.
 
-    Guards the endpoints that manage API keys themselves: a stolen key must not
-    be enough to mint further keys, nor to revoke the ones its owner relies on.
+    Guards the endpoints that manage tokens themselves: a stolen token must not
+    be enough to mint further ones, nor to revoke the ones its owner relies on.
     """
     user = decode_session_token(request.cookies.get(settings.auth_cookie_name, ""))
     if user is None:
-        raise ForbiddenException("This operation requires an interactive session, not an API key")
+        raise ForbiddenException(
+            "This operation requires an interactive session, not a personal access token"
+        )
     return user
 
 

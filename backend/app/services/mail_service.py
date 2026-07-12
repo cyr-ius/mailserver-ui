@@ -85,7 +85,9 @@ def _send_blocking(config: MailSettings, message: EmailMessage) -> None:
     context = ssl.create_default_context()
     client: smtplib.SMTP
     if config.use_ssl:
-        client = smtplib.SMTP_SSL(config.host, config.port, timeout=_SMTP_TIMEOUT, context=context)
+        client = smtplib.SMTP_SSL(
+            config.host, config.port, timeout=_SMTP_TIMEOUT, context=context
+        )
     else:
         client = smtplib.SMTP(config.host, config.port, timeout=_SMTP_TIMEOUT)
     with client:

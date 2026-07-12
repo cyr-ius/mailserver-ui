@@ -61,7 +61,7 @@ export class UsersService {
 
   /**
    * Activate or deactivate an account, local or OIDC. A deactivated account keeps
-   * its data but can no longer sign in, and its sessions and API keys stop
+   * its data but can no longer sign in, and its sessions and access tokens stop
    * working immediately.
    */
   async setActive(userId: number, isActive: boolean): Promise<User> {

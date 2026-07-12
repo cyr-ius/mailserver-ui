@@ -145,7 +145,10 @@ def get_status() -> Fail2banStatus:
     if not mailserver_service.feature_enabled(_FEATURE_VARIABLE):
         return Fail2banStatus()
     jail_names = _parse_jail_names(_run(["fail2ban-client", "status"]))
-    jails = [_parse_jail(name, _run(["fail2ban-client", "status", name])) for name in jail_names]
+    jails = [
+        _parse_jail(name, _run(["fail2ban-client", "status", name]))
+        for name in jail_names
+    ]
     return Fail2banStatus(jails=jails, fail2ban_enabled=True)
 
 
@@ -207,7 +210,9 @@ def get_policy() -> Fail2banPolicy:
     try:
         parser.read_string(content)
     except configparser.Error:
-        logger.warning("Unparsable %s; reporting docker-mailserver's defaults", _JAIL_FILENAME)
+        logger.warning(
+            "Unparsable %s; reporting docker-mailserver's defaults", _JAIL_FILENAME
+        )
         return Fail2banPolicy(
             bantime=_DEFAULT_BANTIME,
             findtime=_DEFAULT_FINDTIME,
@@ -282,6 +287,8 @@ def set_config(content: str) -> Fail2banConfig:
         except configparser.Error as exc:
             raise BadRequestException(f"Invalid fail2ban configuration: {exc}") from exc
 
-    container.write_config(_CONFIG_FILENAME, f"{_MANAGED_HEADER}\n{body}\n" if body else "")
+    container.write_config(
+        _CONFIG_FILENAME, f"{_MANAGED_HEADER}\n{body}\n" if body else ""
+    )
     logger.info("Updated the fail2ban daemon configuration (%d bytes)", len(body))
     return Fail2banConfig(content=body)

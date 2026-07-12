@@ -48,9 +48,9 @@ class AuthConfig(BaseModel):
 
     local_enabled: bool
     oidc_enabled: bool
-    # When false, the profile page hides the personal API key section entirely:
-    # the backend rejects keys, so offering to mint one would be a dead end.
-    api_keys_enabled: bool
+    # When false, the profile page hides the personal access token section
+    # entirely: the backend rejects tokens, so minting one would be a dead end.
+    pats_enabled: bool
 
 
 # ── Cookie helpers ───────────────────────────────────────────────────────────
@@ -60,7 +60,7 @@ def _set_session_cookie(response: Response, token: str, *, secure: bool) -> None
     response.set_cookie(
         key=settings.auth_cookie_name,
         value=token,
-        max_age=settings.auth_token_ttl_seconds,
+        max_age=settings.access_token_expire_minutes * 60,
         httponly=True,
         secure=secure,
         samesite="lax",
@@ -82,7 +82,7 @@ async def auth_config(session: SessionDep) -> AuthConfig:
     return AuthConfig(
         local_enabled=not cfg.oidc_only,
         oidc_enabled=cfg.enabled,
-        api_keys_enabled=settings.api_keys_enabled,
+        pats_enabled=settings.pats_enabled,
     )
 
 
@@ -110,7 +110,9 @@ async def login(
         )
         raise UnauthorizedException("Invalid username or password")
 
-    _set_session_cookie(response, create_session_token(user), secure=is_secure_request(request))
+    _set_session_cookie(
+        response, create_session_token(user), secure=is_secure_request(request)
+    )
     logger.info("Local login succeeded for %s", user.username)
     await audit_service.record(
         session,
@@ -233,7 +235,9 @@ async def oidc_callback(
 
     principal = oidc.map_claims_to_user(cfg, claims)
     if principal is None:
-        return RedirectResponse("/login?error=forbidden", status_code=status.HTTP_302_FOUND)
+        return RedirectResponse(
+            "/login?error=forbidden", status_code=status.HTTP_302_FOUND
+        )
 
     # Persist/refresh the OIDC account so it appears in the users list, and pick
     # up any role granted by the local groups it belongs to. Refuses to take over
@@ -253,10 +257,14 @@ async def oidc_callback(
             detail=f"OIDC sign-in refused: {exc.detail}",
         )
         reason = "conflict" if isinstance(exc, ConflictException) else "disabled"
-        return RedirectResponse(f"/login?error={reason}", status_code=status.HTTP_302_FOUND)
+        return RedirectResponse(
+            f"/login?error={reason}", status_code=status.HTTP_302_FOUND
+        )
 
     response = RedirectResponse("/welcome", status_code=status.HTTP_302_FOUND)
-    _set_session_cookie(response, create_session_token(user), secure=is_secure_request(request))
+    _set_session_cookie(
+        response, create_session_token(user), secure=is_secure_request(request)
+    )
     _clear_cookie(response, _OIDC_STATE_COOKIE)
     logger.info("OIDC login succeeded for %s", user.username)
     await audit_service.record(

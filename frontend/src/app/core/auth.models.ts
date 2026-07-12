@@ -32,8 +32,8 @@ export interface SessionUser {
 export interface AuthConfig {
   local_enabled: boolean;
   oidc_enabled: boolean;
-  /** When false the backend rejects API keys, so the profile page hides them. */
-  api_keys_enabled: boolean;
+  /** When false the backend rejects tokens, so the profile page hides them. */
+  pats_enabled: boolean;
 }
 
 export interface LoginRequest {

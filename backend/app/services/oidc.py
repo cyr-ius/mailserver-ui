@@ -95,7 +95,9 @@ async def fetch_userinfo(config: OidcSettings, access_token: str) -> dict[str, A
     if not endpoint:
         raise OIDCError("Provider exposes no userinfo endpoint")
     async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
-        resp = await client.get(endpoint, headers={"Authorization": f"Bearer {access_token}"})
+        resp = await client.get(
+            endpoint, headers={"Authorization": f"Bearer {access_token}"}
+        )
     if resp.status_code != httpx.codes.OK:
         raise OIDCError("Userinfo request failed")
     claims: dict[str, Any] = resp.json()
@@ -121,7 +123,9 @@ def _in_group(claims: dict[str, Any], claim_name: str, expected: str) -> bool:
     return expected in _claim_groups(claims, claim_name)
 
 
-def map_claims_to_user(config: OidcSettings, claims: dict[str, Any]) -> SessionUser | None:
+def map_claims_to_user(
+    config: OidcSettings, claims: dict[str, Any]
+) -> SessionUser | None:
     """Map OIDC claims to a SessionUser, applying group-based role mapping.
 
     The admin group maps to ``admin`` and the manager group to
@@ -131,7 +135,9 @@ def map_claims_to_user(config: OidcSettings, claims: dict[str, Any]) -> SessionU
     Returns ``None`` when ``restrict_to_groups`` is set and the user belongs to
     neither group (access denied).
     """
-    username = claims.get("preferred_username") or claims.get("email") or claims.get("sub", "")
+    username = (
+        claims.get("preferred_username") or claims.get("email") or claims.get("sub", "")
+    )
     display_name = claims.get("name") or username
 
     matched: list[Role] = []

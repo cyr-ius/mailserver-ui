@@ -89,7 +89,9 @@ def _split_account(line: str) -> tuple[str, str]:
 
 def _account_addresses() -> list[str]:
     """Return every existing account email address."""
-    return [addr for addr, _ in map(_split_account, _read_lines(_ACCOUNTS_FILENAME)) if addr]
+    return [
+        addr for addr, _ in map(_split_account, _read_lines(_ACCOUNTS_FILENAME)) if addr
+    ]
 
 
 def _require_mailbox(address: str) -> None:
@@ -100,7 +102,9 @@ def _require_mailbox(address: str) -> None:
 
 def get_features() -> MailboxFeatures:
     """Return the mailserver toggles bearing on mailbox management."""
-    return MailboxFeatures(quotas_enabled=mailserver_service.feature_enabled("ENABLE_QUOTAS"))
+    return MailboxFeatures(
+        quotas_enabled=mailserver_service.feature_enabled("ENABLE_QUOTAS")
+    )
 
 
 def list_mailboxes() -> list[Mailbox]:
@@ -112,7 +116,9 @@ def list_mailboxes() -> list[Mailbox]:
         if not email or "@" not in email:
             continue
         mailboxes.append(
-            Mailbox(email=email, domain=email.rpartition("@")[2], quota=quotas.get(email))
+            Mailbox(
+                email=email, domain=email.rpartition("@")[2], quota=quotas.get(email)
+            )
         )
     mailboxes.sort(key=lambda m: m.email)
     return mailboxes
@@ -191,7 +197,9 @@ def _set_quota_line(address: str, quota: str) -> None:
     """Insert or replace the quota line for ``address``."""
     quotas = _read_quotas()
     quotas[address] = quota
-    _write_lines(_QUOTAS_FILENAME, [f"{email}:{q}" for email, q in sorted(quotas.items())])
+    _write_lines(
+        _QUOTAS_FILENAME, [f"{email}:{q}" for email, q in sorted(quotas.items())]
+    )
 
 
 def _remove_quota_line(address: str) -> None:
@@ -199,7 +207,9 @@ def _remove_quota_line(address: str) -> None:
     quotas = _read_quotas()
     if quotas.pop(address, None) is None:
         return
-    _write_lines(_QUOTAS_FILENAME, [f"{email}:{q}" for email, q in sorted(quotas.items())])
+    _write_lines(
+        _QUOTAS_FILENAME, [f"{email}:{q}" for email, q in sorted(quotas.items())]
+    )
 
 
 def _parse_doveadm_amount(value: str) -> int | None:
@@ -242,7 +252,10 @@ def get_usage() -> MailboxUsageSummary:
         usage = usages.get(email.lower())
         if usage is None:  # An alias or a stale maildir, not a mail account.
             continue
-        value, limit = _parse_doveadm_amount(raw_value), _parse_doveadm_amount(raw_limit)
+        value, limit = (
+            _parse_doveadm_amount(raw_value),
+            _parse_doveadm_amount(raw_limit),
+        )
         if kind == "STORAGE":
             usage.used_bytes = (value or 0) * _DOVEADM_STORAGE_UNIT
             usage.limit_bytes = limit * _DOVEADM_STORAGE_UNIT if limit else None
@@ -286,7 +299,9 @@ def _parse_alias(line: str) -> tuple[str, list[str]]:
     parts = line.split(None, 1)
     source = parts[0].strip().lower()
     targets = (
-        [t.strip().lower() for t in parts[1].split(",") if t.strip()] if len(parts) > 1 else []
+        [t.strip().lower() for t in parts[1].split(",") if t.strip()]
+        if len(parts) > 1
+        else []
     )
     return source, targets
 

@@ -63,7 +63,9 @@ def _docker_exec(
 
     if result.returncode != 0 and (check or not result.stdout.strip()):
         detail = (result.stderr or result.stdout or "").strip() or "unknown error"
-        logger.warning("container command %s failed (%s): %s", args, result.returncode, detail)
+        logger.warning(
+            "container command %s failed (%s): %s", args, result.returncode, detail
+        )
         raise BadGatewayException(f"Mailserver command failed: {detail[:300]}")
     return result.stdout
 
@@ -151,4 +153,6 @@ def list_config_files(rel_dir: str, suffix: str) -> list[str]:
         timeout=settings.mailserver_command_timeout,
     )
     prefix = f"{base}/"
-    return sorted(line[len(prefix) :] for line in out.splitlines() if line.startswith(prefix))
+    return sorted(
+        line[len(prefix) :] for line in out.splitlines() if line.startswith(prefix)
+    )

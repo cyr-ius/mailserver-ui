@@ -25,7 +25,9 @@ def list_groups(session: Session) -> list[Group]:
     return list(session.exec(select(Group).order_by(Group.name)).all())
 
 
-def get_granted_roles(session: Session, user_ids: Sequence[int]) -> dict[int, list[str]]:
+def get_granted_roles(
+    session: Session, user_ids: Sequence[int]
+) -> dict[int, list[str]]:
     """Return, per user id, the roles granted by the groups that user belongs to.
 
     Resolved for every user in one query so callers listing users do not issue a
@@ -75,7 +77,9 @@ def get_group_member_ids(session: Session, group_id: int) -> list[int]:
 # ── Mutations ────────────────────────────────────────────────────────────────
 
 
-def create_group(session: Session, name: str, description: str = "", role: str = "guest") -> Group:
+def create_group(
+    session: Session, name: str, description: str = "", role: str = "guest"
+) -> Group:
     """Create a new group granting ``role`` to its members."""
     group = Group(name=name, description=description, role=role)
     session.add(group)
@@ -152,7 +156,9 @@ def remove_user_memberships(session: Session, user_id: int) -> None:
     memberships and the user itself in a single transaction.
     """
     session.exec(
-        sql_text("DELETE FROM user_group WHERE user_id = :user_id").bindparams(user_id=user_id)
+        sql_text("DELETE FROM user_group WHERE user_id = :user_id").bindparams(
+            user_id=user_id
+        )
     )
 
 

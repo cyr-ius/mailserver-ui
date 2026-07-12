@@ -29,9 +29,9 @@ class UserBase(SQLModel):
     # ``user_service.resolve_role``).
     role: str = Field(default="guest")
     provider: str = Field(default="local")
-    # A deactivated account keeps its data, group memberships and API keys, but
-    # cannot authenticate — neither locally, through OIDC, nor with one of its
-    # keys — and any session it still holds is rejected on the next request.
+    # A deactivated account keeps its data, group memberships and access tokens,
+    # but cannot authenticate — neither locally, through OIDC, nor with one of
+    # its tokens — and any session it holds is rejected on the next request.
     is_active: bool = Field(default=True)
 
 

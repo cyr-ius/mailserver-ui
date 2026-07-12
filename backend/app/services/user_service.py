@@ -27,7 +27,7 @@ from ..exceptions import (
     NotFoundException,
 )
 from ..models.user_models import User, UserPublic
-from ..services import api_key_service, group_service
+from ..services import group_service, pat_service
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +61,9 @@ def to_session_user(session: Session, user: User) -> SessionUser:
 
 def _to_public(user: User, effective_role: Role) -> UserPublic:
     data = user.model_dump(exclude={"password_hash", "updated_at", "role"})
-    return UserPublic(**data, role=normalize_role(user.role), effective_role=effective_role)
+    return UserPublic(
+        **data, role=normalize_role(user.role), effective_role=effective_role
+    )
 
 
 def to_public(session: Session, user: User) -> UserPublic:
@@ -99,7 +101,9 @@ def get_by_username(session: Session, username: str) -> User | None:
 # ── Authentication ───────────────────────────────────────────────────────────
 
 
-def authenticate_local(session: Session, username: str, password: str) -> SessionUser | None:
+def authenticate_local(
+    session: Session, username: str, password: str
+) -> SessionUser | None:
     """Validate local credentials against the stored hash.
 
     A deactivated account is refused exactly like a wrong password: the caller
@@ -220,22 +224,26 @@ def set_active(session: Session, user: User, is_active: bool) -> User:
     instance out of its own administration.
     """
     if not is_active and is_last_admin(session, user):
-        raise ConflictException("The last active administrator account cannot be deactivated")
+        raise ConflictException(
+            "The last active administrator account cannot be deactivated"
+        )
 
     user.is_active = is_active
     user.updated_at = _now()
     session.add(user)
     session.commit()
     session.refresh(user)
-    logger.info("User %s %s", user.username, "activated" if is_active else "deactivated")
+    logger.info(
+        "User %s %s", user.username, "activated" if is_active else "deactivated"
+    )
     return user
 
 
 def delete_user(session: Session, user: User) -> None:
-    """Delete a user along with every group membership and API key it holds."""
+    """Delete a user along with every group membership and token it holds."""
     if user.id is not None:
         group_service.remove_user_memberships(session, user.id)
-        api_key_service.delete_for_user(session, user.id)
+        pat_service.delete_for_user(session, user.id)
     username = user.username
     session.delete(user)
     session.commit()
@@ -257,7 +265,9 @@ def change_own_password(
     if user is None:
         raise NotFoundException("User", username)
     if user.provider != "local" or not user.password_hash:
-        raise ConflictException("Password is managed by the identity provider for OIDC users")
+        raise ConflictException(
+            "Password is managed by the identity provider for OIDC users"
+        )
     if not verify_password(current_password, user.password_hash):
         raise BadRequestException("The current password is incorrect")
     if current_password == new_password:
@@ -298,12 +308,18 @@ def ensure_default_admin(session: Session) -> None:
     )
     session.add(admin)
     session.commit()
+    banner = "=" * 72
     logger.warning(
-        "No admin account found — created default admin '%s'.\n"
-        "  ==> Generated password: %s\n"
-        "  Store it now: it is shown only once and cannot be recovered.",
+        "\n%s\n"
+        " Mailserver UI — initial admin account created (first launch)\n"
+        "   username : %s\n"
+        "   password : %s\n"
+        " This password is shown only once. Store it now.\n"
+        "%s",
+        banner,
         settings.admin_username,
         password,
+        banner,
     )
 
 

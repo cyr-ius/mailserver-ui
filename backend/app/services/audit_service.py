@@ -103,7 +103,9 @@ def list_entries(
 
     total = session.exec(total_statement).one()
     entries = session.exec(
-        page_statement.order_by(col(AuditLog.created_at).desc(), col(AuditLog.id).desc())
+        page_statement.order_by(
+            col(AuditLog.created_at).desc(), col(AuditLog.id).desc()
+        )
         .offset(max(offset, 0))
         .limit(min(max(limit, 1), MAX_PAGE_SIZE))
     ).all()
@@ -115,10 +117,14 @@ def purge(session: Session, retention_days: int) -> int:
     if retention_days <= 0:
         return 0
     cutoff = datetime.now(UTC) - timedelta(days=retention_days)
-    stale = session.exec(select(AuditLog).where(col(AuditLog.created_at) < cutoff)).all()
+    stale = session.exec(
+        select(AuditLog).where(col(AuditLog.created_at) < cutoff)
+    ).all()
     for entry in stale:
         session.delete(entry)
     session.commit()
     if stale:
-        logger.info("Purged %d audit entries older than %d days", len(stale), retention_days)
+        logger.info(
+            "Purged %d audit entries older than %d days", len(stale), retention_days
+        )
     return len(stale)

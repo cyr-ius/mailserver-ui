@@ -104,7 +104,7 @@ def create_session_token(user: SessionUser) -> str:
         "role": user.role,
         "provider": user.provider,
         "iat": now,
-        "exp": now + settings.auth_token_ttl_seconds,
+        "exp": now + settings.access_token_expire_minutes * 60,
     }
     token: str = jwt.encode(payload, settings.secret_key, algorithm=_ALGORITHM)
     return token

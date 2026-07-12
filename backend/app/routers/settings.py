@@ -20,7 +20,11 @@ from ..models.mail_models import (
     MailTestRequest,
     MailTestResult,
 )
-from ..models.settings_models import OidcSettings, OidcSettingsPublic, OidcSettingsUpdate
+from ..models.settings_models import (
+    OidcSettings,
+    OidcSettingsPublic,
+    OidcSettingsUpdate,
+)
 from ..services import audit_service, mail_service, settings_service
 
 logger = logging.getLogger(__name__)
@@ -161,4 +165,6 @@ async def test_mail(
         target=", ".join(recipients),
         detail="Test message sent",
     )
-    return MailTestResult(sent=True, detail=f"Test message sent to {', '.join(recipients)}")
+    return MailTestResult(
+        sent=True, detail=f"Test message sent to {', '.join(recipients)}"
+    )

@@ -21,12 +21,12 @@ OIDC/SSO authentication.
   change the SSO configuration.
 - **User management** — list local & OIDC accounts, create and delete local ones,
   deactivate any of them (a deactivated account keeps its data but can no longer
-  sign in, and its sessions and API keys stop working at once), reset local
-  passwords (admin only), personal API keys issued from the profile page. The
+  sign in, and its sessions and tokens stop working at once), reset local
+  passwords (admin only), personal access tokens issued from the profile page. The
   last active administrator can neither be deleted nor deactivated, and an OIDC
   identity can never take over a local account of the same name.
 - **Audit log** — every sign-in, sign-out, account change, settings change and
-  API-key operation is appended to an immutable trail, browsable under
+  token operation is appended to an immutable trail, browsable under
   Settings → Audit log with filters on the actor, the category and the outcome.
 - **Mail connector** — an SMTP server configured from the web UI (Settings → Mail
   connector), notifying on sign-in/sign-out alone or on every audit event, with a
@@ -135,23 +135,34 @@ offering actions that would do nothing. Nothing to enable on this side.
 | `FAIL2BAN_COMMAND_TIMEOUT` | `15`    | Timeout (s) of a single fail2ban command.       |
 | `FAIL2BAN_LOG_LINES`       | `200`   | Trailing fail2ban log lines returned to the UI. |
 
-### Authentication & API keys
+### Authentication & personal access tokens
 
-| Variable                 | Default     | Description                                                                                                                                                  |
-| ------------------------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `AUTH_COOKIE_NAME`       | `pc_token`  | Name of the session cookie.                                                                                                                                  |
-| `AUTH_TOKEN_TTL_SECONDS` | `28800`     | Session lifetime (8 h).                                                                                                                                      |
-| `API_KEYS_ENABLED`       | `true`      | Let users issue personal API keys from their profile. Set to `false` and the backend rejects every key, while the profile page hides the section altogether. |
-| `API_KEY_HEADER`         | `X-API-Key` | Header carrying the key (`Authorization: Bearer` too).                                                                                                       |
-| `API_KEY_MAX_PER_USER`   | `10`        | Upper bound on live keys per account.                                                                                                                        |
+| Variable                      | Default    | Description                                                                                                                                                       |
+| ----------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AUTH_COOKIE_NAME`            | `pc_token` | Name of the session cookie.                                                                                                                                       |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | `480`      | Session lifetime in minutes (8 h).                                                                                                                                |
+| `PATS_ENABLED`                | `true`     | Let users issue personal access tokens from their profile. Set to `false` and the backend rejects every token, while the profile page hides the section entirely. |
+| `PAT_MAX_PER_USER`            | `10`       | Upper bound on live tokens per account.                                                                                                                           |
 
 > The auth cookie `Secure` flag is detected automatically from the request
 > scheme (HTTPS), honouring `X-Forwarded-Proto` when the request comes through a
 > trusted proxy. No manual `COOKIE_SECURE` toggle is needed.
 
-A personal API key authenticates a REST call either as `X-API-Key: <key>` or as
-`Authorization: Bearer <key>`. Both are declared in the OpenAPI schema, so the
-Swagger UI's _Authorize_ dialog offers them when `SWAGGER_ENABLED=true`.
+A personal access token (PAT) is a single secret — `pat_` followed by 43 random
+characters — shown once at creation and never again. It authenticates a REST
+call as `Authorization: Bearer <token>`; the `pat_` prefix is what tells it
+apart from a session JWT sent the same way. The scheme is declared in the
+OpenAPI schema, so the Swagger UI's _Authorize_ dialog offers it when
+`SWAGGER_ENABLED=true`.
+
+```bash
+curl -H "Authorization: Bearer pat_…" https://mail.example.com/api/mailboxes
+```
+
+> Tokens replace the API keys of earlier versions. The `api_key` table is
+> dropped on the first startup that follows the upgrade — a token cannot be
+> derived from the digest of an existing key — so their owners reissue a token
+> from the profile page.
 
 ### Mail connector
 
@@ -185,7 +196,6 @@ Seeded on first boot, then edited from the UI (Settings → Mail connector).
 | `RATE_LIMIT_ENABLED`              | `true`            | Master switch for rate limiting.                  |
 | `RATE_LIMIT_WINDOW_SECONDS`       | `60`              | Window applied to all `/api/*` routes.            |
 | `RATE_LIMIT_MAX_REQUESTS`         | `100`             | Requests per IP per window.                       |
-| `RATE_LIMIT_AUTH_MAX_REQUESTS`    | `5`               | Same, restricted to the auth routes.              |
 | `RATE_LIMIT_LOGIN_MAX_ATTEMPTS`   | `5`               | Login attempts before throttling.                 |
 | `RATE_LIMIT_LOGIN_WINDOW_SECONDS` | `300`             | Window for those attempts.                        |
 | `RATE_LIMIT_LOGIN_PATH`           | `/api/auth/login` | Path the stricter login budget applies to.        |

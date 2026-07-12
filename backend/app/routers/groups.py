@@ -59,7 +59,9 @@ async def create_group(
     _admin: AdminDep,
 ) -> GroupPublic:
     """Create a new group granting a role to its members (admin only)."""
-    group = group_service.create_group(session, payload.name, payload.description, payload.role)
+    group = group_service.create_group(
+        session, payload.name, payload.description, payload.role
+    )
     return GroupPublic.model_validate(group, from_attributes=True)
 
 

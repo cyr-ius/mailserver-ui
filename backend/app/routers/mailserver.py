@@ -100,11 +100,17 @@ async def list_relay_exclusions(_admin: AdminDep) -> list[RelayExclusion]:
 
 
 @router.post(
-    "/relay-exclusions", response_model=RelayExclusion, status_code=status.HTTP_201_CREATED
+    "/relay-exclusions",
+    response_model=RelayExclusion,
+    status_code=status.HTTP_201_CREATED,
 )
-async def create_relay_exclusion(payload: RelayExclusionCreate, _admin: AdminDep) -> RelayExclusion:
+async def create_relay_exclusion(
+    payload: RelayExclusionCreate, _admin: AdminDep
+) -> RelayExclusion:
     """Opt a sender domain out of the global relay host (admin only)."""
-    return await run_in_threadpool(mailserver_service.create_relay_exclusion, payload.sender)
+    return await run_in_threadpool(
+        mailserver_service.create_relay_exclusion, payload.sender
+    )
 
 
 @router.delete("/relay-exclusions/{sender}", status_code=status.HTTP_204_NO_CONTENT)
@@ -128,7 +134,9 @@ async def update_postfix_overrides(
     _admin: AdminDep,
 ) -> list[PostfixOverride]:
     """Replace the full set of Postfix ``main.cf`` overrides (admin only)."""
-    return await run_in_threadpool(mailserver_service.set_postfix_overrides, payload.overrides)
+    return await run_in_threadpool(
+        mailserver_service.set_postfix_overrides, payload.overrides
+    )
 
 
 @router.get("/postfix-master", response_model=list[PostfixMasterOverride])
@@ -158,9 +166,13 @@ async def get_dovecot_config(_admin: AdminDep) -> DovecotConfig:
 
 
 @router.put("/dovecot-config", response_model=DovecotConfig)
-async def update_dovecot_config(payload: DovecotConfigUpdate, _admin: AdminDep) -> DovecotConfig:
+async def update_dovecot_config(
+    payload: DovecotConfigUpdate, _admin: AdminDep
+) -> DovecotConfig:
     """Replace the ``dovecot.cf`` override; takes effect on restart (admin only)."""
-    return await run_in_threadpool(mailserver_service.set_dovecot_config, payload.content)
+    return await run_in_threadpool(
+        mailserver_service.set_dovecot_config, payload.content
+    )
 
 
 # ── System and regex aliases ──────────────────────────────────────────────────
@@ -172,8 +184,12 @@ async def list_system_aliases(_admin: AdminDep) -> list[SystemAlias]:
     return await run_in_threadpool(mailserver_service.list_system_aliases)
 
 
-@router.post("/system-aliases", response_model=SystemAlias, status_code=status.HTTP_201_CREATED)
-async def create_system_alias(payload: SystemAliasCreate, _admin: AdminDep) -> SystemAlias:
+@router.post(
+    "/system-aliases", response_model=SystemAlias, status_code=status.HTTP_201_CREATED
+)
+async def create_system_alias(
+    payload: SystemAliasCreate, _admin: AdminDep
+) -> SystemAlias:
     """Add a local system alias such as ``root`` or ``abuse`` (admin only)."""
     return await run_in_threadpool(
         mailserver_service.create_system_alias, payload.name, payload.targets
@@ -192,7 +208,9 @@ async def list_regex_aliases(_admin: AdminDep) -> list[RegexAlias]:
     return await run_in_threadpool(mailserver_service.list_regex_aliases)
 
 
-@router.post("/regex-aliases", response_model=RegexAlias, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/regex-aliases", response_model=RegexAlias, status_code=status.HTTP_201_CREATED
+)
 async def create_regex_alias(payload: RegexAliasCreate, _admin: AdminDep) -> RegexAlias:
     """Add a PCRE alias matching addresses by regular expression (admin only)."""
     return await run_in_threadpool(
@@ -220,7 +238,9 @@ async def list_dkim_keys(_admin: AdminDep) -> list[DkimKey]:
 
 
 @router.post("/dkim", response_model=list[DkimKey], status_code=status.HTTP_201_CREATED)
-async def generate_dkim(payload: DkimGenerateRequest, _admin: AdminDep) -> list[DkimKey]:
+async def generate_dkim(
+    payload: DkimGenerateRequest, _admin: AdminDep
+) -> list[DkimKey]:
     """Generate DKIM keys inside the mailserver container (admin only)."""
     return await run_in_threadpool(mailserver_service.generate_dkim, payload)
 
@@ -235,11 +255,17 @@ async def list_restrictions(kind: str, _admin: AdminDep) -> list[Restriction]:
 
 
 @router.post(
-    "/restrictions/{kind}", response_model=Restriction, status_code=status.HTTP_201_CREATED
+    "/restrictions/{kind}",
+    response_model=Restriction,
+    status_code=status.HTTP_201_CREATED,
 )
-async def add_restriction(kind: str, payload: RestrictionCreate, _admin: AdminDep) -> Restriction:
+async def add_restriction(
+    kind: str, payload: RestrictionCreate, _admin: AdminDep
+) -> Restriction:
     """Restrict an address from sending or receiving (admin only)."""
-    return await run_in_threadpool(mailserver_service.add_restriction, kind, payload.address)
+    return await run_in_threadpool(
+        mailserver_service.add_restriction, kind, payload.address
+    )
 
 
 @router.delete("/restrictions/{kind}/{address}", status_code=status.HTTP_204_NO_CONTENT)
@@ -262,7 +288,9 @@ async def update_sieve_script(
     scope: SieveScope, payload: SieveScriptUpdate, _admin: AdminDep
 ) -> SieveScript:
     """Replace a global Sieve script; takes effect on restart (admin only)."""
-    return await run_in_threadpool(mailserver_service.set_sieve_script, scope, payload.content)
+    return await run_in_threadpool(
+        mailserver_service.set_sieve_script, scope, payload.content
+    )
 
 
 # ── Spam filter configuration files ───────────────────────────────────────────
@@ -279,7 +307,9 @@ async def update_spam_config(
     scope: SpamConfigScope, payload: SpamConfigUpdate, _admin: AdminDep
 ) -> SpamConfig:
     """Replace a spam-filtering file; takes effect on restart (admin only)."""
-    return await run_in_threadpool(mailserver_service.set_spam_config, scope, payload.content)
+    return await run_in_threadpool(
+        mailserver_service.set_spam_config, scope, payload.content
+    )
 
 
 # ── Rspamd overrides ──────────────────────────────────────────────────────────
@@ -296,7 +326,9 @@ async def update_rspamd_overrides(
     payload: RspamdCommandsUpdate, _admin: AdminDep
 ) -> RspamdOverrides:
     """Replace the Rspamd custom commands; takes effect on restart (admin only)."""
-    return await run_in_threadpool(mailserver_service.set_rspamd_overrides, payload.commands)
+    return await run_in_threadpool(
+        mailserver_service.set_rspamd_overrides, payload.commands
+    )
 
 
 # ── LDAP provisioner maps ─────────────────────────────────────────────────────
@@ -313,7 +345,9 @@ async def update_ldap_config(
     scope: LdapScope, payload: LdapConfigUpdate, _admin: AdminDep
 ) -> LdapConfig:
     """Replace one Postfix LDAP map; takes effect on restart (admin only)."""
-    return await run_in_threadpool(mailserver_service.set_ldap_config, scope, payload.content)
+    return await run_in_threadpool(
+        mailserver_service.set_ldap_config, scope, payload.content
+    )
 
 
 # ── Postfix mail queue ────────────────────────────────────────────────────────
@@ -397,8 +431,14 @@ async def list_dovecot_masters(_admin: AdminDep) -> list[DovecotMaster]:
     return await run_in_threadpool(mailserver_service.list_dovecot_masters)
 
 
-@router.post("/dovecot-masters", response_model=DovecotMaster, status_code=status.HTTP_201_CREATED)
-async def create_dovecot_master(payload: DovecotMasterCreate, _admin: AdminDep) -> DovecotMaster:
+@router.post(
+    "/dovecot-masters",
+    response_model=DovecotMaster,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_dovecot_master(
+    payload: DovecotMasterCreate, _admin: AdminDep
+) -> DovecotMaster:
     """Add a Dovecot master account (admin only)."""
     return await run_in_threadpool(
         mailserver_service.create_dovecot_master, payload.name, payload.password

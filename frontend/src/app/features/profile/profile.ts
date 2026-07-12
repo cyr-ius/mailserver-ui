@@ -3,15 +3,15 @@ import { DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { form, FormField, required, submit } from '@angular/forms/signals';
 
-import { ApiKeysService } from '../../core/api-keys.service';
 import { AuthService } from '../../core/auth.service';
+import { PatsService } from '../../core/pats.service';
 import { UsersService } from '../../core/users.service';
-import { API_KEY_HEADER, ApiKey, ApiKeyCreated } from '../../core/api-key.models';
+import { Pat, PatCreated } from '../../core/pat.models';
 import { Role, User, roleLabel } from '../../core/auth.models';
 
 const MIN_PASSWORD_LENGTH = 8;
 
-/** Lifetimes offered when issuing a key; `null` never expires. */
+/** Lifetimes offered when issuing a token; `null` never expires. */
 const EXPIRY_OPTIONS: readonly { readonly label: string; readonly days: number | null }[] = [
   { label: '30 days', days: 30 },
   { label: '90 days', days: 90 },
@@ -35,11 +35,11 @@ const ROLE_BADGE: Record<Role, string> = {
 })
 export class Profile {
   private readonly usersService = inject(UsersService);
-  private readonly apiKeysService = inject(ApiKeysService);
+  private readonly patsService = inject(PatsService);
   private readonly auth = inject(AuthService);
 
-  /** API keys are hidden when the backend rejects them (API_KEYS_ENABLED=false). */
-  protected readonly apiKeysEnabled = this.auth.apiKeysEnabled;
+  /** Tokens are hidden when the backend rejects them (PATS_ENABLED=false). */
+  protected readonly patsEnabled = this.auth.patsEnabled;
 
   protected readonly profile = signal<User | null>(null);
   protected readonly loading = signal(true);
@@ -62,40 +62,40 @@ export class Profile {
     required(path.confirm, { message: 'Please confirm the new password' });
   });
 
-  // ── Personal API keys ──────────────────────────────────────────────────────
+  // ── Personal access tokens ─────────────────────────────────────────────────
 
-  protected readonly apiKeyHeader = API_KEY_HEADER;
   protected readonly expiryOptions = EXPIRY_OPTIONS;
 
-  protected readonly apiKeys = signal<ApiKey[]>([]);
-  protected readonly loadingKeys = signal(true);
-  protected readonly keysError = signal<string | null>(null);
+  protected readonly pats = signal<Pat[]>([]);
+  protected readonly loadingPats = signal(true);
+  protected readonly patsError = signal<string | null>(null);
 
-  protected readonly showKeyForm = signal(false);
-  protected readonly creatingKey = signal(false);
-  protected readonly keyFormError = signal<string | null>(null);
-  protected readonly revokingKeyId = signal<number | null>(null);
+  protected readonly showPatForm = signal(false);
+  protected readonly creatingPat = signal(false);
+  protected readonly patFormError = signal<string | null>(null);
+  protected readonly revokingPatId = signal<number | null>(null);
   protected readonly expiresInDays = signal<number | null>(EXPIRY_OPTIONS[0].days);
 
-  /** The key just issued, shown once: the API never returns its secret again. */
-  protected readonly newKey = signal<ApiKeyCreated | null>(null);
-  protected readonly keyCopied = signal(false);
+  /** The token just issued, shown once: the API never returns its secret again. */
+  protected readonly newPat = signal<PatCreated | null>(null);
+  /** Whether the secret just issued has been copied to the clipboard. */
+  protected readonly copiedSecret = signal(false);
 
-  protected readonly keyModel = signal({ name: '' });
-  protected readonly keyForm = form(this.keyModel, (path) => {
+  protected readonly patModel = signal({ name: '' });
+  protected readonly patForm = form(this.patModel, (path) => {
     required(path.name, { message: 'A name is required' });
   });
 
   constructor() {
     void this.loadProfile();
-    if (this.apiKeysEnabled()) {
-      void this.loadApiKeys();
+    if (this.patsEnabled()) {
+      void this.loadPats();
     }
   }
 
-  /** An expired key is kept in the list, greyed out, until its owner revokes it. */
-  protected isExpired(key: ApiKey): boolean {
-    return key.expires_at !== null && new Date(key.expires_at) <= new Date();
+  /** An expired token stays in the list, greyed out, until its owner revokes it. */
+  protected isExpired(pat: Pat): boolean {
+    return pat.expires_at !== null && new Date(pat.expires_at) <= new Date();
   }
 
   protected onExpiryChange(event: Event): void {
@@ -103,89 +103,90 @@ export class Profile {
     this.expiresInDays.set(raw === '' ? null : Number(raw));
   }
 
-  protected startCreateKey(): void {
-    this.newKey.set(null);
-    this.keyFormError.set(null);
-    this.keyModel.set({ name: '' });
+  protected startCreatePat(): void {
+    this.newPat.set(null);
+    this.patFormError.set(null);
+    this.patModel.set({ name: '' });
     this.expiresInDays.set(EXPIRY_OPTIONS[0].days);
-    this.showKeyForm.set(true);
+    this.showPatForm.set(true);
   }
 
-  protected cancelCreateKey(): void {
-    this.showKeyForm.set(false);
-    this.keyFormError.set(null);
-    this.keyModel.set({ name: '' });
+  protected cancelCreatePat(): void {
+    this.showPatForm.set(false);
+    this.patFormError.set(null);
+    this.patModel.set({ name: '' });
   }
 
-  protected createKey(): void {
-    this.keyFormError.set(null);
-    submit(this.keyForm, async () => {
-      const name = this.keyModel().name.trim();
+  protected createPat(): void {
+    this.patFormError.set(null);
+    submit(this.patForm, async () => {
+      const name = this.patModel().name.trim();
       if (!name) {
-        this.keyFormError.set('A name is required.');
+        this.patFormError.set('A name is required.');
         return;
       }
-      this.creatingKey.set(true);
+      this.creatingPat.set(true);
       try {
-        const created = await this.apiKeysService.create(name, this.expiresInDays());
-        this.newKey.set(created);
-        this.keyCopied.set(false);
-        this.showKeyForm.set(false);
-        this.keyModel.set({ name: '' });
-        await this.loadApiKeys();
+        const created = await this.patsService.create(name, this.expiresInDays());
+        this.newPat.set(created);
+        this.copiedSecret.set(false);
+        this.showPatForm.set(false);
+        this.patModel.set({ name: '' });
+        await this.loadPats();
       } catch (err) {
-        this.keyFormError.set(this.apiErrorFor(err, 'Unable to create the API key.'));
+        this.patFormError.set(this.apiErrorFor(err, 'Unable to create the token.'));
       } finally {
-        this.creatingKey.set(false);
+        this.creatingPat.set(false);
       }
     });
   }
 
-  protected async revokeKey(key: ApiKey): Promise<void> {
-    if (!confirm(`Revoke the API key "${key.name}"? Calls using it will stop working.`)) {
+  protected async revokePat(pat: Pat): Promise<void> {
+    if (!confirm(`Revoke the token "${pat.name}"? Calls using it will stop working.`)) {
       return;
     }
-    this.keysError.set(null);
-    this.revokingKeyId.set(key.id);
+    this.patsError.set(null);
+    this.revokingPatId.set(pat.id);
     try {
-      await this.apiKeysService.revoke(key.id);
-      if (this.newKey()?.id === key.id) {
-        this.newKey.set(null);
+      await this.patsService.revoke(pat.id);
+      if (this.newPat()?.id === pat.id) {
+        this.newPat.set(null);
       }
-      await this.loadApiKeys();
+      await this.loadPats();
     } catch (err) {
-      this.keysError.set(this.apiErrorFor(err, `Unable to revoke "${key.name}".`));
+      this.patsError.set(this.apiErrorFor(err, `Unable to revoke "${pat.name}".`));
     } finally {
-      this.revokingKeyId.set(null);
+      this.revokingPatId.set(null);
     }
   }
 
-  protected async copyKey(): Promise<void> {
-    const secret = this.newKey()?.key;
+  /** Copy the secret of the token just issued. */
+  protected async copySecret(): Promise<void> {
+    const secret = this.newPat()?.token;
     if (!secret) {
       return;
     }
     try {
       await navigator.clipboard.writeText(secret);
-      this.keyCopied.set(true);
+      this.copiedSecret.set(true);
     } catch {
-      this.keysError.set('Unable to copy the key. Select it and copy it manually.');
+      this.patsError.set('Unable to copy the token. Select it and copy it manually.');
     }
   }
 
-  protected dismissNewKey(): void {
-    this.newKey.set(null);
-    this.keyCopied.set(false);
+  protected dismissNewPat(): void {
+    this.newPat.set(null);
+    this.copiedSecret.set(false);
   }
 
-  private async loadApiKeys(): Promise<void> {
-    this.loadingKeys.set(true);
+  private async loadPats(): Promise<void> {
+    this.loadingPats.set(true);
     try {
-      this.apiKeys.set(await this.apiKeysService.list());
+      this.pats.set(await this.patsService.list());
     } catch {
-      this.keysError.set('Unable to load your API keys.');
+      this.patsError.set('Unable to load your access tokens.');
     } finally {
-      this.loadingKeys.set(false);
+      this.loadingPats.set(false);
     }
   }
 

@@ -117,9 +117,9 @@
       </div>
     </div>
 
-    <!-- API keys are hidden entirely when disabled server-side: the backend
+    <!-- Access tokens are hidden entirely when disabled server-side: the backend
          rejects them, so offering to mint one would lead nowhere. -->
-    @if (apiKeysEnabled()) {
+    @if (patsEnabled()) {
     <div class="col-12">
       <div class="card shadow-sm">
         <div class="card-body">
@@ -127,99 +127,98 @@
             <div>
               <h2 class="h6 card-title mb-1">
                 <i class="bi bi-key-fill me-1" aria-hidden="true"></i>
-                API keys
+                Personal access tokens
               </h2>
               <p class="form-text mb-0">
-                Call the REST API from a script with the
-                <code>{{ apiKeyHeader }}</code> header. A key carries your own permissions ({{
+                Call the REST API from a script with an
+                <code>Authorization: Bearer &lt;token&gt;</code> header. A token carries your own permissions ({{
                 roleLabel(me.effective_role) }}).
               </p>
             </div>
-            @if (!showKeyForm()) {
-            <button type="button" class="btn btn-sm btn-primary" (click)="startCreateKey()">
+            @if (!showPatForm()) {
+            <button type="button" class="btn btn-sm btn-primary" (click)="startCreatePat()">
               <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>
-              New key
+              New token
             </button>
             }
           </div>
 
-          @if (keysError(); as msg) {
+          @if (patsError(); as msg) {
           <div class="alert alert-danger py-2" role="alert">{{ msg }}</div>
-          } @if (newKey(); as created) {
+          } @if (newPat(); as created) {
           <div class="alert alert-success" role="alert">
-            <div class="d-flex align-items-start justify-content-between gap-2">
+            <div class="d-flex align-items-start justify-content-between gap-2 mb-2">
+              <div class="fw-semibold">
+                <i class="bi bi-check-circle me-1" aria-hidden="true"></i>
+                Token "{{ created.name }}" created
+              </div>
+              <button type="button" class="btn btn-sm btn-outline-secondary" (click)="dismissNewPat()">Dismiss</button>
+            </div>
+            <div class="small mb-2">Copy it now: the token is shown only once and cannot be recovered.</div>
+
+            <div class="d-flex align-items-start gap-2">
               <div class="flex-grow-1 overflow-hidden">
-                <div class="fw-semibold mb-1">
-                  <i class="bi bi-check-circle me-1" aria-hidden="true"></i>
-                  Key "{{ created.name }}" created
-                </div>
-                <div class="small mb-2">Copy it now: it is shown only once and cannot be recovered.</div>
-                <code class="d-block text-break user-select-all">{{ created.key }}</code>
+                <code class="d-block text-break user-select-all">{{ created.token }}</code>
               </div>
-              <div class="d-flex flex-column gap-1">
-                <button
-                  type="button"
-                  class="btn btn-sm btn-outline-success"
-                  (click)="copyKey()"
-                  [disabled]="keyCopied()"
-                >
-                  <i
-                    class="bi me-1"
-                    [class.bi-clipboard]="!keyCopied()"
-                    [class.bi-clipboard-check]="keyCopied()"
-                    aria-hidden="true"
-                  ></i>
-                  {{ keyCopied() ? 'Copied' : 'Copy' }}
-                </button>
-                <button type="button" class="btn btn-sm btn-outline-secondary" (click)="dismissNewKey()">
-                  Dismiss
-                </button>
-              </div>
+              <button
+                type="button"
+                class="btn btn-sm btn-outline-success flex-shrink-0"
+                (click)="copySecret()"
+                [disabled]="copiedSecret()"
+              >
+                <i
+                  class="bi me-1"
+                  [class.bi-clipboard]="!copiedSecret()"
+                  [class.bi-clipboard-check]="copiedSecret()"
+                  aria-hidden="true"
+                ></i>
+                {{ copiedSecret() ? 'Copied' : 'Copy' }}
+              </button>
             </div>
           </div>
-          } @if (showKeyForm()) {
-          <form class="row g-2 align-items-end mb-3" (submit)="createKey(); $event.preventDefault()" novalidate>
+          } @if (showPatForm()) {
+          <form class="row g-2 align-items-end mb-3" (submit)="createPat(); $event.preventDefault()" novalidate>
             <div class="col-12 col-md-5">
-              <label for="keyName" class="form-label small mb-1">Name *</label>
+              <label for="patName" class="form-label small mb-1">Name *</label>
               <input
-                id="keyName"
+                id="patName"
                 type="text"
                 autocomplete="off"
                 placeholder="Backup script"
                 class="form-control form-control-sm"
-                [formField]="keyForm.name"
+                [formField]="patForm.name"
               />
             </div>
             <div class="col-12 col-md-3">
-              <label for="keyExpiry" class="form-label small mb-1">Expiration</label>
-              <select id="keyExpiry" class="form-select form-select-sm" (change)="onExpiryChange($event)">
+              <label for="patExpiry" class="form-label small mb-1">Expiration</label>
+              <select id="patExpiry" class="form-select form-select-sm" (change)="onExpiryChange($event)">
                 @for (option of expiryOptions; track option.label) {
                 <option [value]="option.days ?? ''">{{ option.label }}</option>
                 }
               </select>
             </div>
             <div class="col-12 col-md-4 d-flex gap-2">
-              <button type="submit" class="btn btn-sm btn-primary" [disabled]="creatingKey() || keyForm().invalid()">
-                @if (creatingKey()) {
+              <button type="submit" class="btn btn-sm btn-primary" [disabled]="creatingPat() || patForm().invalid()">
+                @if (creatingPat()) {
                 <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
-                } Create key
+                } Create token
               </button>
-              <button type="button" class="btn btn-sm btn-outline-secondary" (click)="cancelCreateKey()">Cancel</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary" (click)="cancelCreatePat()">Cancel</button>
             </div>
-            @if (keyFormError(); as msg) {
+            @if (patFormError(); as msg) {
             <div class="col-12">
               <div class="text-danger small">{{ msg }}</div>
             </div>
             }
           </form>
-          } @if (loadingKeys()) {
+          } @if (loadingPats()) {
           <div class="text-center text-body-secondary py-3">
             <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
-            Loading keys…
+            Loading tokens…
           </div>
-          } @else if (apiKeys().length === 0) {
+          } @else if (pats().length === 0) {
           <p class="text-body-secondary small mb-0">
-            You have no API key yet. Create one to call the API without signing in.
+            You have no access token yet. Create one to call the API without signing in.
           </p>
           } @else {
           <div class="table-responsive">
@@ -227,7 +226,7 @@
               <thead>
                 <tr class="small text-body-secondary">
                   <th scope="col">Name</th>
-                  <th scope="col">Key</th>
+                  <th scope="col">Token</th>
                   <th scope="col">Created</th>
                   <th scope="col">Expires</th>
                   <th scope="col">Last used</th>
@@ -235,30 +234,30 @@
                 </tr>
               </thead>
               <tbody>
-                @for (key of apiKeys(); track key.id) {
-                <tr [class.opacity-50]="isExpired(key)">
-                  <td class="fw-medium text-truncate">{{ key.name }}</td>
+                @for (pat of pats(); track pat.id) {
+                <tr [class.opacity-50]="isExpired(pat)">
+                  <td class="fw-medium text-truncate">{{ pat.name }}</td>
                   <td>
-                    <code class="small">{{ key.prefix }}…</code>
+                    <code class="small">{{ pat.token_hint }}</code>
                   </td>
-                  <td class="small">{{ key.created_at | date: 'short' }}</td>
+                  <td class="small">{{ pat.created_at | date: 'short' }}</td>
                   <td class="small">
-                    @if (key.expires_at) { @if (isExpired(key)) {
+                    @if (pat.expires_at) { @if (isExpired(pat)) {
                     <span class="badge text-bg-danger">Expired</span>
-                    } @else { {{ key.expires_at | date: 'short' }} } } @else {
+                    } @else { {{ pat.expires_at | date: 'short' }} } } @else {
                     <span class="text-body-secondary">Never</span>
                     }
                   </td>
-                  <td class="small">{{ key.last_used_at ? (key.last_used_at | date: 'short') : 'Never' }}</td>
+                  <td class="small">{{ pat.last_used_at ? (pat.last_used_at | date: 'short') : 'Never' }}</td>
                   <td class="text-end">
                     <button
                       type="button"
                       class="btn btn-sm btn-outline-danger"
-                      [disabled]="revokingKeyId() === key.id"
-                      (click)="revokeKey(key)"
-                      [attr.aria-label]="'Revoke ' + key.name"
+                      [disabled]="revokingPatId() === pat.id"
+                      (click)="revokePat(pat)"
+                      [attr.aria-label]="'Revoke ' + pat.name"
                     >
-                      @if (revokingKeyId() === key.id) {
+                      @if (revokingPatId() === pat.id) {
                       <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
                       } @else {
                       <i class="bi bi-trash" aria-hidden="true"></i>

@@ -1,5 +1,5 @@
 /** Families an audited action belongs to, as recorded by the backend. */
-export const AUDIT_CATEGORIES = ['auth', 'user', 'settings', 'api_key', 'mailserver'] as const;
+export const AUDIT_CATEGORIES = ['auth', 'user', 'settings', 'pat', 'mailserver'] as const;
 export type AuditCategory = (typeof AUDIT_CATEGORIES)[number];
 
 export type AuditStatus = 'success' | 'failure';
@@ -8,7 +8,7 @@ const CATEGORY_LABELS: Record<AuditCategory, string> = {
   auth: 'Authentication',
   user: 'Users',
   settings: 'Settings',
-  api_key: 'API keys',
+  pat: 'Access tokens',
   mailserver: 'Mailserver',
 };
 

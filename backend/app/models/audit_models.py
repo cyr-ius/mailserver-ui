@@ -1,7 +1,7 @@
 """SQLModel models for the audit trail.
 
 Every security-relevant action (sign-in, sign-out, account and settings changes,
-API-key lifecycle) appends one immutable row here. The table is append-only: the
+token lifecycle) appends one immutable row here. The table is append-only: the
 API exposes reads and a retention-based purge, never an update.
 """
 
@@ -15,7 +15,7 @@ AuditStatus = Literal["success", "failure"]
 
 #: Broad family an action belongs to. ``auth`` covers sign-in/sign-out — the mail
 #: connector can be told to notify on those alone, without the rest of the trail.
-AuditCategory = Literal["auth", "user", "settings", "api_key", "mailserver"]
+AuditCategory = Literal["auth", "user", "settings", "pat", "mailserver"]
 
 
 def _utcnow() -> datetime:

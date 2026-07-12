@@ -53,7 +53,9 @@ app = FastAPI(
 
 # ── Exception handlers ────────────────────────────────────────────────────────
 @app.exception_handler(BaseAPIException)
-async def api_exception_handler(request: Request, exc: BaseAPIException) -> JSONResponse:
+async def api_exception_handler(
+    request: Request, exc: BaseAPIException
+) -> JSONResponse:
     """Turn typed application exceptions into consistent JSON error responses."""
     return JSONResponse(
         status_code=exc.status_code,
@@ -96,7 +98,7 @@ async def swagger_ui() -> HTMLResponse:
         raise HTTPException(status_code=404, detail="Not Found")
     return get_swagger_ui_html(
         openapi_url="/api/openapi.json",
-        title="Docker Mailserver API",
+        title=f"{app.title} - Swagger UI",
         swagger_js_url="/api/static/swagger/swagger-ui-bundle.js",
         swagger_css_url="/api/static/swagger/swagger-ui.css",
         swagger_favicon_url="/api/static/favicon.ico",
@@ -105,11 +107,7 @@ async def swagger_ui() -> HTMLResponse:
 
 @app.get("/api/health")
 async def health() -> dict[str, str]:
-    return {
-        "status": "healthy",
-        "app": "Docker Mailserver UI",
-        "version": settings.app_version,
-    }
+    return {"status": "healthy", "app": app.title, "version": app.version}
 
 
 # ── Serve Angular SPA (must be last) ─────────────────────────────────────────
