@@ -50,9 +50,9 @@ const KINDS: readonly KindDescriptor[] = [
   {
     kind: 'set-option-for-module',
     hint: '<module>.conf',
-    target: { label: 'Module', placeholder: 'milter_headers' },
-    option: { placeholder: 'extended_spam_headers' },
-    value: { placeholder: 'true' },
+    target: { label: 'Module', placeholder: 'greylisting' },
+    option: { placeholder: 'whitelisted_ip' },
+    value: { placeholder: '127.0.0.0/8' },
   },
   {
     kind: 'add-line',
