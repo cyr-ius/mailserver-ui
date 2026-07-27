@@ -65,6 +65,7 @@ from ..models.mailserver_models import (
     SystemAliasCreate,
     TlsCertificate,
 )
+from ..models.pending_action_models import PendingActionsSummary
 from ..services import mailserver_service, pending_action_service
 
 logger = logging.getLogger(__name__)
@@ -81,6 +82,23 @@ _SPAM_SCOPE_TITLES: dict[str, str] = {
     "whitelist-recipients": "Postgrey recipient whitelist changed",
     "amavis": "Amavis overrides changed",
 }
+
+
+# ── Container restart ─────────────────────────────────────────────────────────
+
+
+@router.post("/restart", response_model=PendingActionsSummary)
+async def restart_mailserver(
+    _admin: AdminDep, session: SessionDep
+) -> PendingActionsSummary:
+    """Restart the mailserver container and dismiss every pending action (admin only).
+
+    Blocks until Docker reports the container running again, so a successful
+    response means the restart has already happened, not just been requested.
+    """
+    await run_in_threadpool(mailserver_service.restart_container)
+    await pending_action_service.clear_all(session)
+    return await pending_action_service.summary(session)
 
 
 # ── SMTP relays ───────────────────────────────────────────────────────────────

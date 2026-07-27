@@ -58,6 +58,9 @@ class Settings(BaseSettings):
     mailserver_container: str = "mailserver"
     # Timeout (seconds) for a single mailserver ``docker exec`` command.
     mailserver_command_timeout: int = 30
+    # Timeout (seconds) for ``docker restart``: it blocks until the container has
+    # stopped and started again, which takes longer than a single ``exec``.
+    mailserver_restart_timeout: int = 120
     # Number of trailing mail log lines returned by the mail log endpoint.
     mailserver_log_lines: int = 200
     # Trailing time window the mail statistics endpoint reports on.

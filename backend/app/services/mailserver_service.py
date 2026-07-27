@@ -1949,3 +1949,12 @@ def get_environment() -> MailserverEnvironment:
         update_check_enabled=_flag(variables, "ENABLE_UPDATE_CHECK"),
         warnings=_environment_warnings(variables),
     )
+
+
+# ── Container restart ──────────────────────────────────────────────────────────
+
+
+def restart_container() -> None:
+    """Restart the mailserver container, applying every setting pending one."""
+    container.restart_container(timeout=settings.mailserver_restart_timeout)
+    logger.info("Restarted the mailserver container")

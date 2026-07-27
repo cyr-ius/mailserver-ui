@@ -13,7 +13,11 @@ from datetime import UTC, datetime
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from ..models.pending_action_models import PendingAction
+from ..models.pending_action_models import (
+    PendingAction,
+    PendingActionPublic,
+    PendingActionsSummary,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -69,3 +73,10 @@ async def clear_all(session: AsyncSession) -> None:
     for item in result.all():
         await session.delete(item)
     await session.commit()
+
+
+async def summary(session: AsyncSession) -> PendingActionsSummary:
+    """Return every pending action in the shape the API responds with."""
+    items = await list_all(session)
+    public = [PendingActionPublic.model_validate(item.model_dump()) for item in items]
+    return PendingActionsSummary(items=public, count=len(public))

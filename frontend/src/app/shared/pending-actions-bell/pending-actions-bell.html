@@ -4,6 +4,7 @@
     class="btn btn-sm pending-actions-trigger position-relative"
     data-bs-toggle="dropdown"
     data-bs-display="static"
+    data-bs-auto-close="outside"
     aria-expanded="false"
     aria-label="Pending actions"
     title="Pending actions"
@@ -27,7 +28,12 @@
     <div class="d-flex align-items-center justify-content-between px-3 py-2 border-bottom">
       <h6 class="dropdown-header p-0 m-0">Pending actions</h6>
       @if (count() > 0) {
-      <button type="button" class="btn btn-link btn-sm p-0" (click)="onDismissAll()">
+      <button
+        type="button"
+        class="btn btn-link btn-sm p-0"
+        [disabled]="restarting()"
+        (click)="onDismissAll()"
+      >
         Clear all
       </button>
       }
@@ -52,6 +58,7 @@
             class="btn btn-sm p-0 text-body-secondary"
             aria-label="Dismiss"
             title="Dismiss"
+            [disabled]="restarting()"
             (click)="onDismiss(item.key)"
           >
             <i class="bi bi-x-lg" aria-hidden="true"></i>
@@ -60,8 +67,22 @@
       </li>
       }
     </ul>
-    <div class="px-3 py-2 text-body-secondary small border-top">
-      Restart the mailserver container to apply these changes.
+    <div class="px-3 py-2 border-top">
+      @if (restartError(); as err) {
+      <div class="text-danger small mb-2">{{ err }}</div>
+      }
+      <button
+        type="button"
+        class="btn btn-sm btn-warning w-100"
+        [disabled]="restarting()"
+        (click)="onRestart()"
+      >
+        @if (restarting()) {
+        <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+        Restarting… } @else {
+        <i class="bi bi-arrow-clockwise me-1" aria-hidden="true"></i>
+        Restart mailserver now }
+      </button>
     </div>
     }
   </div>

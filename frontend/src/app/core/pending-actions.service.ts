@@ -37,4 +37,16 @@ export class PendingActionsService {
     await firstValueFrom(this.http.delete<void>('/api/pending-actions'));
     this._items.set([]);
   }
+
+  /**
+   * Restart the mailserver container. Resolves only once Docker reports the
+   * container running again, and dismisses every pending action in the same
+   * call — a successful restart already applies every one of them.
+   */
+  async restart(): Promise<void> {
+    const summary = await firstValueFrom(
+      this.http.post<PendingActionsSummary>('/api/mailserver/restart', {}),
+    );
+    this._items.set(summary.items);
+  }
 }

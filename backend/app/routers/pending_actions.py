@@ -14,7 +14,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from ..auth import SessionUser
 from ..depends import get_session, require_admin
-from ..models.pending_action_models import PendingActionPublic, PendingActionsSummary
+from ..models.pending_action_models import PendingActionsSummary
 from ..services import pending_action_service
 
 logger = logging.getLogger(__name__)
@@ -30,9 +30,7 @@ async def list_pending_actions(
     session: SessionDep, _admin: AdminDep
 ) -> PendingActionsSummary:
     """Return every pending action, most recently changed first (admin only)."""
-    items = await pending_action_service.list_all(session)
-    public = [PendingActionPublic.model_validate(item.model_dump()) for item in items]
-    return PendingActionsSummary(items=public, count=len(public))
+    return await pending_action_service.summary(session)
 
 
 @router.delete("", status_code=status.HTTP_204_NO_CONTENT)

@@ -22,28 +22,24 @@ from ..exceptions import BadGatewayException
 logger = logging.getLogger(__name__)
 
 
-def _docker_exec(
-    args: list[str],
+def _run_docker(
+    cmd: list[str],
     *,
     timeout: int,
     stdin: str | None = None,
     check: bool = True,
 ) -> str:
-    """Run ``docker exec [-i] <container> <args…>`` and return stdout.
+    """Run a fixed ``docker <cmd…>`` argv and return stdout.
 
-    ``stdin`` is streamed to the process (implying ``-i``) when provided. Raises
+    ``stdin`` is streamed to the process when provided. Raises
     :class:`BadGatewayException` when the Docker CLI is missing, the command
-    times out, or the container reports a non-zero exit status.
+    times out, or it reports a non-zero exit status.
 
     ``check=False`` suits commands that report state through their exit code
     (``supervisorctl status`` exits 3 when a service is down) yet still print
     their answer. A failure that printed *nothing* — an unreachable container,
     say — is still raised, so a silent empty result cannot pass for data.
     """
-    cmd = [DOCKER_BINARY, "exec"]
-    if stdin is not None:
-        cmd.append("-i")
-    cmd += [settings.mailserver_container, *args]
     try:
         result = subprocess.run(  # noqa: S603 - fixed argv, no shell, validated input
             cmd,
@@ -64,10 +60,25 @@ def _docker_exec(
     if result.returncode != 0 and (check or not result.stdout.strip()):
         detail = (result.stderr or result.stdout or "").strip() or "unknown error"
         logger.warning(
-            "container command %s failed (%s): %s", args, result.returncode, detail
+            "docker command %s failed (%s): %s", cmd, result.returncode, detail
         )
         raise BadGatewayException(f"Mailserver command failed: {detail[:300]}")
     return result.stdout
+
+
+def _docker_exec(
+    args: list[str],
+    *,
+    timeout: int,
+    stdin: str | None = None,
+    check: bool = True,
+) -> str:
+    """Run ``docker exec [-i] <container> <args…>`` and return stdout."""
+    cmd = [DOCKER_BINARY, "exec"]
+    if stdin is not None:
+        cmd.append("-i")
+    cmd += [settings.mailserver_container, *args]
+    return _run_docker(cmd, timeout=timeout, stdin=stdin, check=check)
 
 
 def run_in_container(args: list[str], *, timeout: int, check: bool = True) -> str:
@@ -78,6 +89,19 @@ def run_in_container(args: list[str], *, timeout: int, check: bool = True) -> st
     status *that produced output*.
     """
     return _docker_exec(args, timeout=timeout, check=check)
+
+
+def restart_container(*, timeout: int) -> None:
+    """Restart the mailserver container and block until it is running again.
+
+    ``docker restart`` stops the container (SIGTERM, then SIGKILL after its
+    stop-timeout) and starts it again before returning, so a successful call
+    already means the container is back up — not that every service inside it
+    has finished initialising.
+    """
+    _run_docker(
+        [DOCKER_BINARY, "restart", settings.mailserver_container], timeout=timeout
+    )
 
 
 # ── Config files inside the container ─────────────────────────────────────────
