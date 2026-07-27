@@ -70,7 +70,7 @@ JSON
 
   echo "→ backend on :${API_PORT} (container: ${CONTAINER})"
   ( cd "$REPO/backend" && \
-    DATABASE_URL="sqlite:///$RUN_DIR/app.db" \
+    DATABASE_URL="sqlite+aiosqlite:///$RUN_DIR/app.db" \
     SECRET_KEY="local-run-only-not-a-production-secret" \
     MAILSERVER_CONTAINER="$CONTAINER" \
     RATE_LIMIT_ENABLED=false \
@@ -88,8 +88,8 @@ JSON
   # FastAPI prints the seeded admin password exactly once, and only for a fresh
   # database — which is why start() deletes app.db above.
   for _ in $(seq 1 10); do
-    grep -oE "Generated password: \S+" "$RUN_DIR/backend.log" \
-      | tail -1 | sed 's/Generated password: //' > "$RUN_DIR/password"
+    grep -oE "password[[:space:]]*:[[:space:]]*\S+" "$RUN_DIR/backend.log" \
+      | tail -1 | sed -E 's/password[[:space:]]*:[[:space:]]*//' > "$RUN_DIR/password"
     [ -s "$RUN_DIR/password" ] && break
     sleep 1
   done
