@@ -45,11 +45,15 @@ import logging
 import re
 from datetime import UTC, datetime, timedelta
 
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.serialization import load_pem_private_key
+
 from ..config import settings
 from ..exceptions import BadRequestException, ConflictException, NotFoundException
 from ..models.mailserver_models import (
     DkimGenerateRequest,
     DkimKey,
+    DkimMigrationResult,
     DnsRecord,
     DomainDnsRecords,
     DovecotConfig,
@@ -96,6 +100,7 @@ _SYSTEM_ALIASES_FILENAME = "postfix-aliases.cf"
 _REGEX_ALIASES_FILENAME = "postfix-regexp.cf"
 _OPENDKIM_KEYS_DIR = "opendkim/keys"
 _RSPAMD_DKIM_DIR = "rspamd/dkim"
+_RSPAMD_DKIM_SIGNING_CONF = "rspamd/override.d/dkim_signing.conf"
 _ACCOUNTS_FILENAME = "postfix-accounts.cf"
 _DOVECOT_MASTERS_FILENAME = "dovecot-masters.cf"
 _SIEVE_FILENAMES: dict[str, str] = {
@@ -650,6 +655,103 @@ def list_dkim_keys() -> list[DkimKey]:
     """
     keys = _rspamd_keys() if dkim_backend() == "rspamd" else _opendkim_keys()
     return sorted(keys, key=lambda key: (key.domain, key.selector))
+
+
+def _rsa_key_size(pem: str) -> int:
+    """Return the bit length of a PEM-encoded RSA private key.
+
+    ``opendkim-genkey`` (what generates every OpenDKIM key) only ever produces
+    RSA keys, so anything else means the file is not what it is expected to be.
+    """
+    key = load_pem_private_key(pem.encode(), password=None)
+    if not isinstance(key, rsa.RSAPrivateKey):
+        raise ConflictException("The OpenDKIM private key is not an RSA key.")
+    return key.key_size
+
+
+def dkim_migration_candidates() -> list[str]:
+    """Return the domains with an OpenDKIM key Rspamd cannot see yet.
+
+    Only meaningful when Rspamd is the active signer: ``setup config dkim``
+    writes to a different directory depending on which engine was enabled at
+    generation time, so turning ``ENABLE_RSPAMD`` on after keys were already
+    generated for OpenDKIM leaves outgoing mail unsigned even though a valid
+    keypair already exists.
+    """
+    if dkim_backend() != "rspamd":
+        return []
+    migrated = {key.domain for key in _rspamd_keys()}
+    return sorted({key.domain for key in _opendkim_keys()} - migrated)
+
+
+def migrate_dkim_to_rspamd() -> DkimMigrationResult:
+    """Copy OpenDKIM-generated keys into Rspamd's directory/naming convention.
+
+    OpenDKIM only ever generates RSA keys, and both engines store them as a
+    plain PEM-encoded RSA private key, so the existing keypair is reused as-is
+    instead of generating a new one — which would invalidate the DNS TXT
+    record already published. Rspamd only rereads ``dkim_signing.conf`` when
+    the container starts, so mail keeps going out unsigned until it restarts.
+    """
+    if dkim_backend() != "rspamd":
+        raise ConflictException("Rspamd is not the active DKIM signer.")
+
+    domains = dkim_migration_candidates()
+    if not domains:
+        raise ConflictException("No OpenDKIM key found to migrate.")
+
+    if container.read_config(_RSPAMD_DKIM_SIGNING_CONF):
+        raise ConflictException(
+            f"{_RSPAMD_DKIM_SIGNING_CONF} already exists; add the migrated "
+            "domain(s) to it by hand instead of overwriting it."
+        )
+
+    domain_blocks = ""
+    for key in _opendkim_keys():
+        if key.domain not in domains:
+            continue
+        private_pem = container.read_config(
+            f"{_OPENDKIM_KEYS_DIR}/{key.domain}/{key.selector}.private"
+        )
+        public_txt = container.read_config(
+            f"{_OPENDKIM_KEYS_DIR}/{key.domain}/{key.selector}.txt"
+        )
+        base_name = f"rsa-{_rsa_key_size(private_pem)}-{key.selector}-{key.domain}"
+        container.write_config(
+            f"{_RSPAMD_DKIM_DIR}/{base_name}.private.txt", private_pem
+        )
+        container.write_config(f"{_RSPAMD_DKIM_DIR}/{base_name}.public.txt", public_txt)
+
+        private_key_path = container.config_path(
+            f"{_RSPAMD_DKIM_DIR}/{base_name}.private.txt"
+        )
+        domain_blocks += (
+            f"    {key.domain} {{\n"
+            f'        path = "{private_key_path}";\n'
+            f'        selector = "{key.selector}";\n'
+            "    }\n"
+        )
+
+    container.write_config(
+        _RSPAMD_DKIM_SIGNING_CONF,
+        "# Migrated from OpenDKIM by mailserver-ui.\n"
+        "enabled = true;\n"
+        "sign_authenticated = true;\n"
+        "sign_local = false;\n"
+        "try_fallback = false;\n"
+        'use_domain = "header";\n'
+        "use_esld = true;\n"
+        "check_pubkey = true;\n"
+        "\n"
+        "domain {\n" + domain_blocks + "}\n",
+    )
+
+    logger.info(
+        "Migrated DKIM keys from OpenDKIM to Rspamd for: %s", ", ".join(domains)
+    )
+    return DkimMigrationResult(
+        keys=list_dkim_keys(), migrated_domains=domains, restart_required=True
+    )
 
 
 def generate_dkim(payload: DkimGenerateRequest) -> list[DkimKey]:

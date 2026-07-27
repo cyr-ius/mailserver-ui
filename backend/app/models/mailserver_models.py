@@ -174,6 +174,27 @@ class DkimGenerateRequest(BaseModel):
     key_size: Literal[1024, 2048, 4096] = 2048
 
 
+class DkimMigrationStatus(BaseModel):
+    """Domains with an OpenDKIM key that Rspamd, the active signer, cannot see.
+
+    ``setup config dkim`` writes to a different directory depending on which
+    engine is enabled at generation time; switching ``ENABLE_RSPAMD`` on after
+    keys were already generated for OpenDKIM leaves them invisible to Rspamd.
+    Empty when Rspamd is not the active signer, or nothing needs migrating.
+    """
+
+    candidates: list[str] = Field(default_factory=list)
+
+
+class DkimMigrationResult(BaseModel):
+    """Result of copying OpenDKIM-generated keys into Rspamd's layout."""
+
+    keys: list[DkimKey] = Field(default_factory=list)
+    migrated_domains: list[str] = Field(default_factory=list)
+    # Rspamd only rereads ``dkim_signing.conf`` when the container starts.
+    restart_required: bool = True
+
+
 class Restriction(BaseModel):
     """A send or receive restriction entry (``setup email restrict``)."""
 

@@ -22,6 +22,8 @@ from ..depends import require_admin
 from ..models.mailserver_models import (
     DkimGenerateRequest,
     DkimKey,
+    DkimMigrationResult,
+    DkimMigrationStatus,
     DomainDnsRecords,
     DovecotConfig,
     DovecotConfigUpdate,
@@ -243,6 +245,23 @@ async def generate_dkim(
 ) -> list[DkimKey]:
     """Generate DKIM keys inside the mailserver container (admin only)."""
     return await run_in_threadpool(mailserver_service.generate_dkim, payload)
+
+
+@router.get("/dkim/migration", response_model=DkimMigrationStatus)
+async def get_dkim_migration_status(_admin: AdminDep) -> DkimMigrationStatus:
+    """Return the OpenDKIM domains Rspamd cannot see yet (admin only)."""
+    candidates = await run_in_threadpool(mailserver_service.dkim_migration_candidates)
+    return DkimMigrationStatus(candidates=candidates)
+
+
+@router.post(
+    "/dkim/migration",
+    response_model=DkimMigrationResult,
+    status_code=status.HTTP_201_CREATED,
+)
+async def migrate_dkim(_admin: AdminDep) -> DkimMigrationResult:
+    """Migrate OpenDKIM-generated keys into Rspamd's layout (admin only)."""
+    return await run_in_threadpool(mailserver_service.migrate_dkim_to_rspamd)
 
 
 # ── Send/receive restrictions ─────────────────────────────────────────────────

@@ -21,6 +21,8 @@ export class Dkim {
   protected readonly error = signal<string | null>(null);
   protected readonly success = signal<string | null>(null);
   protected readonly generating = signal(false);
+  protected readonly migrationCandidates = signal<string[]>([]);
+  protected readonly migrating = signal(false);
 
   protected readonly dkimModel = signal({ domain: '', selector: 'mail', keySize: '2048' });
   protected readonly dkimForm = form(this.dkimModel, (path) => {
@@ -35,11 +37,45 @@ export class Dkim {
     this.loading.set(true);
     this.error.set(null);
     try {
-      this.keys.set(await this.mailserver.listDkimKeys());
+      const [keys, migration] = await Promise.all([
+        this.mailserver.listDkimKeys(),
+        this.mailserver.getDkimMigrationStatus(),
+      ]);
+      this.keys.set(keys);
+      this.migrationCandidates.set(migration.candidates);
     } catch {
       this.error.set('Unable to load the DKIM records.');
     } finally {
       this.loading.set(false);
+    }
+  }
+
+  protected async onMigrate(): Promise<void> {
+    const domains = this.migrationCandidates().join(', ');
+    if (
+      !confirm(
+        `Migrate the OpenDKIM key(s) for ${domains} into Rspamd? The same key pair is reused, ` +
+          'so no DNS change is needed, but the mailserver container must be restarted afterwards ' +
+          'for Rspamd to start signing with it.',
+      )
+    ) {
+      return;
+    }
+    this.error.set(null);
+    this.success.set(null);
+    this.migrating.set(true);
+    try {
+      const result = await this.mailserver.migrateDkimToRspamd();
+      this.keys.set(result.keys);
+      this.migrationCandidates.set([]);
+      this.success.set(
+        `Migrated ${result.migrated_domains.join(', ')} to Rspamd. Restart the mailserver ` +
+          'container for it to start signing with the migrated key(s).',
+      );
+    } catch (err) {
+      this.error.set(mailserverErrorMessage(err));
+    } finally {
+      this.migrating.set(false);
     }
   }
 

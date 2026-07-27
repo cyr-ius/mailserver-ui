@@ -5,6 +5,8 @@ import { firstValueFrom } from 'rxjs';
 import {
   DkimGenerateRequest,
   DkimKey,
+  DkimMigrationResult,
+  DkimMigrationStatus,
   DomainDnsRecords,
   DovecotConfig,
   DovecotConfigUpdateRequest,
@@ -185,6 +187,20 @@ export class MailserverService {
   /** Generate DKIM keys inside the mailserver container; returns the refreshed list. */
   async generateDkim(body: DkimGenerateRequest): Promise<DkimKey[]> {
     return firstValueFrom(this.http.post<DkimKey[]>('/api/mailserver/dkim', body));
+  }
+
+  /** Return the OpenDKIM domains Rspamd, the active signer, cannot see yet. */
+  async getDkimMigrationStatus(): Promise<DkimMigrationStatus> {
+    return firstValueFrom(
+      this.http.get<DkimMigrationStatus>('/api/mailserver/dkim/migration'),
+    );
+  }
+
+  /** Migrate OpenDKIM-generated keys into Rspamd's layout; returns the refreshed list. */
+  async migrateDkimToRspamd(): Promise<DkimMigrationResult> {
+    return firstValueFrom(
+      this.http.post<DkimMigrationResult>('/api/mailserver/dkim/migration', {}),
+    );
   }
 
   // ── Send/receive restrictions ─────────────────────────────────────────────────

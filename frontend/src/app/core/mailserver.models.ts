@@ -103,6 +103,19 @@ export interface DkimGenerateRequest {
   key_size: 1024 | 2048 | 4096;
 }
 
+/** Domains with an OpenDKIM key that Rspamd, the active signer, cannot see yet. */
+export interface DkimMigrationStatus {
+  candidates: string[];
+}
+
+/** Result of copying OpenDKIM-generated keys into Rspamd's layout. */
+export interface DkimMigrationResult {
+  keys: DkimKey[];
+  migrated_domains: string[];
+  /** Rspamd only rereads dkim_signing.conf when the container starts. */
+  restart_required: boolean;
+}
+
 /** A send or receive restriction kind. */
 export type RestrictionKind = 'send' | 'receive';
 

@@ -86,6 +86,16 @@ def run_in_container(args: list[str], *, timeout: int, check: bool = True) -> st
 _CONFIG_DIR = MAILSERVER_CONFIG_DIR.rstrip("/")
 
 
+def config_path(rel_path: str) -> str:
+    """Return the absolute in-container path for ``<config_dir>/<rel_path>``.
+
+    Only needed when a path must be embedded as text inside another config
+    file (e.g. Rspamd's ``dkim_signing.conf`` refers to a key file by its
+    absolute path) rather than read or written directly through this module.
+    """
+    return f"{_CONFIG_DIR}/{rel_path}"
+
+
 def read_file(path: str) -> str:
     """Return the contents of ``path`` inside the container (``""`` when absent).
 
