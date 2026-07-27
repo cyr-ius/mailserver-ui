@@ -70,17 +70,24 @@ async def authorization_url(config: OidcSettings, state: str, nonce: str) -> str
 
 
 async def exchange_code(config: OidcSettings, code: str) -> dict[str, Any]:
-    """Exchange an authorization code for the token response."""
+    """Exchange an authorization code for the token response.
+
+    Authenticates via HTTP Basic (``client_secret_basic``) rather than putting
+    the secret in the request body, matching the default client authentication
+    method expected by providers such as Authelia.
+    """
     meta = await _discover(config)
     data = {
         "grant_type": "authorization_code",
         "code": code,
         "redirect_uri": config.redirect_uri,
-        "client_id": config.client_id,
-        "client_secret": config.client_secret,
     }
     async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
-        resp = await client.post(meta["token_endpoint"], data=data)
+        resp = await client.post(
+            meta["token_endpoint"],
+            data=data,
+            auth=(config.client_id, config.client_secret),
+        )
     if resp.status_code != httpx.codes.OK:
         logger.warning("OIDC token exchange failed: HTTP %s", resp.status_code)
         raise OIDCError("Token exchange failed")
