@@ -2,7 +2,6 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
-  effect,
   inject,
   OnInit,
   signal,
@@ -40,11 +39,7 @@ export class About implements OnInit {
   });
 
   ngOnInit(): void {
-    effect(() => {
-      // If repo is configured, attempt to auto-check once on mount.
-      // Do not block rendering; call checkForUpdate lazily.
-      void this.loadVersion();
-    });
+    void this.loadVersion();
   }
 
   private async loadVersion(): Promise<void> {
