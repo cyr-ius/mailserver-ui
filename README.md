@@ -92,6 +92,37 @@ logs for the generated admin password:
 docker compose logs mailserver-ui | grep "Generated password"
 ```
 
+### Docker run (one-liner)
+
+If you already have a running `docker-mailserver` container (here named
+`mailserver`), you can start the UI alone:
+
+```bash
+docker run -d \
+  --name mailserver-ui \
+  -p 8000:8000 \
+  -e MAILSERVER_CONTAINER=mailserver \
+  -v mailserver-ui:/var/lib/mailserver-ui \
+  -v /var/run/docker.sock:/var/run/docker.sock:ro \
+  --restart unless-stopped \
+  ghcr.io/cyr-ius/mailserver-ui:latest
+```
+
+- `-v /var/run/docker.sock:/var/run/docker.sock:ro` is **required** — the UI
+  drives docker-mailserver through `docker exec` (see
+  [How it talks to docker-mailserver](#how-it-talks-to-docker-mailserver)).
+- `-e MAILSERVER_CONTAINER=mailserver` must match the name (or ID) of your
+  docker-mailserver container.
+- `-v mailserver-ui:/var/lib/mailserver-ui` persists the SQLite database
+  (users, settings, audit log) across restarts.
+
+The UI is then available on <http://localhost:8000>; check the generated
+admin password with:
+
+```bash
+docker logs mailserver-ui | grep "Generated password"
+```
+
 ## Configuration
 
 All settings are provided through environment variables (see
