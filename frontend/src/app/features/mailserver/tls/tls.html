@@ -4,13 +4,20 @@
       <i class="bi bi-shield-check text-primary me-2" aria-hidden="true"></i>
       TLS certificate
     </h1>
-    <button type="button" class="btn btn-sm btn-outline-secondary" (click)="refresh()" [disabled]="loading()">
+    <button
+      type="button"
+      class="btn btn-sm btn-outline-secondary"
+      (click)="refresh()"
+      [disabled]="loading()"
+    >
       <i class="bi bi-arrow-clockwise me-1" aria-hidden="true"></i>
       Refresh
     </button>
   </div>
 
-  <p class="text-body-secondary small">The certificate Postfix serves, read from the path it actually uses.</p>
+  <p class="text-body-secondary small">
+    The certificate Postfix serves, read from the path it actually uses.
+  </p>
 
   @if (error(); as msg) {
   <div class="alert alert-danger py-2" role="alert">{{ msg }}</div>
@@ -19,21 +26,41 @@
     <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
     Loading the certificate…
   </div>
-  } @else if (certificate(); as cert) { @if (!cert.configured) {
+  } @else if (certificate(); as cert) { @if (!cert.configured) { @if (cert.ssl_type ===
+  'letsencrypt') {
   <div class="alert alert-warning" role="alert">
-    No TLS certificate is configured: the mailserver started with
-    <code>SSL_TYPE</code> empty, so mail is exchanged in clear text. Set <code>SSL_TYPE</code> on the container to
-    enable TLS.
+    <code>SSL_TYPE</code> is set to <code>letsencrypt</code>, but Postfix found no certificate to
+    serve. Check that:
+    <ul class="mb-0">
+      <li>
+        the local <code>/etc/letsencrypt</code> folder is mounted into the container, with
+        certificates present under <code>/etc/letsencrypt/live/&lt;FQDN&gt;/</code> (<code
+          >fullchain.pem</code
+        >
+        and <code>privkey.pem</code>), or
+      </li>
+      <li>
+        when using Traefik, its <code>acme.json</code> file is mounted at
+        <code>/etc/letsencrypt/acme.json</code>, and at least one router/service actually requests a
+        certificate for the mail hostname (Traefik only issues certificates it is asked for).
+      </li>
+    </ul>
   </div>
   } @else {
+  <div class="alert alert-warning" role="alert">
+    No TLS certificate is configured: the mailserver started with
+    <code>SSL_TYPE</code> empty, so mail is exchanged in clear text. Set <code>SSL_TYPE</code> on
+    the container to enable TLS.
+  </div>
+  } } @else {
   <div class="card shadow-sm">
     <div class="card-body">
       <dl class="row mb-0">
         <dt class="col-12 col-sm-3 text-body-secondary fw-normal">Expires</dt>
         <dd class="col-12 col-sm-9">
           <span class="badge" [class]="expiryClass()">
-            @if (cert.days_remaining !== null && cert.days_remaining < 0) { Expired } @else { {{ cert.days_remaining }}
-            days left }
+            @if (cert.days_remaining !== null && cert.days_remaining < 0) { Expired } @else { {{
+            cert.days_remaining }} days left }
           </span>
           <span class="font-monospace ms-2">{{ cert.not_after }}</span>
         </dd>
