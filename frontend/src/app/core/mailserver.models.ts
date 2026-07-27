@@ -341,12 +341,20 @@ export interface RspamdCommand {
   value: string;
 }
 
+/** A file under rspamd/override.d/ (read-only). */
+export interface RspamdOverrideFile {
+  name: string;
+  content: string;
+}
+
 /** The Rspamd custom commands, plus whether Rspamd is the active filter. */
 export interface RspamdOverrides {
   commands: RspamdCommand[];
   /** False when ENABLE_RSPAMD=0: the file is written but nothing reads it. */
   rspamd_enabled: boolean;
   restart_required: boolean;
+  /** The files custom-commands.conf (and any manual drop-in) produced under override.d/. */
+  override_files: RspamdOverrideFile[];
 }
 
 /** Request schema replacing the full set of Rspamd commands. */

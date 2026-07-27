@@ -1,7 +1,11 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 
 import { MailserverService } from '../../../core/mailserver.service';
-import { RspamdCommand, RspamdCommandKind } from '../../../core/mailserver.models';
+import {
+  RspamdCommand,
+  RspamdCommandKind,
+  RspamdOverrideFile,
+} from '../../../core/mailserver.models';
 import { mailserverErrorMessage } from '../mailserver.utils';
 
 /** Which arguments a directive takes, and how to label them in the table. */
@@ -78,6 +82,7 @@ export class Rspamd {
 
   protected readonly kinds = KINDS;
   protected readonly commands = signal<RspamdCommand[]>([]);
+  protected readonly overrideFiles = signal<RspamdOverrideFile[]>([]);
   protected readonly rspamdEnabled = signal(true);
   protected readonly loading = signal(false);
   protected readonly saving = signal(false);
@@ -96,6 +101,7 @@ export class Rspamd {
     try {
       const overrides = await this.mailserver.getRspamdOverrides();
       this.commands.set(overrides.commands);
+      this.overrideFiles.set(overrides.override_files);
       this.rspamdEnabled.set(overrides.rspamd_enabled);
     } catch (err) {
       this.error.set(mailserverErrorMessage(err));
@@ -173,7 +179,9 @@ export class Rspamd {
 
     this.saving.set(true);
     try {
-      this.commands.set((await this.mailserver.setRspamdOverrides(cleaned)).commands);
+      const overrides = await this.mailserver.setRspamdOverrides(cleaned);
+      this.commands.set(overrides.commands);
+      this.overrideFiles.set(overrides.override_files);
       this.success.set('Rspamd commands saved. Restart the mailserver to apply them.');
     } catch (err) {
       this.error.set(mailserverErrorMessage(err));

@@ -326,6 +326,13 @@ class RspamdCommandsUpdate(BaseModel):
     commands: list[RspamdCommand] = Field(default_factory=list)
 
 
+class RspamdOverrideFile(BaseModel):
+    """A file under ``rspamd/override.d/`` (read-only)."""
+
+    name: str
+    content: str
+
+
 class RspamdOverrides(BaseModel):
     """The Rspamd custom commands, plus whether Rspamd is the active filter."""
 
@@ -334,6 +341,10 @@ class RspamdOverrides(BaseModel):
     rspamd_enabled: bool = False
     # ``custom-commands.conf`` is only applied when the mailserver starts.
     restart_required: bool = True
+    # The files ``custom-commands.conf`` (and any manual drop-in) produced under
+    # ``rspamd/override.d/``, shown read-only since editing them directly is
+    # overwritten by ``custom-commands.conf`` on the next container start.
+    override_files: list[RspamdOverrideFile] = Field(default_factory=list)
 
 
 # ── LDAP provisioner maps ─────────────────────────────────────────────────────

@@ -75,6 +75,7 @@ from ..models.mailserver_models import (
     RelayHostCreate,
     Restriction,
     RspamdCommand,
+    RspamdOverrideFile,
     RspamdOverrides,
     ServiceStatus,
     SieveScope,
@@ -100,7 +101,8 @@ _SYSTEM_ALIASES_FILENAME = "postfix-aliases.cf"
 _REGEX_ALIASES_FILENAME = "postfix-regexp.cf"
 _OPENDKIM_KEYS_DIR = "opendkim/keys"
 _RSPAMD_DKIM_DIR = "rspamd/dkim"
-_RSPAMD_DKIM_SIGNING_CONF = "rspamd/override.d/dkim_signing.conf"
+_RSPAMD_OVERRIDE_DIR = "rspamd/override.d"
+_RSPAMD_DKIM_SIGNING_CONF = f"{_RSPAMD_OVERRIDE_DIR}/dkim_signing.conf"
 _ACCOUNTS_FILENAME = "postfix-accounts.cf"
 _DOVECOT_MASTERS_FILENAME = "dovecot-masters.cf"
 _SIEVE_FILENAMES: dict[str, str] = {
@@ -1341,6 +1343,16 @@ def _validate_rspamd_command(command: RspamdCommand) -> RspamdCommand:
     return cleaned
 
 
+def _rspamd_override_files() -> list[RspamdOverrideFile]:
+    """Return every file under ``rspamd/override.d/``, sorted by name, with its content."""
+    return [
+        RspamdOverrideFile(
+            name=rel, content=container.read_config(f"{_RSPAMD_OVERRIDE_DIR}/{rel}")
+        )
+        for rel in container.list_config_files(_RSPAMD_OVERRIDE_DIR, "")
+    ]
+
+
 def get_rspamd_overrides() -> RspamdOverrides:
     """Return the directives of ``rspamd/custom-commands.conf``, in file order."""
     commands = [
@@ -1353,6 +1365,7 @@ def get_rspamd_overrides() -> RspamdOverrides:
     return RspamdOverrides(
         commands=commands,
         rspamd_enabled=_flag(_dms_settings(), "ENABLE_RSPAMD"),
+        override_files=_rspamd_override_files(),
     )
 
 
@@ -1370,6 +1383,7 @@ def set_rspamd_overrides(commands: list[RspamdCommand]) -> RspamdOverrides:
     return RspamdOverrides(
         commands=cleaned,
         rspamd_enabled=_flag(_dms_settings(), "ENABLE_RSPAMD"),
+        override_files=_rspamd_override_files(),
     )
 
 

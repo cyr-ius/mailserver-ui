@@ -7,9 +7,11 @@
   </div>
 
   <p class="text-body-secondary small">
-    Simple <code>option = value</code> overrides, stored in <code>rspamd/custom-commands.conf</code> and applied to
-    <code>/etc/rspamd/override.d/</code> when the mailserver starts: restart the container to apply a change. For
-    anything the directives below cannot express, drop a UCL file into <code>rspamd/override.d/</code> instead.
+    Simple <code>option = value</code> overrides, stored in
+    <code>rspamd/custom-commands.conf</code> and applied to
+    <code>/etc/rspamd/override.d/</code> when the mailserver starts: restart the container to apply
+    a change. For anything the directives below cannot express, drop a UCL file into
+    <code>rspamd/override.d/</code> instead.
   </p>
 
   @if (success(); as msg) {
@@ -19,7 +21,8 @@
   } @if (!loading() && !rspamdEnabled()) {
   <div class="alert alert-warning py-2" role="alert">
     <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
-    Rspamd is disabled on this container (<code>ENABLE_RSPAMD=0</code>). These commands are stored but never read.
+    Rspamd is disabled on this container (<code>ENABLE_RSPAMD=0</code>). These commands are stored
+    but never read.
   </div>
   } @if (loading()) {
   <div class="text-center text-body-secondary py-5">
@@ -54,7 +57,9 @@
                   (change)="onKind($index, $event)"
                 >
                   @for (entry of kinds; track entry.kind) {
-                  <option [value]="entry.kind" [selected]="entry.kind === command.kind">{{ entry.kind }}</option>
+                  <option [value]="entry.kind" [selected]="entry.kind === command.kind">
+                    {{ entry.kind }}
+                  </option>
                   }
                 </select>
               </td>
@@ -122,7 +127,12 @@
           <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>
           Add command
         </button>
-        <button type="button" class="btn btn-sm btn-primary" (click)="onSave()" [disabled]="saving()">
+        <button
+          type="button"
+          class="btn btn-sm btn-primary"
+          (click)="onSave()"
+          [disabled]="saving()"
+        >
           @if (saving()) {
           <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
           } Save changes
@@ -142,6 +152,31 @@
         </dd>
         }
       </dl>
+    </div>
+  </div>
+
+  <div class="card shadow-sm mt-4">
+    <div class="card-body">
+      <h2 class="h6 text-uppercase text-body-secondary mb-3">Files under override.d/</h2>
+      <p class="text-body-secondary small">
+        What is currently on disk at <code>/etc/rspamd/override.d/</code>, read-only: these files
+        are (re)generated from the commands above (and any manual drop-in) when the mailserver
+        starts, so editing them here would just be overwritten.
+      </p>
+      @if (overrideFiles().length === 0) {
+      <p class="text-body-secondary mb-0">No file found under <code>override.d/</code> yet.</p>
+      } @else { @for (file of overrideFiles(); track file.name) {
+      <details class="mb-2">
+        <summary class="font-monospace">{{ file.name }}</summary>
+        <textarea
+          class="form-control form-control-sm font-monospace mt-2"
+          rows="10"
+          readonly
+          [attr.aria-label]="file.name"
+          [value]="file.content"
+        ></textarea>
+      </details>
+      } }
     </div>
   </div>
   }
