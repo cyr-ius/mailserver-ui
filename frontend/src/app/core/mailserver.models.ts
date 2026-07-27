@@ -341,9 +341,14 @@ export interface RspamdCommand {
   value: string;
 }
 
-/** A file under rspamd/override.d/ (read-only). */
+/** A file under rspamd/override.d/. */
 export interface RspamdOverrideFile {
   name: string;
+  content: string;
+}
+
+/** Request schema creating or replacing one rspamd/override.d/ file. */
+export interface RspamdOverrideFileUpdateRequest {
   content: string;
 }
 

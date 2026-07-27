@@ -327,10 +327,16 @@ class RspamdCommandsUpdate(BaseModel):
 
 
 class RspamdOverrideFile(BaseModel):
-    """A file under ``rspamd/override.d/`` (read-only)."""
+    """A file under ``rspamd/override.d/``."""
 
     name: str
     content: str
+
+
+class RspamdOverrideFileUpdate(BaseModel):
+    """Request schema creating or replacing one ``rspamd/override.d/`` file."""
+
+    content: str = Field(default="", max_length=65536)
 
 
 class RspamdOverrides(BaseModel):
@@ -342,8 +348,9 @@ class RspamdOverrides(BaseModel):
     # ``custom-commands.conf`` is only applied when the mailserver starts.
     restart_required: bool = True
     # The files ``custom-commands.conf`` (and any manual drop-in) produced under
-    # ``rspamd/override.d/``, shown read-only since editing them directly is
-    # overwritten by ``custom-commands.conf`` on the next container start.
+    # ``rspamd/override.d/``. Editing one directly is overwritten by
+    # ``custom-commands.conf`` on the next container start, unless the file is
+    # not one of the ones it produces.
     override_files: list[RspamdOverrideFile] = Field(default_factory=list)
 
 

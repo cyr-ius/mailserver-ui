@@ -1347,10 +1347,45 @@ def _rspamd_override_files() -> list[RspamdOverrideFile]:
     """Return every file under ``rspamd/override.d/``, sorted by name, with its content."""
     return [
         RspamdOverrideFile(
-            name=rel, content=container.read_config(f"{_RSPAMD_OVERRIDE_DIR}/{rel}")
+            name=rel,
+            content=_read_managed_body(f"{_RSPAMD_OVERRIDE_DIR}/{rel}"),
         )
         for rel in container.list_config_files(_RSPAMD_OVERRIDE_DIR, "")
     ]
+
+
+def _validate_rspamd_override_filename(name: str) -> str:
+    """Return ``name`` unchanged, rejecting anything but a bare ``<name>.<ext>`` file.
+
+    The same pattern ``add-line`` targets validate against; besides matching
+    what Rspamd expects, it rules out path separators and ``..``.
+    """
+    if not _RSPAMD_FILENAME_RE.match(name):
+        raise BadRequestException(f"Invalid Rspamd override file name: {name!r}")
+    return name
+
+
+def set_rspamd_override_file(name: str, content: str) -> RspamdOverrideFile:
+    """Create or replace one file under ``rspamd/override.d/``.
+
+    docker-mailserver regenerates this directory from ``custom-commands.conf``
+    (plus any manual drop-in) when the mailserver starts, so an edit only
+    survives if the file is not also one ``custom-commands.conf`` produces.
+    """
+    filename = _validate_rspamd_override_filename(name)
+    body = content.strip()
+    _write_managed_body(f"{_RSPAMD_OVERRIDE_DIR}/{filename}", body)
+    logger.info("Wrote Rspamd override file '%s' (%d bytes)", filename, len(body))
+    return RspamdOverrideFile(name=filename, content=body)
+
+
+def delete_rspamd_override_file(name: str) -> None:
+    """Delete one file under ``rspamd/override.d/``."""
+    filename = _validate_rspamd_override_filename(name)
+    if filename not in container.list_config_files(_RSPAMD_OVERRIDE_DIR, ""):
+        raise NotFoundException("Rspamd override file", filename)
+    container.delete_config(f"{_RSPAMD_OVERRIDE_DIR}/{filename}")
+    logger.info("Deleted Rspamd override file '%s'", filename)
 
 
 def get_rspamd_overrides() -> RspamdOverrides:

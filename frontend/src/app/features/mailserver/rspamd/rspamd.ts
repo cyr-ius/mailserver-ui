@@ -91,6 +91,12 @@ export class Rspamd {
 
   protected readonly hasCommands = computed(() => this.commands().length > 0);
 
+  protected readonly savingFile = signal<string | null>(null);
+  protected readonly deletingFile = signal<string | null>(null);
+  protected readonly newFileName = signal('');
+  protected readonly newFileContent = signal('');
+  protected readonly creatingFile = signal(false);
+
   constructor() {
     void this.load();
   }
@@ -187,6 +193,95 @@ export class Rspamd {
       this.error.set(mailserverErrorMessage(err));
     } finally {
       this.saving.set(false);
+    }
+  }
+
+  /** Update a file's content in place as the user types in its textarea. */
+  protected onFileContent(name: string, event: Event): void {
+    const text = (event.target as HTMLTextAreaElement).value;
+    this.overrideFiles.update((files) =>
+      files.map((file) => (file.name === name ? { ...file, content: text } : file)),
+    );
+  }
+
+  protected async saveFile(name: string): Promise<void> {
+    const file = this.overrideFiles().find((f) => f.name === name);
+    if (!file) {
+      return;
+    }
+    this.error.set(null);
+    this.success.set(null);
+    this.savingFile.set(name);
+    try {
+      const saved = await this.mailserver.setRspamdOverrideFile(name, file.content);
+      this.overrideFiles.update((files) => files.map((f) => (f.name === name ? saved : f)));
+      this.success.set(
+        `Saved "${name}". A restart of the mailserver will overwrite it again unless ` +
+          'custom-commands.conf does not also produce this file.',
+      );
+    } catch (err) {
+      this.error.set(mailserverErrorMessage(err));
+    } finally {
+      this.savingFile.set(null);
+    }
+  }
+
+  protected async deleteFile(name: string): Promise<void> {
+    if (!confirm(`Delete "${name}" from override.d/?`)) {
+      return;
+    }
+    this.error.set(null);
+    this.success.set(null);
+    this.deletingFile.set(name);
+    try {
+      await this.mailserver.deleteRspamdOverrideFile(name);
+      this.overrideFiles.update((files) => files.filter((f) => f.name !== name));
+      this.success.set(`Deleted "${name}".`);
+    } catch (err) {
+      this.error.set(mailserverErrorMessage(err));
+    } finally {
+      this.deletingFile.set(null);
+    }
+  }
+
+  protected onNewFileName(event: Event): void {
+    this.newFileName.set((event.target as HTMLInputElement).value);
+  }
+
+  protected onNewFileContent(event: Event): void {
+    this.newFileContent.set((event.target as HTMLTextAreaElement).value);
+  }
+
+  protected async createFile(): Promise<void> {
+    const name = this.newFileName().trim();
+    this.error.set(null);
+    this.success.set(null);
+
+    if (!FILENAME_RE.test(name)) {
+      this.error.set(`Invalid Rspamd override file name: "${name}".`);
+      return;
+    }
+    if (this.overrideFiles().some((f) => f.name === name)) {
+      this.error.set(`"${name}" already exists.`);
+      return;
+    }
+
+    this.creatingFile.set(true);
+    try {
+      const created = await this.mailserver.setRspamdOverrideFile(name, this.newFileContent());
+      this.overrideFiles.update((files) =>
+        [...files, created].sort((a, b) => a.name.localeCompare(b.name)),
+      );
+      this.newFileName.set('');
+      this.newFileContent.set('');
+      this.success.set(
+        `Created "${name}". A restart of the mailserver will overwrite it again unless ` +
+          'custom-commands.conf does not also produce this file.',
+      );
+    } catch (err) {
+      this.error.set(mailserverErrorMessage(err));
+    } finally {
+      this.creatingFile.set(false);
     }
   }
 }

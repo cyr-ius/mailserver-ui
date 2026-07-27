@@ -50,6 +50,8 @@ from ..models.mailserver_models import (
     Restriction,
     RestrictionCreate,
     RspamdCommandsUpdate,
+    RspamdOverrideFile,
+    RspamdOverrideFileUpdate,
     RspamdOverrides,
     ServiceStatus,
     SieveScope,
@@ -348,6 +350,22 @@ async def update_rspamd_overrides(
     return await run_in_threadpool(
         mailserver_service.set_rspamd_overrides, payload.commands
     )
+
+
+@router.put("/rspamd/override/{name}", response_model=RspamdOverrideFile)
+async def update_rspamd_override_file(
+    name: str, payload: RspamdOverrideFileUpdate, _admin: AdminDep
+) -> RspamdOverrideFile:
+    """Create or replace one file under ``rspamd/override.d/`` (admin only)."""
+    return await run_in_threadpool(
+        mailserver_service.set_rspamd_override_file, name, payload.content
+    )
+
+
+@router.delete("/rspamd/override/{name}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_rspamd_override_file(name: str, _admin: AdminDep) -> None:
+    """Delete one file under ``rspamd/override.d/`` (admin only)."""
+    await run_in_threadpool(mailserver_service.delete_rspamd_override_file, name)
 
 
 # ── LDAP provisioner maps ─────────────────────────────────────────────────────

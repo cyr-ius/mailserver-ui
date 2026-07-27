@@ -35,6 +35,8 @@ import {
   RestrictionKind,
   RspamdCommand,
   RspamdCommandsUpdateRequest,
+  RspamdOverrideFile,
+  RspamdOverrideFileUpdateRequest,
   RspamdOverrides,
   ServiceStatus,
   SieveScope,
@@ -288,6 +290,24 @@ export class MailserverService {
   async setRspamdOverrides(commands: RspamdCommand[]): Promise<RspamdOverrides> {
     const body: RspamdCommandsUpdateRequest = { commands };
     return firstValueFrom(this.http.put<RspamdOverrides>('/api/mailserver/rspamd', body));
+  }
+
+  /** Create or replace one file under rspamd/override.d/. */
+  async setRspamdOverrideFile(name: string, content: string): Promise<RspamdOverrideFile> {
+    const body: RspamdOverrideFileUpdateRequest = { content };
+    return firstValueFrom(
+      this.http.put<RspamdOverrideFile>(
+        `/api/mailserver/rspamd/override/${encodeURIComponent(name)}`,
+        body,
+      ),
+    );
+  }
+
+  /** Delete one file under rspamd/override.d/. */
+  async deleteRspamdOverrideFile(name: string): Promise<void> {
+    await firstValueFrom(
+      this.http.delete<void>(`/api/mailserver/rspamd/override/${encodeURIComponent(name)}`),
+    );
   }
 
   // ── LDAP provisioner maps ───────────────────────────────────────────────────

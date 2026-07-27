@@ -159,24 +159,85 @@
     <div class="card-body">
       <h2 class="h6 text-uppercase text-body-secondary mb-3">Files under override.d/</h2>
       <p class="text-body-secondary small">
-        What is currently on disk at <code>/etc/rspamd/override.d/</code>, read-only: these files
-        are (re)generated from the commands above (and any manual drop-in) when the mailserver
-        starts, so editing them here would just be overwritten.
+        What is currently on disk at <code>/etc/rspamd/override.d/</code>. These files are
+        (re)generated from the commands above (and any manual drop-in) when the mailserver starts,
+        so an edit here is overwritten on the next restart unless
+        <code>custom-commands.conf</code> does not also produce this file.
       </p>
       @if (overrideFiles().length === 0) {
       <p class="text-body-secondary mb-0">No file found under <code>override.d/</code> yet.</p>
       } @else { @for (file of overrideFiles(); track file.name) {
-      <details class="mb-2">
+      <details class="mb-2" open>
         <summary class="font-monospace">{{ file.name }}</summary>
         <textarea
           class="form-control form-control-sm font-monospace mt-2"
           rows="10"
-          readonly
           [attr.aria-label]="file.name"
           [value]="file.content"
+          (input)="onFileContent(file.name, $event)"
         ></textarea>
+        <div class="d-flex justify-content-end gap-2 mt-2">
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-danger"
+            (click)="deleteFile(file.name)"
+            [disabled]="deletingFile() === file.name"
+          >
+            @if (deletingFile() === file.name) {
+            <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+            } Delete
+          </button>
+          <button
+            type="button"
+            class="btn btn-sm btn-primary"
+            (click)="saveFile(file.name)"
+            [disabled]="savingFile() === file.name"
+          >
+            @if (savingFile() === file.name) {
+            <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+            } Save
+          </button>
+        </div>
       </details>
       } }
+
+      <hr class="my-3" />
+
+      <h3 class="h6 text-body-secondary mb-2">New file</h3>
+      <div class="row g-2 align-items-start">
+        <div class="col-sm-4">
+          <input
+            type="text"
+            class="form-control form-control-sm font-monospace"
+            aria-label="New file name"
+            placeholder="logging.inc"
+            [value]="newFileName()"
+            (input)="onNewFileName($event)"
+          />
+        </div>
+        <div class="col-sm-8">
+          <textarea
+            class="form-control form-control-sm font-monospace"
+            rows="4"
+            aria-label="New file content"
+            placeholder='level = "silly";'
+            [value]="newFileContent()"
+            (input)="onNewFileContent($event)"
+          ></textarea>
+        </div>
+      </div>
+      <div class="d-flex justify-content-end mt-2">
+        <button
+          type="button"
+          class="btn btn-sm btn-outline-secondary"
+          (click)="createFile()"
+          [disabled]="creatingFile() || !newFileName().trim()"
+        >
+          @if (creatingFile()) {
+          <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+          } <i class="bi bi-plus-lg me-1" aria-hidden="true"></i> Create file
+        </button>
+      </div>
     </div>
   </div>
   }
