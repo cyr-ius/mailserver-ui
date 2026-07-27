@@ -12,6 +12,7 @@ from pathlib import Path
 from sqlalchemy import inspect
 from sqlalchemy import text as sql_text
 from sqlalchemy.engine import Connection
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlmodel import SQLModel
 
@@ -118,7 +119,17 @@ async def create_db_and_tables() -> None:
         user_models,
     )
 
+    try:
+        async with engine.begin() as connection:
+            await connection.run_sync(SQLModel.metadata.create_all)
+    except OperationalError as exc:
+        if "already exists" not in str(exc):
+            raise
+        # Lost the race against a sibling worker creating the schema
+        # concurrently on first boot: the tables are already there. Falls
+        # through to _migrate_schema in a fresh transaction below.
+        logger.info("Tables already created by a concurrent worker")
+
     async with engine.begin() as connection:
-        await connection.run_sync(SQLModel.metadata.create_all)
         await connection.run_sync(_migrate_schema)
     logger.info("Database ready at %s", settings.database_url)
