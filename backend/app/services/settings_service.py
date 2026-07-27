@@ -9,7 +9,7 @@ authoritative and the UI edits it directly.
 import logging
 from datetime import UTC, datetime
 
-from sqlmodel import Session
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from ..config import settings
 from ..exceptions import BadRequestException
@@ -20,25 +20,27 @@ from ..services import oidc
 logger = logging.getLogger(__name__)
 
 
-def get_oidc_settings(session: Session) -> OidcSettings:
+async def get_oidc_settings(session: AsyncSession) -> OidcSettings:
     """Return the OIDC settings singleton, seeding it from env on first access."""
-    config = session.get(OidcSettings, OIDC_SETTINGS_ID)
+    config = await session.get(OidcSettings, OIDC_SETTINGS_ID)
     if config is None:
         config = _seed_from_env()
         session.add(config)
-        session.commit()
-        session.refresh(config)
+        await session.commit()
+        await session.refresh(config)
         logger.info("OIDC settings initialised from environment variables")
     return config
 
 
-def update_oidc_settings(session: Session, payload: OidcSettingsUpdate) -> OidcSettings:
+async def update_oidc_settings(
+    session: AsyncSession, payload: OidcSettingsUpdate
+) -> OidcSettings:
     """Apply an update to the OIDC settings and persist it.
 
     The client secret is preserved when the payload omits it (write-only field).
     Changing the issuer invalidates the cached discovery document.
     """
-    config = get_oidc_settings(session)
+    config = await get_oidc_settings(session)
     _validate(payload)
 
     previous_issuer = config.issuer
@@ -51,8 +53,8 @@ def update_oidc_settings(session: Session, payload: OidcSettingsUpdate) -> OidcS
 
     config.updated_at = datetime.now(UTC)
     session.add(config)
-    session.commit()
-    session.refresh(config)
+    await session.commit()
+    await session.refresh(config)
 
     if config.issuer != previous_issuer:
         oidc.reset_discovery_cache()
@@ -63,24 +65,26 @@ def update_oidc_settings(session: Session, payload: OidcSettingsUpdate) -> OidcS
 # ── Mail connector ───────────────────────────────────────────────────────────
 
 
-def get_mail_settings(session: Session) -> MailSettings:
+async def get_mail_settings(session: AsyncSession) -> MailSettings:
     """Return the mail settings singleton, seeding it from env on first access."""
-    config = session.get(MailSettings, MAIL_SETTINGS_ID)
+    config = await session.get(MailSettings, MAIL_SETTINGS_ID)
     if config is None:
         config = _seed_mail_from_env()
         session.add(config)
-        session.commit()
-        session.refresh(config)
+        await session.commit()
+        await session.refresh(config)
         logger.info("Mail settings initialised from environment variables")
     return config
 
 
-def update_mail_settings(session: Session, payload: MailSettingsUpdate) -> MailSettings:
+async def update_mail_settings(
+    session: AsyncSession, payload: MailSettingsUpdate
+) -> MailSettings:
     """Apply an update to the mail connector and persist it.
 
     The password is preserved when the payload omits it (write-only field).
     """
-    config = get_mail_settings(session)
+    config = await get_mail_settings(session)
     _validate_mail(payload)
 
     data = payload.model_dump(exclude={"password"})
@@ -92,8 +96,8 @@ def update_mail_settings(session: Session, payload: MailSettingsUpdate) -> MailS
 
     config.updated_at = datetime.now(UTC)
     session.add(config)
-    session.commit()
-    session.refresh(config)
+    await session.commit()
+    await session.refresh(config)
     logger.info(
         "Mail settings updated (enabled=%s host=%s)", config.enabled, config.host
     )

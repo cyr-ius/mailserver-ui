@@ -5,7 +5,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel
-from sqlmodel import Session
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from ..auth import SessionUser
 from ..depends import get_session, require_admin
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/groups", tags=["groups"])
 
-SessionDep = Annotated[Session, Depends(get_session)]
+SessionDep = Annotated[AsyncSession, Depends(get_session)]
 AdminDep = Annotated[SessionUser, Depends(require_admin)]
 
 
@@ -34,10 +34,10 @@ async def list_groups(
     _admin: AdminDep,
 ) -> list[GroupWithMembers]:
     """List all groups with member count (admin only)."""
-    groups = group_service.list_groups(session)
+    groups = await group_service.list_groups(session)
     result = []
     for group in groups:
-        member_ids = group_service.get_group_member_ids(session, group.id)
+        member_ids = await group_service.get_group_member_ids(session, group.id)
         result.append(
             GroupWithMembers(
                 id=group.id,
@@ -59,7 +59,7 @@ async def create_group(
     _admin: AdminDep,
 ) -> GroupPublic:
     """Create a new group granting a role to its members (admin only)."""
-    group = group_service.create_group(
+    group = await group_service.create_group(
         session, payload.name, payload.description, payload.role
     )
     return GroupPublic.model_validate(group, from_attributes=True)
@@ -73,10 +73,10 @@ async def update_group(
     _admin: AdminDep,
 ) -> GroupPublic:
     """Update a group's name, description and granted role (admin only)."""
-    group = group_service.get_group(session, group_id)
+    group = await group_service.get_group(session, group_id)
     if group is None:
         raise NotFoundException("Group", group_id)
-    updated = group_service.update_group(
+    updated = await group_service.update_group(
         session, group, payload.name, payload.description, payload.role
     )
     return GroupPublic.model_validate(updated, from_attributes=True)
@@ -89,10 +89,10 @@ async def delete_group(
     _admin: AdminDep,
 ) -> None:
     """Delete a group (admin only)."""
-    group = group_service.get_group(session, group_id)
+    group = await group_service.get_group(session, group_id)
     if group is None:
         raise NotFoundException("Group", group_id)
-    group_service.delete_group(session, group_id)
+    await group_service.delete_group(session, group_id)
 
 
 @router.get("/{group_id}/members", response_model=list[UserPublic])
@@ -102,11 +102,11 @@ async def get_group_members(
     _admin: AdminDep,
 ) -> list[UserPublic]:
     """Get all members of a group (admin only)."""
-    group = group_service.get_group(session, group_id)
+    group = await group_service.get_group(session, group_id)
     if group is None:
         raise NotFoundException("Group", group_id)
-    members = group_service.get_group_members(session, group_id)
-    return user_service.to_public_many(session, members)
+    members = await group_service.get_group_members(session, group_id)
+    return await user_service.to_public_many(session, members)
 
 
 # Declared before /{user_id}: a literal path segment must be matched before the
@@ -119,13 +119,13 @@ async def add_users_to_group(
     _admin: AdminDep,
 ) -> None:
     """Add multiple users to a group (admin only)."""
-    group = group_service.get_group(session, group_id)
+    group = await group_service.get_group(session, group_id)
     if group is None:
         raise NotFoundException("Group", group_id)
     for user_id in payload.user_ids:
-        if user_service.get_user(session, user_id) is None:
+        if await user_service.get_user(session, user_id) is None:
             raise NotFoundException("User", user_id)
-    group_service.add_users_to_group(session, group_id, payload.user_ids)
+    await group_service.add_users_to_group(session, group_id, payload.user_ids)
 
 
 @router.post("/{group_id}/members/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -136,13 +136,13 @@ async def add_user_to_group(
     _admin: AdminDep,
 ) -> None:
     """Add a user to a group (admin only)."""
-    group = group_service.get_group(session, group_id)
+    group = await group_service.get_group(session, group_id)
     if group is None:
         raise NotFoundException("Group", group_id)
-    user = user_service.get_user(session, user_id)
+    user = await user_service.get_user(session, user_id)
     if user is None:
         raise NotFoundException("User", user_id)
-    group_service.add_user_to_group(session, group_id, user_id)
+    await group_service.add_user_to_group(session, group_id, user_id)
 
 
 @router.delete("/{group_id}/members/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -153,7 +153,7 @@ async def remove_user_from_group(
     _admin: AdminDep,
 ) -> None:
     """Remove a user from a group (admin only)."""
-    group = group_service.get_group(session, group_id)
+    group = await group_service.get_group(session, group_id)
     if group is None:
         raise NotFoundException("Group", group_id)
-    group_service.remove_user_from_group(session, group_id, user_id)
+    await group_service.remove_user_from_group(session, group_id, user_id)

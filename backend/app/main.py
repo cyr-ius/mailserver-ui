@@ -12,7 +12,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from sqlmodel import Session
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from .config import settings
 from .database import create_db_and_tables, engine
@@ -33,10 +33,10 @@ logging.basicConfig(
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Initialise the database, seed the default admin and trim the audit trail."""
-    create_db_and_tables()
-    with Session(engine) as session:
-        user_service.ensure_default_admin(session)
-        audit_service.purge(session, settings.audit_retention_days)
+    await create_db_and_tables()
+    async with AsyncSession(engine, expire_on_commit=False) as session:
+        await user_service.ensure_default_admin(session)
+        await audit_service.purge(session, settings.audit_retention_days)
     yield
 
 

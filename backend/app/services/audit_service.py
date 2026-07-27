@@ -16,7 +16,8 @@ from datetime import UTC, datetime, timedelta
 
 from fastapi import Request
 from sqlalchemy import func
-from sqlmodel import Session, col, select
+from sqlmodel import col, select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from ..client_ip import get_client_ip
 from ..models.audit_models import AuditCategory, AuditLog, AuditStatus
@@ -29,7 +30,7 @@ MAX_PAGE_SIZE = 200
 
 
 async def record(
-    session: Session,
+    session: AsyncSession,
     *,
     category: AuditCategory,
     action: str,
@@ -55,17 +56,17 @@ async def record(
     )
     try:
         session.add(entry)
-        session.commit()
-        session.refresh(entry)
+        await session.commit()
+        await session.refresh(entry)
     except Exception as exc:  # noqa: BLE001 — the audited action already happened
-        session.rollback()
+        await session.rollback()
         logger.error("Failed to record audit entry %s: %s", action, exc)
         return
 
     try:
         # Detached snapshot: the notification is sent in the background, long
         # after this request's session is closed.
-        config = settings_service.get_mail_settings(session)
+        config = await settings_service.get_mail_settings(session)
         mail_service.notify(config.model_copy(), entry)
     except Exception as exc:  # noqa: BLE001 — notification is best-effort
         logger.error("Failed to dispatch audit notification for %s: %s", action, exc)
@@ -74,8 +75,8 @@ async def record(
 # ── Queries ──────────────────────────────────────────────────────────────────
 
 
-def list_entries(
-    session: Session,
+async def list_entries(
+    session: AsyncSession,
     *,
     actor: str = "",
     action: str = "",
@@ -101,28 +102,31 @@ def list_entries(
         total_statement = total_statement.where(condition)
         page_statement = page_statement.where(condition)
 
-    total = session.exec(total_statement).one()
-    entries = session.exec(
+    total_result = await session.exec(total_statement)
+    total = total_result.one()
+    entries_result = await session.exec(
         page_statement.order_by(
             col(AuditLog.created_at).desc(), col(AuditLog.id).desc()
         )
         .offset(max(offset, 0))
         .limit(min(max(limit, 1), MAX_PAGE_SIZE))
-    ).all()
+    )
+    entries = entries_result.all()
     return list(entries), int(total)
 
 
-def purge(session: Session, retention_days: int) -> int:
+async def purge(session: AsyncSession, retention_days: int) -> int:
     """Delete entries older than ``retention_days``. ``0`` keeps them forever."""
     if retention_days <= 0:
         return 0
     cutoff = datetime.now(UTC) - timedelta(days=retention_days)
-    stale = session.exec(
+    result = await session.exec(
         select(AuditLog).where(col(AuditLog.created_at) < cutoff)
-    ).all()
+    )
+    stale = result.all()
     for entry in stale:
-        session.delete(entry)
-    session.commit()
+        await session.delete(entry)
+    await session.commit()
     if stale:
         logger.info(
             "Purged %d audit entries older than %d days", len(stale), retention_days

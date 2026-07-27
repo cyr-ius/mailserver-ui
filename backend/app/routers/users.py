@@ -4,7 +4,7 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request, status
-from sqlmodel import Session
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from ..auth import SessionUser
 from ..depends import get_session, require_admin, require_session_login, require_user
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
-SessionDep = Annotated[Session, Depends(get_session)]
+SessionDep = Annotated[AsyncSession, Depends(get_session)]
 AdminDep = Annotated[SessionUser, Depends(require_admin)]
 UserDep = Annotated[SessionUser, Depends(require_user)]
 #: Tokens are managed from the browser only — never with a token itself.
@@ -37,7 +37,9 @@ async def list_users(
     _admin: AdminDep,
 ) -> list[UserPublic]:
     """List all local and OIDC users (admin only)."""
-    return user_service.to_public_many(session, user_service.list_users(session))
+    return await user_service.to_public_many(
+        session, await user_service.list_users(session)
+    )
 
 
 @router.post("", response_model=UserPublic, status_code=status.HTTP_201_CREATED)
@@ -51,7 +53,7 @@ async def create_user(
 
     The account is created as a ``guest``; add it to a group to grant a role.
     """
-    user = user_service.create_local_user(
+    user = await user_service.create_local_user(
         session, payload.username, payload.display_name, payload.password
     )
     await audit_service.record(
@@ -63,16 +65,16 @@ async def create_user(
         target=user.username,
         detail="Local account created",
     )
-    return user_service.to_public(session, user)
+    return await user_service.to_public(session, user)
 
 
 # ── Self-service ─────────────────────────────────────────────────────────────
 # Declared before the "/{user_id}" routes so "me" is never parsed as an id.
 
 
-def _own_account(session: Session, user: SessionUser) -> User:
+async def _own_account(session: AsyncSession, user: SessionUser) -> User:
     """Return the persisted account behind the current principal."""
-    account = user_service.get_by_username(session, user.username)
+    account = await user_service.get_by_username(session, user.username)
     if account is None:
         raise NotFoundException("User", user.username)
     return account
@@ -81,7 +83,7 @@ def _own_account(session: Session, user: SessionUser) -> User:
 @router.get("/me", response_model=UserPublic)
 async def read_own_profile(session: SessionDep, user: UserDep) -> UserPublic:
     """Return the profile of the caller, group-granted role included."""
-    return user_service.to_public(session, _own_account(session, user))
+    return await user_service.to_public(session, await _own_account(session, user))
 
 
 @router.patch("/me/password", response_model=UserPublic)
@@ -92,7 +94,7 @@ async def change_own_password(
     user: UserDep,
 ) -> UserPublic:
     """Let the caller rotate their own password, proving the current one first."""
-    updated = user_service.change_own_password(
+    updated = await user_service.change_own_password(
         session, user.username, payload.current_password, payload.new_password
     )
     await audit_service.record(
@@ -104,7 +106,7 @@ async def change_own_password(
         target=user.username,
         detail="Own password rotated",
     )
-    return user_service.to_public(session, updated)
+    return await user_service.to_public(session, updated)
 
 
 # ── Personal access tokens ───────────────────────────────────────────────────
@@ -116,8 +118,8 @@ async def change_own_password(
 @router.get("/me/pats", response_model=list[PatPublic])
 async def list_own_pats(session: SessionDep, user: UserDep) -> list[Pat]:
     """List the tokens owned by the caller. Secrets are never returned."""
-    account = _own_account(session, user)
-    return pat_service.list_for_user(session, account.id or 0)
+    account = await _own_account(session, user)
+    return await pat_service.list_for_user(session, account.id or 0)
 
 
 @router.post("/me/pats", response_model=PatCreated, status_code=status.HTTP_201_CREATED)
@@ -132,8 +134,8 @@ async def create_own_pat(
     The token is returned once, here: only its digest is stored, so a token that
     is lost has to be revoked and reissued.
     """
-    account = _own_account(session, user)
-    pat, raw_token = pat_service.create(
+    account = await _own_account(session, user)
+    pat, raw_token = await pat_service.create(
         session, account, payload.name, payload.expires_in_days
     )
     await audit_service.record(
@@ -159,12 +161,12 @@ async def revoke_own_pat(
     user: InteractiveDep,
 ) -> None:
     """Revoke one of the caller's tokens, refusing any token it does not own."""
-    account = _own_account(session, user)
-    pat = pat_service.get_for_user(session, pat_id, account.id or 0)
+    account = await _own_account(session, user)
+    pat = await pat_service.get_for_user(session, pat_id, account.id or 0)
     if pat is None:
         raise NotFoundException("Personal access token", pat_id)
     name = pat.name
-    pat_service.delete_pat(session, pat)
+    await pat_service.delete_pat(session, pat)
     await audit_service.record(
         session,
         request=request,
@@ -190,17 +192,17 @@ async def delete_user(
     Refuses to remove the caller's own account or the last active administrator,
     both of which would lock the instance out of its own administration.
     """
-    user = user_service.get_user(session, user_id)
+    user = await user_service.get_user(session, user_id)
     if user is None:
         raise NotFoundException("User", user_id)
     if user.username == admin.username:
         raise ConflictException("You cannot delete your own account")
-    if user_service.is_last_admin(session, user):
+    if await user_service.is_last_admin(session, user):
         raise ConflictException(
             "The last active administrator account cannot be deleted"
         )
     username = user.username
-    user_service.delete_user(session, user)
+    await user_service.delete_user(session, user)
     await audit_service.record(
         session,
         request=request,
@@ -227,13 +229,13 @@ async def set_user_status(
     Refuses to deactivate the caller's own account or the last active
     administrator.
     """
-    user = user_service.get_user(session, user_id)
+    user = await user_service.get_user(session, user_id)
     if user is None:
         raise NotFoundException("User", user_id)
     if not payload.is_active and user.username == admin.username:
         raise ConflictException("You cannot deactivate your own account")
 
-    updated = user_service.set_active(session, user, payload.is_active)
+    updated = await user_service.set_active(session, user, payload.is_active)
     await audit_service.record(
         session,
         request=request,
@@ -243,7 +245,7 @@ async def set_user_status(
         target=updated.username,
         detail=f"provider={updated.provider}",
     )
-    return user_service.to_public(session, updated)
+    return await user_service.to_public(session, updated)
 
 
 @router.patch("/{user_id}/password", response_model=UserPublic)
@@ -259,14 +261,14 @@ async def change_password(
     OIDC accounts are managed by the identity provider and cannot be changed
     here.
     """
-    user = user_service.get_user(session, user_id)
+    user = await user_service.get_user(session, user_id)
     if user is None:
         raise NotFoundException("User", user_id)
     if user.provider != "local":
         raise ConflictException(
             "Password is managed by the identity provider for OIDC users"
         )
-    updated = user_service.set_password(session, user, payload.new_password)
+    updated = await user_service.set_password(session, user, payload.new_password)
     await audit_service.record(
         session,
         request=request,
@@ -276,4 +278,4 @@ async def change_password(
         target=updated.username,
         detail="Password reset by an administrator",
     )
-    return user_service.to_public(session, updated)
+    return await user_service.to_public(session, updated)

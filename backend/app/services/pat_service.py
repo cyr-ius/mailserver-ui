@@ -11,7 +11,8 @@ import secrets
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import text as sql_text
-from sqlmodel import Session, col, select
+from sqlmodel import col, select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from ..config import settings
 from ..exceptions import BadRequestException, ConflictException
@@ -66,28 +67,25 @@ def is_expired(pat: Pat) -> bool:
 # ── Queries ──────────────────────────────────────────────────────────────────
 
 
-def list_for_user(session: Session, user_id: int) -> list[Pat]:
+async def list_for_user(session: AsyncSession, user_id: int) -> list[Pat]:
     """Return every token owned by a user, most recently issued first."""
-    return list(
-        session.exec(
-            select(Pat)
-            .where(Pat.user_id == user_id)
-            .order_by(col(Pat.created_at).desc())
-        ).all()
+    result = await session.exec(
+        select(Pat).where(Pat.user_id == user_id).order_by(col(Pat.created_at).desc())
     )
+    return list(result.all())
 
 
-def get_for_user(session: Session, pat_id: int, user_id: int) -> Pat | None:
+async def get_for_user(session: AsyncSession, pat_id: int, user_id: int) -> Pat | None:
     """Return a token by primary key, but only if ``user_id`` owns it."""
-    pat = session.get(Pat, pat_id)
+    pat = await session.get(Pat, pat_id)
     return pat if pat is not None and pat.user_id == user_id else None
 
 
 # ── Mutations ────────────────────────────────────────────────────────────────
 
 
-def create(
-    session: Session,
+async def create(
+    session: AsyncSession,
     user: User,
     name: str,
     expires_in_days: int | None = None,
@@ -105,7 +103,7 @@ def create(
     name = name.strip()
     if not name:
         raise BadRequestException("A token name is required")
-    if len(list_for_user(session, user.id)) >= settings.pat_max_per_user:
+    if len(await list_for_user(session, user.id)) >= settings.pat_max_per_user:
         raise ConflictException(
             f"You cannot own more than {settings.pat_max_per_user} tokens"
         )
@@ -123,29 +121,29 @@ def create(
         expires_at=expires_at,
     )
     session.add(pat)
-    session.commit()
-    session.refresh(pat)
+    await session.commit()
+    await session.refresh(pat)
     logger.info(
         "Issued PAT %s (id=%s) for user %s", pat.token_hint, pat.id, user.username
     )
     return pat, raw_token
 
 
-def delete_pat(session: Session, pat: Pat) -> None:
+async def delete_pat(session: AsyncSession, pat: Pat) -> None:
     """Revoke a token: further requests presenting it are rejected immediately."""
     hint, pat_id = pat.token_hint, pat.id
-    session.delete(pat)
-    session.commit()
+    await session.delete(pat)
+    await session.commit()
     logger.info("Revoked PAT %s (id=%s)", hint, pat_id)
 
 
-def delete_for_user(session: Session, user_id: int) -> None:
+async def delete_for_user(session: AsyncSession, user_id: int) -> None:
     """Revoke every token of a user, without committing.
 
     Called just before deleting the account so the tokens and the user itself
     are wiped in a single transaction.
     """
-    session.exec(
+    await session.exec(
         sql_text("DELETE FROM pat WHERE user_id = :user_id").bindparams(user_id=user_id)
     )
 
@@ -153,7 +151,7 @@ def delete_for_user(session: Session, user_id: int) -> None:
 # ── Authentication ───────────────────────────────────────────────────────────
 
 
-def authenticate(session: Session, raw_token: str) -> User | None:
+async def authenticate(session: AsyncSession, raw_token: str) -> User | None:
     """Resolve a presented token to its owner, or None when it is not usable.
 
     A token is unusable when unknown, expired, or orphaned by an account that
@@ -163,22 +161,23 @@ def authenticate(session: Session, raw_token: str) -> User | None:
     if not candidate.removeprefix(TOKEN_PREFIX):
         return None
 
-    pat = session.exec(select(Pat).where(Pat.token_hash == _digest(candidate))).first()
+    result = await session.exec(select(Pat).where(Pat.token_hash == _digest(candidate)))
+    pat = result.first()
     if pat is None:
         return None
     if is_expired(pat):
         logger.info("Rejected expired PAT %s (id=%s)", pat.token_hint, pat.id)
         return None
 
-    user = session.get(User, pat.user_id)
+    user = await session.get(User, pat.user_id)
     if user is None:
         return None
 
-    _touch_last_used(session, pat)
+    await _touch_last_used(session, pat)
     return user
 
 
-def _touch_last_used(session: Session, pat: Pat) -> None:
+async def _touch_last_used(session: AsyncSession, pat: Pat) -> None:
     """Record the token's last use, at most once per refresh interval."""
     now = _utcnow()
     if (
@@ -189,4 +188,4 @@ def _touch_last_used(session: Session, pat: Pat) -> None:
         return
     pat.last_used_at = now
     session.add(pat)
-    session.commit()
+    await session.commit()

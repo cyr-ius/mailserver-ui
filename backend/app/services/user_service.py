@@ -9,7 +9,8 @@ import logging
 import secrets
 from datetime import UTC, datetime
 
-from sqlmodel import Session, select
+from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from ..auth import (
     Role,
@@ -38,23 +39,25 @@ _GENERATED_PASSWORD_BYTES = 24
 # ── Role resolution ──────────────────────────────────────────────────────────
 
 
-def resolve_role(session: Session, user: User) -> Role:
+async def resolve_role(session: AsyncSession, user: User) -> Role:
     """Return the effective role of ``user``.
 
     An account carries a role of its own (set by the OIDC group claims, or
     ``admin`` for the seeded administrator). Membership in a local group can only
     raise it: the effective role is the most privileged of the two sources.
     """
-    granted = group_service.get_granted_roles(session, [user.id] if user.id else [])
+    granted = await group_service.get_granted_roles(
+        session, [user.id] if user.id else []
+    )
     return highest_role([user.role, *granted.get(user.id or 0, [])])
 
 
-def to_session_user(session: Session, user: User) -> SessionUser:
+async def to_session_user(session: AsyncSession, user: User) -> SessionUser:
     """Map a persisted user to the session principal carried by the cookie."""
     return SessionUser(
         username=user.username,
         display_name=user.display_name or user.username,
-        role=resolve_role(session, user),
+        role=await resolve_role(session, user),
         provider="oidc" if user.provider == "oidc" else "local",
     )
 
@@ -66,14 +69,16 @@ def _to_public(user: User, effective_role: Role) -> UserPublic:
     )
 
 
-def to_public(session: Session, user: User) -> UserPublic:
+async def to_public(session: AsyncSession, user: User) -> UserPublic:
     """Map a persisted user to its API representation, effective role included."""
-    return _to_public(user, resolve_role(session, user))
+    return _to_public(user, await resolve_role(session, user))
 
 
-def to_public_many(session: Session, users: list[User]) -> list[UserPublic]:
+async def to_public_many(session: AsyncSession, users: list[User]) -> list[UserPublic]:
     """Map several users at once, resolving every group membership in one query."""
-    granted = group_service.get_granted_roles(session, [u.id for u in users if u.id])
+    granted = await group_service.get_granted_roles(
+        session, [u.id for u in users if u.id]
+    )
     return [
         _to_public(user, highest_role([user.role, *granted.get(user.id or 0, [])]))
         for user in users
@@ -83,33 +88,35 @@ def to_public_many(session: Session, users: list[User]) -> list[UserPublic]:
 # ── Queries ──────────────────────────────────────────────────────────────────
 
 
-def list_users(session: Session) -> list[User]:
+async def list_users(session: AsyncSession) -> list[User]:
     """Return every user ordered by username."""
-    return list(session.exec(select(User).order_by(User.username)).all())
+    result = await session.exec(select(User).order_by(User.username))
+    return list(result.all())
 
 
-def get_user(session: Session, user_id: int) -> User | None:
+async def get_user(session: AsyncSession, user_id: int) -> User | None:
     """Return a user by primary key, or None."""
-    return session.get(User, user_id)
+    return await session.get(User, user_id)
 
 
-def get_by_username(session: Session, username: str) -> User | None:
+async def get_by_username(session: AsyncSession, username: str) -> User | None:
     """Return a user by username, or None."""
-    return session.exec(select(User).where(User.username == username)).first()
+    result = await session.exec(select(User).where(User.username == username))
+    return result.first()
 
 
 # ── Authentication ───────────────────────────────────────────────────────────
 
 
-def authenticate_local(
-    session: Session, username: str, password: str
+async def authenticate_local(
+    session: AsyncSession, username: str, password: str
 ) -> SessionUser | None:
     """Validate local credentials against the stored hash.
 
     A deactivated account is refused exactly like a wrong password: the caller
     gets no signal about which of the two it was.
     """
-    user = get_by_username(session, username)
+    user = await get_by_username(session, username)
     if user is None or user.provider != "local" or not user.password_hash:
         # Run a dummy hash comparison to keep timing roughly uniform.
         verify_password(password, "$2b$12$" + "." * 53)
@@ -119,11 +126,13 @@ def authenticate_local(
     if not user.is_active:
         logger.warning("Login refused for deactivated account %s", user.username)
         return None
-    _touch_login(session, user)
-    return to_session_user(session, user)
+    await _touch_login(session, user)
+    return await to_session_user(session, user)
 
 
-def upsert_oidc_user(session: Session, principal: SessionUser) -> SessionUser:
+async def upsert_oidc_user(
+    session: AsyncSession, principal: SessionUser
+) -> SessionUser:
     """Create or refresh the local record mirroring an OIDC principal.
 
     ``principal.role`` is the role derived from the provider's group claims; it
@@ -138,7 +147,7 @@ def upsert_oidc_user(session: Session, principal: SessionUser) -> SessionUser:
     stay separate, and an administrator who wants the account on SSO deletes the
     local one first.
     """
-    user = get_by_username(session, principal.username)
+    user = await get_by_username(session, principal.username)
     if user is not None and user.provider != "oidc":
         raise ConflictException(
             f"A local account named {principal.username} already exists; "
@@ -160,16 +169,16 @@ def upsert_oidc_user(session: Session, principal: SessionUser) -> SessionUser:
     user.last_login_at = _now()
     user.updated_at = _now()
     session.add(user)
-    session.commit()
-    session.refresh(user)
-    return to_session_user(session, user)
+    await session.commit()
+    await session.refresh(user)
+    return await to_session_user(session, user)
 
 
 # ── Mutations ────────────────────────────────────────────────────────────────
 
 
-def create_local_user(
-    session: Session,
+async def create_local_user(
+    session: AsyncSession,
     username: str,
     display_name: str,
     password: str,
@@ -182,7 +191,7 @@ def create_local_user(
     username = username.strip()
     if not username:
         raise BadRequestException("A username is required")
-    if get_by_username(session, username) is not None:
+    if await get_by_username(session, username) is not None:
         raise ConflictException(f"User {username} already exists")
 
     user = User(
@@ -193,13 +202,13 @@ def create_local_user(
         password_hash=hash_password(password),
     )
     session.add(user)
-    session.commit()
-    session.refresh(user)
+    await session.commit()
+    await session.refresh(user)
     logger.info("Created local user %s (id=%s)", user.username, user.id)
     return user
 
 
-def is_last_admin(session: Session, user: User) -> bool:
+async def is_last_admin(session: AsyncSession, user: User) -> bool:
     """Return True when ``user`` is the only *active* account with an admin role.
 
     Deleting or deactivating it would leave the instance with no way to
@@ -207,23 +216,24 @@ def is_last_admin(session: Session, user: User) -> bool:
     administrator does not count: it cannot sign in, so it cannot be the one that
     keeps the instance administrable.
     """
-    if not user.is_active or resolve_role(session, user) != "admin":
+    if not user.is_active or await resolve_role(session, user) != "admin":
         return False
+    users = await list_users(session)
     active_admins = [
         public
-        for public in to_public_many(session, list_users(session))
+        for public in await to_public_many(session, users)
         if public.effective_role == "admin" and public.is_active
     ]
     return len(active_admins) <= 1
 
 
-def set_active(session: Session, user: User, is_active: bool) -> User:
+async def set_active(session: AsyncSession, user: User, is_active: bool) -> User:
     """Activate or deactivate an account, local or OIDC.
 
     Deactivating the last active administrator is refused: it would lock the
     instance out of its own administration.
     """
-    if not is_active and is_last_admin(session, user):
+    if not is_active and await is_last_admin(session, user):
         raise ConflictException(
             "The last active administrator account cannot be deactivated"
         )
@@ -231,27 +241,27 @@ def set_active(session: Session, user: User, is_active: bool) -> User:
     user.is_active = is_active
     user.updated_at = _now()
     session.add(user)
-    session.commit()
-    session.refresh(user)
+    await session.commit()
+    await session.refresh(user)
     logger.info(
         "User %s %s", user.username, "activated" if is_active else "deactivated"
     )
     return user
 
 
-def delete_user(session: Session, user: User) -> None:
+async def delete_user(session: AsyncSession, user: User) -> None:
     """Delete a user along with every group membership and token it holds."""
     if user.id is not None:
-        group_service.remove_user_memberships(session, user.id)
-        pat_service.delete_for_user(session, user.id)
+        await group_service.remove_user_memberships(session, user.id)
+        await pat_service.delete_for_user(session, user.id)
     username = user.username
-    session.delete(user)
-    session.commit()
+    await session.delete(user)
+    await session.commit()
     logger.info("Deleted user %s", username)
 
 
-def change_own_password(
-    session: Session,
+async def change_own_password(
+    session: AsyncSession,
     username: str,
     current_password: str,
     new_password: str,
@@ -261,7 +271,7 @@ def change_own_password(
     OIDC accounts have no local hash to replace: their credentials live in the
     identity provider.
     """
-    user = get_by_username(session, username)
+    user = await get_by_username(session, username)
     if user is None:
         raise NotFoundException("User", username)
     if user.provider != "local" or not user.password_hash:
@@ -272,29 +282,30 @@ def change_own_password(
         raise BadRequestException("The current password is incorrect")
     if current_password == new_password:
         raise BadRequestException("The new password must differ from the current one")
-    return set_password(session, user, new_password)
+    return await set_password(session, user, new_password)
 
 
-def set_password(session: Session, user: User, new_password: str) -> User:
+async def set_password(session: AsyncSession, user: User, new_password: str) -> User:
     """Set a new bcrypt password hash for a local user."""
     user.password_hash = hash_password(new_password)
     user.updated_at = _now()
     session.add(user)
-    session.commit()
-    session.refresh(user)
+    await session.commit()
+    await session.refresh(user)
     logger.info("Password changed for user %s", user.username)
     return user
 
 
-def ensure_default_admin(session: Session) -> None:
+async def ensure_default_admin(session: AsyncSession) -> None:
     """Seed a default admin with a random password when none exists.
 
     The generated password is printed once to the logs; there is no other way
     to recover it, so it must be captured on first startup.
     """
-    existing = session.exec(
+    result = await session.exec(
         select(User).where(User.role == "admin", User.provider == "local")
-    ).first()
+    )
+    existing = result.first()
     if existing is not None:
         return
 
@@ -307,7 +318,7 @@ def ensure_default_admin(session: Session) -> None:
         password_hash=hash_password(password),
     )
     session.add(admin)
-    session.commit()
+    await session.commit()
     banner = "=" * 72
     logger.warning(
         "\n%s\n"
@@ -331,8 +342,8 @@ def _now() -> datetime:
     return datetime.now(UTC)
 
 
-def _touch_login(session: Session, user: User) -> None:
+async def _touch_login(session: AsyncSession, user: User) -> None:
     """Record the user's last successful login time."""
     user.last_login_at = _now()
     session.add(user)
-    session.commit()
+    await session.commit()

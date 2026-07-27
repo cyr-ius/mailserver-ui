@@ -10,12 +10,12 @@ enforces roles identically whichever credential was used.
 """
 
 import logging
-from collections.abc import Generator
+from collections.abc import AsyncGenerator
 from typing import Annotated
 
 from fastapi import Depends, Request, Security
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlmodel import Session
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from .auth import SessionUser, decode_session_token, role_grants
 from .config import settings
@@ -35,15 +35,22 @@ _pat_bearer = HTTPBearer(
 )
 
 
-def get_session() -> Generator[Session]:
-    """Yield a database session scoped to the current request."""
-    with Session(engine) as session:
+async def get_session() -> AsyncGenerator[AsyncSession]:
+    """Yield a database session scoped to the current request.
+
+    ``expire_on_commit=False``: a committed object's attributes stay loaded
+    instead of expiring, so code that keeps using it right after (e.g. a
+    router returning the row it just updated) does not trigger an implicit
+    lazy-load — which would require IO outside of an ``await``, an async
+    session cannot do that transparently the way a sync one can.
+    """
+    async with AsyncSession(engine, expire_on_commit=False) as session:
         yield session
 
 
-def current_user_optional(
+async def current_user_optional(
     request: Request,
-    session: Annotated[Session, Depends(get_session)],
+    session: Annotated[AsyncSession, Depends(get_session)],
     bearer: Annotated[
         HTTPAuthorizationCredentials | None, Security(_pat_bearer)
     ] = None,
@@ -62,9 +69,9 @@ def current_user_optional(
     if token:
         user = decode_session_token(token)
         if user is not None:
-            account = user_service.get_by_username(session, user.username)
+            account = await user_service.get_by_username(session, user.username)
             if account is not None and account.is_active:
-                return user_service.to_session_user(session, account)
+                return await user_service.to_session_user(session, account)
             logger.info(
                 "Rejected session of unknown or deactivated account %s", user.username
             )
@@ -76,10 +83,10 @@ def current_user_optional(
     # as a bearer token is never mistaken for one.
     if not bearer.credentials.startswith(pat_service.TOKEN_PREFIX):
         return None
-    account = pat_service.authenticate(session, bearer.credentials)
+    account = await pat_service.authenticate(session, bearer.credentials)
     if account is None or not account.is_active:
         return None
-    return user_service.to_session_user(session, account)
+    return await user_service.to_session_user(session, account)
 
 
 def require_user(

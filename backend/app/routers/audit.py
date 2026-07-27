@@ -8,7 +8,7 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
-from sqlmodel import Session
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from ..auth import SessionUser
 from ..depends import get_session, require_admin
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/audit", tags=["audit"])
 
-SessionDep = Annotated[Session, Depends(get_session)]
+SessionDep = Annotated[AsyncSession, Depends(get_session)]
 AdminDep = Annotated[SessionUser, Depends(require_admin)]
 
 
@@ -39,7 +39,7 @@ async def list_audit_entries(
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> AuditPage:
     """Return a page of audit entries, newest first (admin only)."""
-    entries, total = audit_service.list_entries(
+    entries, total = await audit_service.list_entries(
         session,
         actor=actor,
         action=action,

@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Request, Response, status
 from fastapi.responses import RedirectResponse
 from jose import JWTError, jwt
 from pydantic import BaseModel, Field
-from sqlmodel import Session
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from ..auth import SessionUser, create_session_token
 from ..client_ip import is_secure_request
@@ -24,7 +24,7 @@ from ..exceptions import (
 )
 from ..services import audit_service, oidc, settings_service, user_service
 
-SessionDep = Annotated[Session, Depends(get_session)]
+SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +78,7 @@ def _clear_cookie(response: Response, name: str) -> None:
 @router.get("/config", response_model=AuthConfig)
 async def auth_config(session: SessionDep) -> AuthConfig:
     """Report which login methods are available to the frontend."""
-    cfg = settings_service.get_oidc_settings(session)
+    cfg = await settings_service.get_oidc_settings(session)
     return AuthConfig(
         local_enabled=not cfg.oidc_only,
         oidc_enabled=cfg.enabled,
@@ -91,10 +91,12 @@ async def login(
     payload: LoginRequest, request: Request, response: Response, session: SessionDep
 ) -> SessionUser:
     """Authenticate local credentials against the database and start a session."""
-    if settings_service.get_oidc_settings(session).oidc_only:
+    if (await settings_service.get_oidc_settings(session)).oidc_only:
         raise ForbiddenException("Local login is disabled")
 
-    user = user_service.authenticate_local(session, payload.username, payload.password)
+    user = await user_service.authenticate_local(
+        session, payload.username, payload.password
+    )
     if user is None:
         # The audit trail names the account that was attempted — a burst of
         # failures against one username is exactly what it exists to surface.
@@ -179,7 +181,7 @@ def _decode_state(token: str) -> dict[str, str] | None:
 @router.get("/oidc/login")
 async def oidc_login(request: Request, session: SessionDep) -> RedirectResponse:
     """Start the OIDC flow: stash state/nonce in a cookie and redirect."""
-    cfg = settings_service.get_oidc_settings(session)
+    cfg = await settings_service.get_oidc_settings(session)
     if not cfg.enabled:
         raise NotFoundException("OIDC endpoint", "login")
 
@@ -213,7 +215,7 @@ async def oidc_callback(
     error: str | None = None,
 ) -> RedirectResponse:
     """Handle the provider redirect: verify state, exchange code, start session."""
-    cfg = settings_service.get_oidc_settings(session)
+    cfg = await settings_service.get_oidc_settings(session)
     if not cfg.enabled:
         raise NotFoundException("OIDC endpoint", "callback")
 
@@ -243,7 +245,7 @@ async def oidc_callback(
     # up any role granted by the local groups it belongs to. Refuses to take over
     # a local account of the same name, and to sign in a deactivated one.
     try:
-        user = user_service.upsert_oidc_user(session, principal)
+        user = await user_service.upsert_oidc_user(session, principal)
     except (ConflictException, ForbiddenException) as exc:
         logger.warning("OIDC login refused for %s: %s", principal.username, exc.detail)
         await audit_service.record(

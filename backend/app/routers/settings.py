@@ -9,7 +9,7 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
-from sqlmodel import Session
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from ..auth import SessionUser
 from ..depends import get_session, require_admin
@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
-SessionDep = Annotated[Session, Depends(get_session)]
+SessionDep = Annotated[AsyncSession, Depends(get_session)]
 AdminDep = Annotated[SessionUser, Depends(require_admin)]
 
 
@@ -45,7 +45,7 @@ def _to_public(config: OidcSettings) -> OidcSettingsPublic:
 @router.get("/oidc", response_model=OidcSettingsPublic)
 async def get_oidc(session: SessionDep, _admin: AdminDep) -> OidcSettingsPublic:
     """Return the current OIDC configuration (admin only)."""
-    return _to_public(settings_service.get_oidc_settings(session))
+    return _to_public(await settings_service.get_oidc_settings(session))
 
 
 @router.put("/oidc", response_model=OidcSettingsPublic)
@@ -59,7 +59,7 @@ async def update_oidc(
 
     Leave ``client_secret`` empty to keep the stored secret unchanged.
     """
-    config = settings_service.update_oidc_settings(session, payload)
+    config = await settings_service.update_oidc_settings(session, payload)
     await audit_service.record(
         session,
         request=request,
@@ -85,7 +85,7 @@ def _mail_to_public(config: MailSettings) -> MailSettingsPublic:
 @router.get("/mail", response_model=MailSettingsPublic)
 async def get_mail(session: SessionDep, _admin: AdminDep) -> MailSettingsPublic:
     """Return the current mail connector configuration (admin only)."""
-    return _mail_to_public(settings_service.get_mail_settings(session))
+    return _mail_to_public(await settings_service.get_mail_settings(session))
 
 
 @router.put("/mail", response_model=MailSettingsPublic)
@@ -99,7 +99,7 @@ async def update_mail(
 
     Leave ``password`` empty to keep the stored one unchanged.
     """
-    config = settings_service.update_mail_settings(session, payload)
+    config = await settings_service.update_mail_settings(session, payload)
     await audit_service.record(
         session,
         request=request,
@@ -128,7 +128,7 @@ async def test_mail(
     configuration is the whole point of this endpoint. The failure text comes from
     the SMTP conversation (host, status code) — never a backtrace.
     """
-    config = settings_service.get_mail_settings(session)
+    config = await settings_service.get_mail_settings(session)
     recipients = (
         mail_service.parse_recipients(payload.recipient)
         if payload.recipient
