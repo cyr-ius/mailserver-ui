@@ -1,0 +1,68 @@
+<div class="dropdown pending-actions-bell">
+  <button
+    type="button"
+    class="btn btn-sm pending-actions-trigger position-relative"
+    data-bs-toggle="dropdown"
+    data-bs-display="static"
+    aria-expanded="false"
+    aria-label="Pending actions"
+    title="Pending actions"
+    (click)="onOpen()"
+  >
+    <i
+      class="bi"
+      [class.bi-bell]="count() === 0"
+      [class.bi-bell-fill]="count() > 0"
+      aria-hidden="true"
+    ></i>
+    @if (count() > 0) {
+    <span class="badge rounded-pill bg-danger position-absolute pending-actions-badge">
+      {{ count() > 99 ? '99+' : count() }}
+      <span class="visually-hidden">pending actions</span>
+    </span>
+    }
+  </button>
+
+  <div class="dropdown-menu dropdown-menu-end pending-actions-menu p-0">
+    <div class="d-flex align-items-center justify-content-between px-3 py-2 border-bottom">
+      <h6 class="dropdown-header p-0 m-0">Pending actions</h6>
+      @if (count() > 0) {
+      <button type="button" class="btn btn-link btn-sm p-0" (click)="onDismissAll()">
+        Clear all
+      </button>
+      }
+    </div>
+
+    @if (count() === 0) {
+    <div class="px-3 py-3 text-body-secondary small">
+      No pending action. Everything is up to date.
+    </div>
+    } @else {
+    <ul class="list-unstyled m-0 pending-actions-list">
+      @for (item of items(); track item.key) {
+      <li class="px-3 py-2 border-bottom pending-actions-item">
+        <div class="d-flex align-items-start gap-2">
+          <i class="bi bi-arrow-repeat text-warning mt-1" aria-hidden="true"></i>
+          <div class="flex-fill">
+            <div class="fw-semibold small">{{ item.title }}</div>
+            <div class="text-body-secondary small">{{ item.updated_at | date: 'short' }}</div>
+          </div>
+          <button
+            type="button"
+            class="btn btn-sm p-0 text-body-secondary"
+            aria-label="Dismiss"
+            title="Dismiss"
+            (click)="onDismiss(item.key)"
+          >
+            <i class="bi bi-x-lg" aria-hidden="true"></i>
+          </button>
+        </div>
+      </li>
+      }
+    </ul>
+    <div class="px-3 py-2 text-body-secondary small border-top">
+      Restart the mailserver container to apply these changes.
+    </div>
+    }
+  </div>
+</div>

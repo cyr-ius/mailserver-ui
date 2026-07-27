@@ -17,7 +17,16 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from .config import settings
 from .database import create_db_and_tables, engine
 from .exceptions import BaseAPIException
-from .routers import audit, auth, fail2ban, groups, mailboxes, mailserver, users
+from .routers import (
+    audit,
+    auth,
+    fail2ban,
+    groups,
+    mailboxes,
+    mailserver,
+    pending_actions,
+    users,
+)
 from .routers import settings as settings_router
 from .security import RateLimitMiddleware, SecurityHeadersMiddleware
 from .services import audit_service, user_service
@@ -86,6 +95,7 @@ app.include_router(mailserver.router)
 app.include_router(fail2ban.router)
 app.include_router(settings_router.router)
 app.include_router(audit.router)
+app.include_router(pending_actions.router)
 
 # ── Self-hosted static assets (Swagger UI, no Internet dependency) ─────────────
 static_dir = Path(__file__).resolve().parent / "static"

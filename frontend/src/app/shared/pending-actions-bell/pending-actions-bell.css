@@ -1,0 +1,37 @@
+.pending-actions-trigger {
+  line-height: 1;
+  border: 0;
+  color: var(--bs-body-color);
+}
+
+.pending-actions-trigger:hover,
+.pending-actions-trigger:focus-visible,
+.pending-actions-trigger.show {
+  background-color: var(--app-hover);
+  color: var(--bs-body-color);
+}
+
+.pending-actions-trigger::after {
+  display: none;
+}
+
+.pending-actions-badge {
+  top: 0.2rem;
+  left: 100%;
+  transform: translate(-60%, -30%);
+  font-size: 0.6rem;
+}
+
+.pending-actions-menu {
+  min-width: 20rem;
+  max-width: 24rem;
+}
+
+.pending-actions-list {
+  max-height: 20rem;
+  overflow-y: auto;
+}
+
+.pending-actions-item:last-child {
+  border-bottom: 0 !important;
+}

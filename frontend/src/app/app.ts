@@ -12,6 +12,7 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 
 import { AuthService } from './core/auth.service';
 import { MailserverService } from './core/mailserver.service';
+import { PendingActionsBell } from './shared/pending-actions-bell/pending-actions-bell';
 import { SessionExpiredModal } from './shared/session-expired-modal/session-expired-modal';
 import { UserMenu } from './shared/user-menu/user-menu';
 
@@ -27,6 +28,7 @@ const DESKTOP_MIN_WIDTH = 768;
     RouterOutlet,
     RouterLink,
     RouterLinkActive,
+    PendingActionsBell,
     SessionExpiredModal,
     UserMenu,
   ],

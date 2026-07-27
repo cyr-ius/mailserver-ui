@@ -11,9 +11,10 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 from fastapi.concurrency import run_in_threadpool
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from ..auth import SessionUser
-from ..depends import require_admin
+from ..depends import get_session, require_admin
 from ..models.fail2ban_models import (
     BannedIp,
     BanRequest,
@@ -25,13 +26,14 @@ from ..models.fail2ban_models import (
     Fail2banPolicyUpdate,
     Fail2banStatus,
 )
-from ..services import fail2ban_service
+from ..services import fail2ban_service, pending_action_service
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/fail2ban", tags=["fail2ban"])
 
 AdminDep = Annotated[SessionUser, Depends(require_admin)]
+SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 
 @router.get("/status", response_model=Fail2banStatus)
@@ -71,9 +73,15 @@ async def get_policy(_admin: AdminDep) -> Fail2banPolicy:
 
 
 @router.put("/policy", response_model=Fail2banPolicy)
-async def set_policy(payload: Fail2banPolicyUpdate, _admin: AdminDep) -> Fail2banPolicy:
+async def set_policy(
+    payload: Fail2banPolicyUpdate, _admin: AdminDep, session: SessionDep
+) -> Fail2banPolicy:
     """Replace the fail2ban ban policy; takes effect on restart (admin only)."""
-    return await run_in_threadpool(fail2ban_service.set_policy, payload)
+    result = await run_in_threadpool(fail2ban_service.set_policy, payload)
+    await pending_action_service.mark_restart_required(
+        session, key="fail2ban-policy", title="Fail2ban ban policy changed"
+    )
+    return result
 
 
 @router.get("/config", response_model=Fail2banConfig)
@@ -83,6 +91,12 @@ async def get_config(_admin: AdminDep) -> Fail2banConfig:
 
 
 @router.put("/config", response_model=Fail2banConfig)
-async def set_config(payload: Fail2banConfigUpdate, _admin: AdminDep) -> Fail2banConfig:
+async def set_config(
+    payload: Fail2banConfigUpdate, _admin: AdminDep, session: SessionDep
+) -> Fail2banConfig:
     """Replace the fail2ban daemon configuration; applies on restart (admin only)."""
-    return await run_in_threadpool(fail2ban_service.set_config, payload.content)
+    result = await run_in_threadpool(fail2ban_service.set_config, payload.content)
+    await pending_action_service.mark_restart_required(
+        session, key="fail2ban-config", title="Fail2ban configuration changed"
+    )
+    return result

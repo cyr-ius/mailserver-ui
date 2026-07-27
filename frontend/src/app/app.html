@@ -2,7 +2,10 @@
 <div class="app-root d-flex">
   <aside id="app-sidebar" class="sidebar" [class.collapsed]="sidebarCollapsed()">
     <div class="sidebar-top d-flex align-items-center py-3">
-      <a class="sidebar-brand d-flex align-items-center gap-2 text-decoration-none text-reset" routerLink="/">
+      <a
+        class="sidebar-brand d-flex align-items-center gap-2 text-decoration-none text-reset"
+        routerLink="/"
+      >
         <i class="bi bi-envelope-paper-fill text-primary" aria-hidden="true"></i>
         <span class="sidebar-label fw-semibold">Mailserver UI</span>
       </a>
@@ -250,10 +253,20 @@
           >
             Mail connector
           </a>
-          <a class="nav-link" routerLink="/users" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
+          <a
+            class="nav-link"
+            routerLink="/users"
+            routerLinkActive="active"
+            [routerLinkActiveOptions]="{ exact: true }"
+          >
             Users
           </a>
-          <a class="nav-link" routerLink="/audit" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
+          <a
+            class="nav-link"
+            routerLink="/audit"
+            routerLinkActive="active"
+            [routerLinkActiveOptions]="{ exact: true }"
+          >
             Audit log
           </a>
         </div>
@@ -276,7 +289,9 @@
   </aside>
 
   <div class="app-content flex-fill d-flex flex-column">
-    <header class="app-header d-flex align-items-center justify-content-between px-3 py-2 border-bottom">
+    <header
+      class="app-header d-flex align-items-center justify-content-between px-3 py-2 border-bottom"
+    >
       <div class="d-flex align-items-center gap-2">
         <button
           type="button"
@@ -291,7 +306,12 @@
         </button>
       </div>
 
-      <app-user-menu />
+      <div class="d-flex align-items-center gap-2">
+        @if (isAdmin()) {
+        <app-pending-actions-bell />
+        }
+        <app-user-menu />
+      </div>
     </header>
 
     <main class="app-main flex-fill p-4">

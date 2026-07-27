@@ -116,6 +116,7 @@ async def create_db_and_tables() -> None:
         audit_models,
         mail_models,
         pat_models,
+        pending_action_models,
         user_models,
     )
 

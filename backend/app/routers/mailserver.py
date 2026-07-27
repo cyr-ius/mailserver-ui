@@ -16,9 +16,10 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
 from fastapi.concurrency import run_in_threadpool
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from ..auth import SessionUser
-from ..depends import require_admin
+from ..depends import get_session, require_admin
 from ..models.mailserver_models import (
     DkimGenerateRequest,
     DkimKey,
@@ -64,13 +65,22 @@ from ..models.mailserver_models import (
     SystemAliasCreate,
     TlsCertificate,
 )
-from ..services import mailserver_service
+from ..services import mailserver_service, pending_action_service
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/mailserver", tags=["mailserver"])
 
 AdminDep = Annotated[SessionUser, Depends(require_admin)]
+SessionDep = Annotated[AsyncSession, Depends(get_session)]
+
+# Human-readable label per spam-filtering scope, for the pending-actions list.
+_SPAM_SCOPE_TITLES: dict[str, str] = {
+    "rules": "SpamAssassin rules changed",
+    "whitelist-clients": "Postgrey client whitelist changed",
+    "whitelist-recipients": "Postgrey recipient whitelist changed",
+    "amavis": "Amavis overrides changed",
+}
 
 
 # ── SMTP relays ───────────────────────────────────────────────────────────────
@@ -136,11 +146,16 @@ async def get_postfix_overrides(_admin: AdminDep) -> list[PostfixOverride]:
 async def update_postfix_overrides(
     payload: PostfixOverridesUpdate,
     _admin: AdminDep,
+    session: SessionDep,
 ) -> list[PostfixOverride]:
     """Replace the full set of Postfix ``main.cf`` overrides (admin only)."""
-    return await run_in_threadpool(
+    result = await run_in_threadpool(
         mailserver_service.set_postfix_overrides, payload.overrides
     )
+    await pending_action_service.mark_restart_required(
+        session, key="postfix-main", title="Postfix overrides changed"
+    )
+    return result
 
 
 @router.get("/postfix-master", response_model=list[PostfixMasterOverride])
@@ -153,11 +168,16 @@ async def get_postfix_master_overrides(_admin: AdminDep) -> list[PostfixMasterOv
 async def update_postfix_master_overrides(
     payload: PostfixMasterOverridesUpdate,
     _admin: AdminDep,
+    session: SessionDep,
 ) -> list[PostfixMasterOverride]:
     """Replace the full set of Postfix ``master.cf`` overrides (admin only)."""
-    return await run_in_threadpool(
+    result = await run_in_threadpool(
         mailserver_service.set_postfix_master_overrides, payload.overrides
     )
+    await pending_action_service.mark_restart_required(
+        session, key="postfix-master", title="Postfix master overrides changed"
+    )
+    return result
 
 
 # ── Dovecot configuration override ────────────────────────────────────────────
@@ -171,12 +191,16 @@ async def get_dovecot_config(_admin: AdminDep) -> DovecotConfig:
 
 @router.put("/dovecot-config", response_model=DovecotConfig)
 async def update_dovecot_config(
-    payload: DovecotConfigUpdate, _admin: AdminDep
+    payload: DovecotConfigUpdate, _admin: AdminDep, session: SessionDep
 ) -> DovecotConfig:
     """Replace the ``dovecot.cf`` override; takes effect on restart (admin only)."""
-    return await run_in_threadpool(
+    result = await run_in_threadpool(
         mailserver_service.set_dovecot_config, payload.content
     )
+    await pending_action_service.mark_restart_required(
+        session, key="dovecot-config", title="Dovecot configuration changed"
+    )
+    return result
 
 
 # ── System and regex aliases ──────────────────────────────────────────────────
@@ -261,9 +285,13 @@ async def get_dkim_migration_status(_admin: AdminDep) -> DkimMigrationStatus:
     response_model=DkimMigrationResult,
     status_code=status.HTTP_201_CREATED,
 )
-async def migrate_dkim(_admin: AdminDep) -> DkimMigrationResult:
+async def migrate_dkim(_admin: AdminDep, session: SessionDep) -> DkimMigrationResult:
     """Migrate OpenDKIM-generated keys into Rspamd's layout (admin only)."""
-    return await run_in_threadpool(mailserver_service.migrate_dkim_to_rspamd)
+    result = await run_in_threadpool(mailserver_service.migrate_dkim_to_rspamd)
+    await pending_action_service.mark_restart_required(
+        session, key="dkim-migration", title="DKIM keys migrated to Rspamd"
+    )
+    return result
 
 
 # ── Send/receive restrictions ─────────────────────────────────────────────────
@@ -306,12 +334,18 @@ async def get_sieve_script(scope: SieveScope, _admin: AdminDep) -> SieveScript:
 
 @router.put("/sieve/{scope}", response_model=SieveScript)
 async def update_sieve_script(
-    scope: SieveScope, payload: SieveScriptUpdate, _admin: AdminDep
+    scope: SieveScope, payload: SieveScriptUpdate, _admin: AdminDep, session: SessionDep
 ) -> SieveScript:
     """Replace a global Sieve script; takes effect on restart (admin only)."""
-    return await run_in_threadpool(
+    result = await run_in_threadpool(
         mailserver_service.set_sieve_script, scope, payload.content
     )
+    await pending_action_service.mark_restart_required(
+        session,
+        key=f"sieve-{scope}",
+        title=f"Global Sieve script ({scope}) changed",
+    )
+    return result
 
 
 # ── Spam filter configuration files ───────────────────────────────────────────
@@ -325,12 +359,21 @@ async def get_spam_config(scope: SpamConfigScope, _admin: AdminDep) -> SpamConfi
 
 @router.put("/spam/{scope}", response_model=SpamConfig)
 async def update_spam_config(
-    scope: SpamConfigScope, payload: SpamConfigUpdate, _admin: AdminDep
+    scope: SpamConfigScope,
+    payload: SpamConfigUpdate,
+    _admin: AdminDep,
+    session: SessionDep,
 ) -> SpamConfig:
     """Replace a spam-filtering file; takes effect on restart (admin only)."""
-    return await run_in_threadpool(
+    result = await run_in_threadpool(
         mailserver_service.set_spam_config, scope, payload.content
     )
+    await pending_action_service.mark_restart_required(
+        session,
+        key=f"spam-{scope}",
+        title=_SPAM_SCOPE_TITLES.get(scope, f"Spam filter ({scope}) changed"),
+    )
+    return result
 
 
 # ── Rspamd overrides ──────────────────────────────────────────────────────────
@@ -344,28 +387,45 @@ async def get_rspamd_overrides(_admin: AdminDep) -> RspamdOverrides:
 
 @router.put("/rspamd", response_model=RspamdOverrides)
 async def update_rspamd_overrides(
-    payload: RspamdCommandsUpdate, _admin: AdminDep
+    payload: RspamdCommandsUpdate, _admin: AdminDep, session: SessionDep
 ) -> RspamdOverrides:
     """Replace the Rspamd custom commands; takes effect on restart (admin only)."""
-    return await run_in_threadpool(
+    result = await run_in_threadpool(
         mailserver_service.set_rspamd_overrides, payload.commands
     )
+    await pending_action_service.mark_restart_required(
+        session, key="rspamd-commands", title="Rspamd custom commands changed"
+    )
+    return result
 
 
 @router.put("/rspamd/override/{name}", response_model=RspamdOverrideFile)
 async def update_rspamd_override_file(
-    name: str, payload: RspamdOverrideFileUpdate, _admin: AdminDep
+    name: str, payload: RspamdOverrideFileUpdate, _admin: AdminDep, session: SessionDep
 ) -> RspamdOverrideFile:
     """Create or replace one file under ``rspamd/override.d/`` (admin only)."""
-    return await run_in_threadpool(
+    result = await run_in_threadpool(
         mailserver_service.set_rspamd_override_file, name, payload.content
     )
+    await pending_action_service.mark_restart_required(
+        session,
+        key=f"rspamd-override-{name}",
+        title=f"Rspamd override file '{name}' changed",
+    )
+    return result
 
 
 @router.delete("/rspamd/override/{name}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_rspamd_override_file(name: str, _admin: AdminDep) -> None:
+async def delete_rspamd_override_file(
+    name: str, _admin: AdminDep, session: SessionDep
+) -> None:
     """Delete one file under ``rspamd/override.d/`` (admin only)."""
     await run_in_threadpool(mailserver_service.delete_rspamd_override_file, name)
+    await pending_action_service.mark_restart_required(
+        session,
+        key=f"rspamd-override-{name}",
+        title=f"Rspamd override file '{name}' deleted",
+    )
 
 
 # ── LDAP provisioner maps ─────────────────────────────────────────────────────
@@ -379,12 +439,16 @@ async def get_ldap_config(scope: LdapScope, _admin: AdminDep) -> LdapConfig:
 
 @router.put("/ldap/{scope}", response_model=LdapConfig)
 async def update_ldap_config(
-    scope: LdapScope, payload: LdapConfigUpdate, _admin: AdminDep
+    scope: LdapScope, payload: LdapConfigUpdate, _admin: AdminDep, session: SessionDep
 ) -> LdapConfig:
     """Replace one Postfix LDAP map; takes effect on restart (admin only)."""
-    return await run_in_threadpool(
+    result = await run_in_threadpool(
         mailserver_service.set_ldap_config, scope, payload.content
     )
+    await pending_action_service.mark_restart_required(
+        session, key=f"ldap-{scope}", title=f"LDAP {scope} map changed"
+    )
+    return result
 
 
 # ── Postfix mail queue ────────────────────────────────────────────────────────
