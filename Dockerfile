@@ -30,7 +30,7 @@ ENV UV_PROJECT_ENVIRONMENT=/app/.venv
 ENV PYTHONUNBUFFERED=1
 ENV PATH="$UV_PROJECT_ENVIRONMENT/bin:$PATH"
 
-RUN apk add --no-cache docker && \
+RUN apk add --no-cache docker curl && \
     update-ca-certificates && \
     rm -rf /var/cache/apk/*
 
