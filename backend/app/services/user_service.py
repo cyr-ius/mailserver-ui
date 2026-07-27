@@ -9,6 +9,7 @@ import logging
 import secrets
 from datetime import UTC, datetime
 
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -318,7 +319,14 @@ async def ensure_default_admin(session: AsyncSession) -> None:
         password_hash=hash_password(password),
     )
     session.add(admin)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError:
+        # Lost the race against a sibling worker seeding the same admin
+        # account concurrently on first boot: it already exists now.
+        await session.rollback()
+        logger.info("Default admin already created by a concurrent worker")
+        return
     banner = "=" * 72
     logger.warning(
         "\n%s\n"
