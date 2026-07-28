@@ -1,0 +1,56 @@
+site_name: Docker Mailserver UI
+site_description: A web interface for docker-mailserver
+site_url: https://cyr-ius.github.io/mailserver-ui/
+repo_name: cyr-ius/mailserver-ui
+repo_url: https://github.com/cyr-ius/mailserver-ui
+edit_uri: edit/master/docs/
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  icon:
+    repo: fontawesome/brands/github
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.top
+    - content.code.copy
+    - content.action.edit
+    - search.suggest
+    - search.highlight
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting started:
+      - Installation: getting-started/installation.md
+      - Configuration: getting-started/configuration.md
+  - Features: features.md
+  - Architecture: architecture.md
+  - Development: development.md
+  - Security: security.md
+
+plugins:
+  - search

@@ -6,3 +6,7 @@ node_modules/
 
 # Data Environment
 .data_env/
+
+# MkDocs build output
+site/
+.venv-docs/

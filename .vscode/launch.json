@@ -23,6 +23,14 @@
       "preLaunchTask": "npm: start - frontend",
       "url": "http://localhost:4200/",
       "webRoot": "${workspaceFolder}/frontend"
+    },
+    {
+      "name": "Docs (MkDocs)",
+      "type": "chrome",
+      "request": "launch",
+      "preLaunchTask": "mkdocs: serve",
+      "url": "http://localhost:8001/mailserver-ui/",
+      "webRoot": "${workspaceFolder}/docs"
     }
   ]
 }
