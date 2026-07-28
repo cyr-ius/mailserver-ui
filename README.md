@@ -2,7 +2,7 @@
 
 [![ci::status]][ci::github] [![docker::pulls]][docker::hub] [![documentation::badge]][documentation::web]
 
-[ci::status]: https://img.shields.io/github/actions/workflow/status/cyr-ius/mailserver-ui/docker-publish.yml?branch=master&color=blue&label=CI&logo=github
+[ci::status]: https://img.shields.io/github/actions/workflow/status/cyr-ius/mailserver-ui/docker-publish.yml?color=blue&logo=github
 [ci::github]: https://github.com/cyr-ius/mailserver-ui/actions
 [docker::pulls]: https://img.shields.io/docker/pulls/cyrius44/mailserver-ui.svg?logo=docker
 [docker::hub]: https://hub.docker.com/r/cyrius44/mailserver-ui
