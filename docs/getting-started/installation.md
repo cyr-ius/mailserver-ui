@@ -15,7 +15,7 @@ The UI is available on <http://localhost:8000>. On first startup, check the
 logs for the generated admin password:
 
 ```bash
-docker compose logs mailserver-ui | grep "Generated password"
+docker compose logs mailserver-ui | grep "password"
 ```
 
 ## Docker run (one-liner)
