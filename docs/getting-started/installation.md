@@ -1,14 +1,14 @@
 # Installation
 
-## Quick start (Docker Compose)
+## Quick start (production)
 
 A ready-to-use [`docker-compose.yml`](https://github.com/cyr-ius/mailserver-ui/blob/master/docker-compose.yml)
 is provided at the root of the repository. It starts both docker-mailserver and
-the UI with a sensible default configuration.
+the UI, pulling the published image from GHCR — no local build required.
 
 ```bash
 cp backend/.env.example .env   # sensible defaults; nothing is required
-docker compose up -d --build
+docker compose up -d
 ```
 
 The UI is available on <http://localhost:8000>. On first startup, check the
@@ -48,3 +48,10 @@ password with:
 ```bash
 docker logs mailserver-ui | grep "Generated password"
 ```
+
+## Running from source
+
+Building from source — either the backend/frontend directly or the Docker
+image itself — is a development workflow. See
+[Development](../development.md) for the local run and Docker build
+instructions.

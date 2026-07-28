@@ -83,15 +83,15 @@ from `opendkim/keys` or from Rspamd's own directory depending on
 `ENABLE_FAIL2BAN`, `ENABLE_SPAMASSASSIN`, `ENABLE_POSTGREY`, `ENABLE_AMAVIS`)
 warns that its file is stored but never read.
 
-## Quick start (Docker)
+## Quick start (production)
 
 A ready-to-use [`docker-compose.yml`](docker-compose.yml) is provided at the
-root of the repository. It starts both docker-mailserver and the UI with a
-sensible default configuration.
+root of the repository. It starts both docker-mailserver and the UI, pulling
+the published image from GHCR — no local build required.
 
 ```bash
 cp backend/.env.example .env   # sensible defaults; nothing is required
-docker compose up -d --build
+docker compose up -d
 ```
 
 The UI is available on <http://localhost:8000>. On first startup, check the
@@ -294,6 +294,23 @@ A throwaway docker-mailserver instance for end-to-end testing is available with
 cd frontend
 npm install
 npm start                               # http://localhost:4200 (proxied to :8000)
+```
+
+### Building the Docker image locally
+
+`docker-compose.yml` targets the published image, so it never rebuilds on its
+own. To test packaging changes (Dockerfile, dependency bumps) before they land
+on GHCR, build and run the image directly:
+
+```bash
+docker build -t mailserver-ui:dev .
+docker run -d \
+  --name mailserver-ui-dev \
+  -p 8000:8000 \
+  -e MAILSERVER_CONTAINER=mailserver \
+  -v mailserver-ui-dev:/var/lib/mailserver-ui \
+  -v /var/run/docker.sock:/var/run/docker.sock:ro \
+  mailserver-ui:dev
 ```
 
 ### Linting

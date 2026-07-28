@@ -23,6 +23,24 @@ npm install
 npm start                               # http://localhost:4200 (proxied to :8000)
 ```
 
+## Building the Docker image locally
+
+The repository's `docker-compose.yml` targets the published image
+(`ghcr.io/cyr-ius/mailserver-ui:latest`), so it never rebuilds on its own. To
+test packaging changes (Dockerfile, dependency bumps) before they land on
+GHCR, build and run the image directly:
+
+```bash
+docker build -t mailserver-ui:dev .
+docker run -d \
+  --name mailserver-ui-dev \
+  -p 8000:8000 \
+  -e MAILSERVER_CONTAINER=mailserver \
+  -v mailserver-ui-dev:/var/lib/mailserver-ui \
+  -v /var/run/docker.sock:/var/run/docker.sock:ro \
+  mailserver-ui:dev
+```
+
 ## Linting
 
 ```bash
