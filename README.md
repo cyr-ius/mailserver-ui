@@ -1,5 +1,14 @@
 # Docker Mailserver UI
 
+[![ci::status]][ci::github] [![docker::pulls]][docker::hub] [![documentation::badge]][documentation::web]
+
+[ci::status]: https://img.shields.io/github/actions/workflow/status/cyr-ius/mailserver-ui/docker-publish.yml?branch=master&color=blue&label=CI&logo=github
+[ci::github]: https://github.com/cyr-ius/mailserver-ui/actions
+[docker::pulls]: https://img.shields.io/docker/pulls/cyrius44/mailserver-ui.svg?logo=docker
+[docker::hub]: https://hub.docker.com/r/cyrius44/mailserver-ui
+[documentation::badge]: https://img.shields.io/badge/DOCUMENTATION-GH%20PAGES-0078D4?logo=googledocs
+[documentation::web]: https://cyr-ius.github.io/mailserver-ui/
+
 A web interface for [docker-mailserver](https://github.com/docker-mailserver/docker-mailserver).
 Single container serving an Angular SPA and a FastAPI backend, with local and
 OIDC/SSO authentication.
