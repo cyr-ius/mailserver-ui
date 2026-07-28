@@ -530,10 +530,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#quick-start-docker-compose" class="md-nav__link">
+  <a href="#quick-start-production" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Quick start (Docker Compose)
+        Quick start (production)
       
     </span>
   </a>
@@ -545,6 +545,17 @@
     <span class="md-ellipsis">
       
         Docker run (one-liner)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#running-from-source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running from source
       
     </span>
   </a>
@@ -730,10 +741,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#quick-start-docker-compose" class="md-nav__link">
+  <a href="#quick-start-production" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Quick start (Docker Compose)
+        Quick start (production)
       
     </span>
   </a>
@@ -745,6 +756,17 @@
     <span class="md-ellipsis">
       
         Docker run (one-liner)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#running-from-source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running from source
       
     </span>
   </a>
@@ -777,12 +799,12 @@
 
 
 <h1 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h1>
-<h2 id="quick-start-docker-compose">Quick start (Docker Compose)<a class="headerlink" href="#quick-start-docker-compose" title="Permanent link">&para;</a></h2>
+<h2 id="quick-start-production">Quick start (production)<a class="headerlink" href="#quick-start-production" title="Permanent link">&para;</a></h2>
 <p>A ready-to-use <a href="https://github.com/cyr-ius/mailserver-ui/blob/master/docker-compose.yml"><code>docker-compose.yml</code></a>
 is provided at the root of the repository. It starts both docker-mailserver and
-the UI with a sensible default configuration.</p>
+the UI, pulling the published image from GHCR — no local build required.</p>
 <div class="highlight"><pre><span></span><code>cp<span class="w"> </span>backend/.env.example<span class="w"> </span>.env<span class="w">   </span><span class="c1"># sensible defaults; nothing is required</span>
-docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>-d<span class="w"> </span>--build
+docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>-d
 </code></pre></div>
 <p>The UI is available on <a href="http://localhost:8000">http://localhost:8000</a>. On first startup, check the
 logs for the generated admin password:</p>
@@ -813,6 +835,11 @@ logs for the generated admin password:</p>
 password with:</p>
 <div class="highlight"><pre><span></span><code>docker<span class="w"> </span>logs<span class="w"> </span>mailserver-ui<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s2">&quot;Generated password&quot;</span>
 </code></pre></div>
+<h2 id="running-from-source">Running from source<a class="headerlink" href="#running-from-source" title="Permanent link">&para;</a></h2>
+<p>Building from source — either the backend/frontend directly or the Docker
+image itself — is a development workflow. See
+<a href="../../development/">Development</a> for the local run and Docker build
+instructions.</p>
 
 
 

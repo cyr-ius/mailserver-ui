@@ -664,6 +664,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#building-the-docker-image-locally" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Building the Docker image locally
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#linting" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -769,6 +780,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#building-the-docker-image-locally" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Building the Docker image locally
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#linting" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -830,6 +852,20 @@ automatically, so local development works without any extra configuration.</p>
 <div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>frontend
 npm<span class="w"> </span>install
 npm<span class="w"> </span>start<span class="w">                               </span><span class="c1"># http://localhost:4200 (proxied to :8000)</span>
+</code></pre></div>
+<h2 id="building-the-docker-image-locally">Building the Docker image locally<a class="headerlink" href="#building-the-docker-image-locally" title="Permanent link">&para;</a></h2>
+<p>The repository's <code>docker-compose.yml</code> targets the published image
+(<code>ghcr.io/cyr-ius/mailserver-ui:latest</code>), so it never rebuilds on its own. To
+test packaging changes (Dockerfile, dependency bumps) before they land on
+GHCR, build and run the image directly:</p>
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>build<span class="w"> </span>-t<span class="w"> </span>mailserver-ui:dev<span class="w"> </span>.
+docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--name<span class="w"> </span>mailserver-ui-dev<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-p<span class="w"> </span><span class="m">8000</span>:8000<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-e<span class="w"> </span><span class="nv">MAILSERVER_CONTAINER</span><span class="o">=</span>mailserver<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-v<span class="w"> </span>mailserver-ui-dev:/var/lib/mailserver-ui<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock:ro<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>mailserver-ui:dev
 </code></pre></div>
 <h2 id="linting">Linting<a class="headerlink" href="#linting" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code><span class="c1"># Backend</span>
