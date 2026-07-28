@@ -129,7 +129,7 @@ The UI is then available on <http://localhost:8000>; check the generated
 admin password with:
 
 ```bash
-docker logs mailserver-ui | grep "Generated password"
+docker logs mailserver-ui | grep "password"
 ```
 
 ## Configuration
