@@ -1,8 +1,11 @@
 # Docker Mailserver UI
 
-[![ci::status]][ci::github] [![docker::pulls]][docker::hub] [![documentation::badge]][documentation::web]
+![licence] ![python] ![angular] [![ci::status]][ci::github] [![docker::pulls]][docker::hub] [![documentation::badge]][documentation::web]
 
-[ci::status]: https://img.shields.io/github/actions/workflow/status/cyr-ius/mailserver-ui/docker-publish.yml?color=blue&logo=github
+[licence]: https://img.shields.io/badge/license-MIT-blue
+[python]: https://img.shields.io/badge/python-3.12%2B-blue
+[angular]: https://img.shields.io/badge/angular-22-blue
+[ci::status]: https://img.shields.io/github/actions/workflow/status/cyr-ius/mailserver-ui/docker-publish.yml?logo=github
 [ci::github]: https://github.com/cyr-ius/mailserver-ui/actions
 [docker::pulls]: https://img.shields.io/docker/pulls/cyrius44/mailserver-ui.svg?logo=docker
 [docker::hub]: https://hub.docker.com/r/cyrius44/mailserver-ui
