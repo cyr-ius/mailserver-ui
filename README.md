@@ -2,14 +2,14 @@
 
 ![licence] ![python] ![angular] [![ci::status]][ci::github] [![docker::pulls]][docker::hub] [![documentation::badge]][documentation::web]
 
-[licence]: https://img.shields.io/badge/license-MIT-blue
-[python]: https://img.shields.io/badge/python-3.12%2B-blue
-[angular]: https://img.shields.io/badge/angular-22-blue
+[licence]: https://img.shields.io/badge/license-MIT-blue?logo=googledocs
+[python]: https://img.shields.io/badge/python-3.12%2B-blue?logo=python
+[angular]: https://img.shields.io/badge/angular-22-blue?logo=angular
 [ci::status]: https://img.shields.io/github/actions/workflow/status/cyr-ius/mailserver-ui/docker-publish.yml?logo=github
 [ci::github]: https://github.com/cyr-ius/mailserver-ui/actions
 [docker::pulls]: https://img.shields.io/docker/pulls/cyrius44/mailserver-ui.svg?logo=docker
 [docker::hub]: https://hub.docker.com/r/cyrius44/mailserver-ui
-[documentation::badge]: https://img.shields.io/badge/DOCUMENTATION-GH%20PAGES-0078D4?logo=googledocs
+[documentation::badge]: https://img.shields.io/badge/DOCUMENTATION-GH%20PAGES-0078D4?logo=helpdesk
 [documentation::web]: https://cyr-ius.github.io/mailserver-ui/
 
 A web interface for [docker-mailserver](https://github.com/docker-mailserver/docker-mailserver).
