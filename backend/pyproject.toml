@@ -7,7 +7,7 @@ requires-python = ">=3.14"
 dependencies = [
     "aiosqlite>=0.22.1",
     "bcrypt>=5.0.0",
-    "cryptography>=46.0.0",
+    "cryptography>=50.0.0",
     "fastapi[standard]>=0.140.7",
     "packaging>=26.0",
     "passlib[bcrypt]==1.7.4",
