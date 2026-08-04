@@ -9,7 +9,7 @@
 [ci::github]: https://github.com/cyr-ius/mailserver-ui/actions
 [docker::pulls]: https://img.shields.io/docker/pulls/cyrius44/mailserver-ui.svg?logo=docker
 [docker::hub]: https://hub.docker.com/r/cyrius44/mailserver-ui
-[documentation::badge]: https://img.shields.io/badge/DOCUMENTATION-GH%20PAGES-0078D4?logo=helpdesk
+[documentation::badge]: https://img.shields.io/badge/Documentation-gh__pages-blue?logo=helpdesk
 [documentation::web]: https://cyr-ius.github.io/mailserver-ui/
 
 A web interface for [docker-mailserver](https://github.com/docker-mailserver/docker-mailserver).
