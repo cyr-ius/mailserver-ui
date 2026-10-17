@@ -5,16 +5,14 @@
     "ghcr.io/devcontainers/features/python:1": {},
     "ghcr.io/devcontainers-extra/features/prek:1": {},
     "ghcr.io/devcontainers-extra/features/uv:1": {},
-    "ghcr.io/devcontainers/features/node:2.1.0": {},
-    // Runs a Docker daemon inside the container so we can start a real
-    // docker-mailserver next to the app (and drive fail2ban via `docker exec`).
-    "ghcr.io/devcontainers/features/docker-in-docker:4.0.0": {
+    "ghcr.io/devcontainers/features/node:2.1.1": {},
+    "ghcr.io/devcontainers/features/docker-in-docker:4.1.3": {
       "moby": false
     }
   },
   "mounts": [
     "source=${env:HOME}/.claude,target=/home/vscode/.claude,type=bind,consistency=cached",
-    "target=${containerWorkspaceFolder}/.data_env,type=volume,consistency=cached"
+    "t:4.1.3${containerWorkspaceFolder}/.data_env,type=volume,consistency=cached"
   ],
   // ─── VS Code extensions ────────────────────────────────────────────────
   "customizations": {
