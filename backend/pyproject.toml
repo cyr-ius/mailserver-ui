@@ -11,7 +11,7 @@ dependencies = [
     "fastapi[standard]>=0.143.0",
     "packaging>=26.3",
     "passlib[bcrypt]==1.7.4",
-    "pydantic-settings==2.15.0",
+    "pydantic-settings==2.16.0",
     "python-jose[cryptography]==3.5.0",
     "python-multipart==0.0.32",
     "sqlmodel>=0.0.48",
