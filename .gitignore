@@ -10,3 +10,4 @@ node_modules/
 # MkDocs build output
 site/
 .venv-docs/
+.mcp.json
