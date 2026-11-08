@@ -1,6 +1,8 @@
 .login-page {
   min-height: 100dvh;
-  background: radial-gradient(1200px 600px at 50% -10%, var(--app-accent-soft), transparent 70%), var(--app-canvas);
+  background:
+    radial-gradient(1200px 600px at 50% -10%, var(--app-accent-soft), transparent 70%),
+    var(--app-canvas);
   padding-inline: 1rem;
 }
 

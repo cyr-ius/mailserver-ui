@@ -4,15 +4,20 @@
       <i class="bi bi-journal-text text-primary me-2" aria-hidden="true"></i>
       Audit log
     </h1>
-    <button type="button" class="btn btn-sm btn-outline-secondary" [disabled]="loading()" (click)="refresh()">
+    <button
+      type="button"
+      class="btn btn-sm btn-outline-secondary"
+      [disabled]="loading()"
+      (click)="refresh()"
+    >
       <i class="bi bi-arrow-clockwise me-1" aria-hidden="true"></i>
       Refresh
     </button>
   </div>
 
   <p class="text-body-secondary small">
-    Every security-relevant action, newest first. The trail is append-only: entries cannot be edited or deleted from
-    here.
+    Every security-relevant action, newest first. The trail is append-only: entries cannot be edited
+    or deleted from here.
   </p>
 
   <div class="card shadow-sm mb-3">
@@ -112,11 +117,15 @@
               <span class="badge" [class]="statusBadge(entry.status)">{{ entry.status }}</span>
             </td>
             <td class="d-none d-xl-table-cell text-body-secondary small">{{ entry.ip || '—' }}</td>
-            <td class="d-none d-lg-table-cell text-body-secondary small audit-detail">{{ entry.detail || '—' }}</td>
+            <td class="d-none d-lg-table-cell text-body-secondary small audit-detail">
+              {{ entry.detail || '—' }}
+            </td>
           </tr>
           } @empty {
           <tr>
-            <td colspan="7" class="text-center text-body-secondary py-4">No audit entries found.</td>
+            <td colspan="7" class="text-center text-body-secondary py-4">
+              No audit entries found.
+            </td>
           </tr>
           }
         </tbody>
@@ -125,7 +134,9 @@
 
     @if (total() > 0) {
     <div class="card-footer d-flex align-items-center justify-content-between py-2">
-      <span class="text-body-secondary small"> {{ firstShown() }}–{{ lastShown() }} of {{ total() }} entries </span>
+      <span class="text-body-secondary small">
+        {{ firstShown() }}–{{ lastShown() }} of {{ total() }} entries
+      </span>
       <div class="btn-group btn-group-sm" role="group" aria-label="Pagination">
         <button
           type="button"

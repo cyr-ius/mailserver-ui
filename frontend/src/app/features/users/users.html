@@ -111,10 +111,18 @@
               The account starts as a guest. Add it to a group to grant it a role.
             </div>
             <div class="d-flex justify-content-end gap-2">
-              <button type="button" class="btn btn-sm btn-outline-secondary" (click)="cancelCreateUser()">
+              <button
+                type="button"
+                class="btn btn-sm btn-outline-secondary"
+                (click)="cancelCreateUser()"
+              >
                 Cancel
               </button>
-              <button type="submit" class="btn btn-sm btn-primary" [disabled]="creatingUser() || userForm().invalid()">
+              <button
+                type="submit"
+                class="btn btn-sm btn-primary"
+                [disabled]="creatingUser() || userForm().invalid()"
+              >
                 @if (creatingUser()) {
                 <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
                 } Create
@@ -152,7 +160,9 @@
             <td class="fw-medium">{{ u.username }}</td>
             <td class="d-none d-md-table-cell text-body-secondary">{{ u.display_name || '—' }}</td>
             <td>
-              <span class="badge" [class]="roleBadge(u.effective_role)"> {{ roleLabel(u.effective_role) }} </span>
+              <span class="badge" [class]="roleBadge(u.effective_role)">
+                {{ roleLabel(u.effective_role) }}
+              </span>
               @if (u.effective_role !== u.role) {
               <div class="form-text mt-1">granted by a group</div>
               }
@@ -172,7 +182,11 @@
             </td>
             <td class="text-end">
               @if (u.provider === 'local') {
-              <button type="button" class="btn btn-sm btn-outline-primary me-2" (click)="startEdit(u)">
+              <button
+                type="button"
+                class="btn btn-sm btn-outline-primary me-2"
+                (click)="startEdit(u)"
+              >
                 <i class="bi bi-key me-1" aria-hidden="true"></i>
                 Change password
               </button>
@@ -223,7 +237,9 @@
             <td colspan="7">
               <form class="row g-2 py-2" (submit)="onSubmit(); $event.preventDefault()" novalidate>
                 <div class="col-12 col-sm-4">
-                  <label [attr.for]="'pw-' + u.id" class="form-label small mb-1"> New password </label>
+                  <label [attr.for]="'pw-' + u.id" class="form-label small mb-1">
+                    New password
+                  </label>
                   <input
                     [id]="'pw-' + u.id"
                     type="password"
@@ -233,7 +249,9 @@
                   />
                 </div>
                 <div class="col-12 col-sm-4">
-                  <label [attr.for]="'pwc-' + u.id" class="form-label small mb-1"> Confirm password </label>
+                  <label [attr.for]="'pwc-' + u.id" class="form-label small mb-1">
+                    Confirm password
+                  </label>
                   <input
                     [id]="'pwc-' + u.id"
                     type="password"
@@ -243,7 +261,13 @@
                   />
                 </div>
                 <div class="col-12 col-sm-4 d-flex align-items-end justify-content-end gap-2">
-                  <button type="button" class="btn btn-sm btn-outline-secondary" (click)="cancelEdit()">Cancel</button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-secondary"
+                    (click)="cancelEdit()"
+                  >
+                    Cancel
+                  </button>
                   <button
                     type="submit"
                     class="btn btn-sm btn-primary"
@@ -289,7 +313,9 @@
     } @else {
     <div class="card shadow-sm mb-3">
       <div class="card-body">
-        <h5 class="card-title">{{ editedGroupId() === null ? 'Create New Group' : 'Edit Group' }}</h5>
+        <h5 class="card-title">
+          {{ editedGroupId() === null ? 'Create New Group' : 'Edit Group' }}
+        </h5>
         <form class="row g-3" (submit)="submitGroup(); $event.preventDefault()" novalidate>
           <div class="col-12 col-md-4">
             <label for="groupName" class="form-label small mb-1">Group name *</label>
@@ -322,8 +348,18 @@
             <div class="form-text">Every member gets at least this role.</div>
           </div>
           <div class="col-12 d-flex justify-content-end gap-2">
-            <button type="button" class="btn btn-sm btn-outline-secondary" (click)="closeGroupForm()">Cancel</button>
-            <button type="submit" class="btn btn-sm btn-primary" [disabled]="savingGroup() || groupForm().invalid()">
+            <button
+              type="button"
+              class="btn btn-sm btn-outline-secondary"
+              (click)="closeGroupForm()"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              class="btn btn-sm btn-primary"
+              [disabled]="savingGroup() || groupForm().invalid()"
+            >
               @if (savingGroup()) {
               <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
               } {{ editedGroupId() === null ? 'Create' : 'Save' }}
@@ -364,11 +400,19 @@
               <span class="badge text-bg-info">{{ g.member_count }}</span>
             </td>
             <td class="text-end">
-              <button type="button" class="btn btn-sm btn-outline-secondary me-2" (click)="startEditGroup(g)">
+              <button
+                type="button"
+                class="btn btn-sm btn-outline-secondary me-2"
+                (click)="startEditGroup(g)"
+              >
                 <i class="bi bi-pencil me-1" aria-hidden="true"></i>
                 Edit
               </button>
-              <button type="button" class="btn btn-sm btn-outline-primary me-2" (click)="startEditingGroup(g.id)">
+              <button
+                type="button"
+                class="btn btn-sm btn-outline-primary me-2"
+                (click)="startEditingGroup(g.id)"
+              >
                 <i class="bi bi-person-plus me-1" aria-hidden="true"></i>
                 Manage Members
               </button>
@@ -416,7 +460,11 @@
                       <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
                       } Add {{ selectedUserIds().length || '' }} selected
                     </button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" (click)="cancelEditingGroup()">
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-secondary"
+                      (click)="cancelEditingGroup()"
+                    >
                       Close
                     </button>
                   </div>

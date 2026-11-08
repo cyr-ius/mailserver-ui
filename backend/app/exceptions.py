@@ -9,7 +9,7 @@ shapes consistent and never leaking internals to the client.
 from fastapi import status
 
 
-class BaseAPIException(Exception):
+class BaseAPIException(Exception):  # noqa: N818
     """Base class for all application errors mapped to an HTTP response."""
 
     def __init__(

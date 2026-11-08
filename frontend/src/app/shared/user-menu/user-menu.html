@@ -16,7 +16,11 @@
   <ul class="dropdown-menu dropdown-menu-end">
     <!-- The identity block doubles as the entry point to the profile page. -->
     <li>
-      <a class="dropdown-item user-menu-identity px-3 py-2" routerLink="/profile" routerLinkActive="active">
+      <a
+        class="dropdown-item user-menu-identity px-3 py-2"
+        routerLink="/profile"
+        routerLinkActive="active"
+      >
         <div class="fw-semibold text-truncate">{{ u.display_name }}</div>
         <div class="text-body-secondary small text-truncate">{{ roleLabel(u.role) }}</div>
       </a>
@@ -46,7 +50,11 @@
     <li><hr class="dropdown-divider" /></li>
 
     <li>
-      <button type="button" class="dropdown-item d-flex align-items-center gap-2" (click)="onLogout()">
+      <button
+        type="button"
+        class="dropdown-item d-flex align-items-center gap-2"
+        (click)="onLogout()"
+      >
         <i class="bi bi-box-arrow-right" aria-hidden="true"></i>
         <span>Logout</span>
       </button>

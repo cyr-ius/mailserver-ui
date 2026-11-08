@@ -20,8 +20,15 @@
     <div class="card-body">
       <form (submit)="onSubmit(); $event.preventDefault()" novalidate>
         <div class="form-check form-switch mb-4">
-          <input id="oidc-enabled" type="checkbox" class="form-check-input" [formField]="oidcForm.enabled" />
-          <label for="oidc-enabled" class="form-check-label fw-medium"> Enable OIDC single sign-on </label>
+          <input
+            id="oidc-enabled"
+            type="checkbox"
+            class="form-check-input"
+            [formField]="oidcForm.enabled"
+          />
+          <label for="oidc-enabled" class="form-check-label fw-medium">
+            Enable OIDC single sign-on
+          </label>
         </div>
 
         <h2 class="h6 text-uppercase text-body-secondary mb-3">Provider</h2>
@@ -61,7 +68,12 @@
           </div>
           <div class="col-12 col-lg-6">
             <label for="oidc-scope" class="form-label small mb-1">Scopes</label>
-            <input id="oidc-scope" type="text" class="form-control form-control-sm" [formField]="oidcForm.scope" />
+            <input
+              id="oidc-scope"
+              type="text"
+              class="form-control form-control-sm"
+              [formField]="oidcForm.scope"
+            />
           </div>
           <div class="col-12 col-lg-6">
             <label for="oidc-redirect" class="form-label small mb-1">Redirect URI</label>
@@ -74,7 +86,9 @@
             />
           </div>
           <div class="col-12 col-lg-6">
-            <label for="oidc-logout-redirect" class="form-label small mb-1">Post-logout redirect URI</label>
+            <label for="oidc-logout-redirect" class="form-label small mb-1"
+              >Post-logout redirect URI</label
+            >
             <input
               id="oidc-logout-redirect"
               type="url"
@@ -86,9 +100,9 @@
 
         <h2 class="h6 text-uppercase text-body-secondary mb-3">Role mapping</h2>
         <p class="text-body-secondary small mb-3">
-          Members of the admin group sign in as administrators, members of the mailbox manager group as mailbox
-          managers. Anyone in neither group signs in as a guest, and can be promoted later by adding them to a local
-          group.
+          Members of the admin group sign in as administrators, members of the mailbox manager group
+          as mailbox managers. Anyone in neither group signs in as a guest, and can be promoted
+          later by adding them to a local group.
         </p>
         <div class="row g-3 mb-3">
           <div class="col-12 col-lg-6">
@@ -111,7 +125,9 @@
             />
           </div>
           <div class="col-12 col-lg-6">
-            <label for="oidc-manager-claim" class="form-label small mb-1">Mailbox manager group claim</label>
+            <label for="oidc-manager-claim" class="form-label small mb-1"
+              >Mailbox manager group claim</label
+            >
             <input
               id="oidc-manager-claim"
               type="text"
@@ -121,7 +137,9 @@
             />
           </div>
           <div class="col-12 col-lg-6">
-            <label for="oidc-manager-group" class="form-label small mb-1">Mailbox manager group value</label>
+            <label for="oidc-manager-group" class="form-label small mb-1"
+              >Mailbox manager group value</label
+            >
             <input
               id="oidc-manager-group"
               type="text"
@@ -143,7 +161,12 @@
           </label>
         </div>
         <div class="form-check form-switch mb-4">
-          <input id="oidc-only" type="checkbox" class="form-check-input" [formField]="oidcForm.oidc_only" />
+          <input
+            id="oidc-only"
+            type="checkbox"
+            class="form-check-input"
+            [formField]="oidcForm.oidc_only"
+          />
           <label for="oidc-only" class="form-check-label"> Disable local login (SSO only) </label>
         </div>
 
