@@ -7,9 +7,10 @@
   </div>
 
   <p class="text-body-secondary small">
-    The Postfix LDAP maps docker-mailserver reads when accounts come from a directory. Each file is copied to
-    <code>/etc/postfix/</code> when the container starts: restart it to apply a change. Deleting the contents of a map
-    restores the default one docker-mailserver ships with.
+    The Postfix LDAP maps docker-mailserver reads when accounts come from a directory. Each file is
+    copied to
+    <code>/etc/postfix/</code> when the container starts: restart it to apply a change. Deleting the
+    contents of a map restores the default one docker-mailserver ships with.
   </p>
 
   @if (success(); as msg) {
@@ -20,8 +21,8 @@
   <div class="alert alert-warning py-2" role="alert">
     <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
     Accounts are provisioned with
-    <code>ACCOUNT_PROVISIONER={{ provisioner() || 'FILE' }}</code>, not <code>LDAP</code>. These maps are stored but
-    never read.
+    <code>ACCOUNT_PROVISIONER={{ provisioner() || 'FILE' }}</code>, not <code>LDAP</code>. These
+    maps are stored but never read.
   </div>
   }
 
@@ -48,16 +49,17 @@
   <div class="card shadow-sm">
     <div class="card-body">
       <p class="form-text mt-0 mb-2">
-        <code>{{ current().filename }}</code> — {{ current().purpose }}. @if (!configured()) { No such file yet:
-        docker-mailserver uses its own default map. }
+        <code>{{ current().filename }}</code> — {{ current().purpose }}. @if (!configured()) { No
+        such file yet: docker-mailserver uses its own default map. }
       </p>
 
       @if (overriddenKeys().length > 0) {
       <div class="alert alert-warning py-2 small" role="alert">
         <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
-        The container's environment overwrites <code>{{ overriddenList() }}</code> when the mailserver starts. Whatever
-        this file says about {{ overriddenKeys().length === 1 ? 'that key' : 'those keys' }} is discarded — change the
-        matching <code>LDAP_*</code> variable instead.
+        The container's environment overwrites <code>{{ overriddenList() }}</code> when the
+        mailserver starts. Whatever this file says about {{ overriddenKeys().length === 1 ? 'that
+        key' : 'those keys' }} is discarded — change the matching <code>LDAP_*</code> variable
+        instead.
       </div>
       }
 
@@ -75,7 +77,12 @@
         <code>bind_pw</code> written here is stored in clear text in the config volume.
       </div>
       <div class="d-flex justify-content-end mt-3">
-        <button type="button" class="btn btn-sm btn-primary" (click)="onSave()" [disabled]="saving()">
+        <button
+          type="button"
+          class="btn btn-sm btn-primary"
+          (click)="onSave()"
+          [disabled]="saving()"
+        >
           @if (saving()) {
           <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
           } Save map

@@ -7,7 +7,8 @@
   </div>
 
   <p class="text-body-secondary small">
-    Dovecot master accounts can log in to any mailbox for administration or migration (<code>dovecot-masters.cf</code>).
+    Dovecot master accounts can log in to any mailbox for administration or migration
+    (<code>dovecot-masters.cf</code>).
   </p>
 
   @if (success(); as msg) {
@@ -44,8 +45,14 @@
             />
           </div>
           <div class="col-12 col-lg-3">
-            <label class="form-label small mb-1 d-none d-lg-inline-block" aria-hidden="true">&nbsp;</label>
-            <button type="submit" class="btn btn-sm btn-primary w-100" [disabled]="creatingMaster()">
+            <label class="form-label small mb-1 d-none d-lg-inline-block" aria-hidden="true"
+              >&nbsp;</label
+            >
+            <button
+              type="submit"
+              class="btn btn-sm btn-primary w-100"
+              [disabled]="creatingMaster()"
+            >
               @if (creatingMaster()) {
               <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
               } Add
@@ -101,9 +108,9 @@
     <div class="card-body">
       <h2 class="h6 text-uppercase text-body-secondary mb-3">Configuration override</h2>
       <p class="text-body-secondary small">
-        The contents of <code>dovecot.cf</code>, copied verbatim to <code>/etc/dovecot/local.conf</code> when the
-        mailserver starts. Nothing is validated here: a syntax error will only surface on restart, and may prevent
-        Dovecot from starting.
+        The contents of <code>dovecot.cf</code>, copied verbatim to
+        <code>/etc/dovecot/local.conf</code> when the mailserver starts. Nothing is validated here:
+        a syntax error will only surface on restart, and may prevent Dovecot from starting.
       </p>
       <textarea
         class="form-control font-monospace"
@@ -115,7 +122,12 @@
         (input)="onConfig($event)"
       ></textarea>
       <div class="d-flex justify-content-end mt-3">
-        <button type="button" class="btn btn-sm btn-primary" (click)="onSaveConfig()" [disabled]="savingConfig()">
+        <button
+          type="button"
+          class="btn btn-sm btn-primary"
+          (click)="onSaveConfig()"
+          [disabled]="savingConfig()"
+        >
           @if (savingConfig()) {
           <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
           } Save configuration

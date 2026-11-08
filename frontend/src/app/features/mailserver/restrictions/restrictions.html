@@ -7,12 +7,19 @@
   </div>
 
   <p class="text-body-secondary small">
-    Block an address or a whole domain from sending or receiving mail (<code>postfix-send-access.cf</code> and
-    <code>postfix-receive-access.cf</code>).
+    Block an address or a whole domain from sending or receiving mail (<code
+      >postfix-send-access.cf</code
+    >
+    and <code>postfix-receive-access.cf</code>).
   </p>
 
   <div class="btn-group btn-group-sm mb-3" role="group" aria-label="Restriction kind">
-    <button type="button" class="btn btn-outline-primary" [class.active]="kind() === 'send'" (click)="setKind('send')">
+    <button
+      type="button"
+      class="btn btn-outline-primary"
+      [class.active]="kind() === 'send'"
+      (click)="setKind('send')"
+    >
       <i class="bi bi-send-slash me-1" aria-hidden="true"></i>
       Sending
     </button>

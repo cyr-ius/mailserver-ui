@@ -13,8 +13,8 @@
   } @if (!quotasEnabled()) {
   <div class="alert alert-warning py-2" role="alert">
     <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
-    Quotas are disabled on this container (<code>ENABLE_QUOTAS=0</code>). A quota set here is stored but Dovecot never
-    enforces it.
+    Quotas are disabled on this container (<code>ENABLE_QUOTAS=0</code>). A quota set here is stored
+    but Dovecot never enforces it.
   </div>
   }
 
@@ -69,7 +69,11 @@
           />
         </div>
         <div class="col-6 col-lg-1 d-flex align-items-end">
-          <button type="submit" class="btn btn-sm btn-primary w-100" [disabled]="creating() || createForm().invalid()">
+          <button
+            type="submit"
+            class="btn btn-sm btn-primary w-100"
+            [disabled]="creating() || createForm().invalid()"
+          >
             @if (creating()) {
             <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
             } Create
@@ -81,7 +85,9 @@
         </div>
         }
         <div class="col-12">
-          <div class="form-text">Password: minimum {{ minLength }} characters. Quota (optional): e.g. 512M, 5G.</div>
+          <div class="form-text">
+            Password: minimum {{ minLength }} characters. Quota (optional): e.g. 512M, 5G.
+          </div>
         </div>
       </form>
     </div>
@@ -151,9 +157,15 @@
                     <i class="bi bi-key me-1" aria-hidden="true"></i>
                     Reset password
                   </h3>
-                  <form class="row g-2" (submit)="onResetPassword(); $event.preventDefault()" novalidate>
+                  <form
+                    class="row g-2"
+                    (submit)="onResetPassword(); $event.preventDefault()"
+                    novalidate
+                  >
                     <div class="col-12 col-sm-6">
-                      <label [attr.for]="'rpw-' + m.email" class="form-label small mb-1">New password</label>
+                      <label [attr.for]="'rpw-' + m.email" class="form-label small mb-1"
+                        >New password</label
+                      >
                       <input
                         [id]="'rpw-' + m.email"
                         type="password"
@@ -163,7 +175,9 @@
                       />
                     </div>
                     <div class="col-12 col-sm-6">
-                      <label [attr.for]="'rpwc-' + m.email" class="form-label small mb-1">Confirm</label>
+                      <label [attr.for]="'rpwc-' + m.email" class="form-label small mb-1"
+                        >Confirm</label
+                      >
                       <input
                         [id]="'rpwc-' + m.email"
                         type="password"
@@ -179,7 +193,10 @@
                         [disabled]="saving() || passwordForm().invalid()"
                       >
                         @if (saving()) {
-                        <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+                        <span
+                          class="spinner-border spinner-border-sm me-1"
+                          aria-hidden="true"
+                        ></span>
                         } Save password
                       </button>
                       @if (formError(); as msg) {
@@ -195,7 +212,9 @@
                   </h3>
                   <div class="row g-2 align-items-end">
                     <div class="col-12 col-sm-6">
-                      <label [attr.for]="'q-' + m.email" class="form-label small mb-1">Limit (empty = unlimited)</label>
+                      <label [attr.for]="'q-' + m.email" class="form-label small mb-1"
+                        >Limit (empty = unlimited)</label
+                      >
                       <input
                         [id]="'q-' + m.email"
                         type="text"
@@ -214,7 +233,10 @@
                         [disabled]="savingQuota()"
                       >
                         @if (savingQuota()) {
-                        <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+                        <span
+                          class="spinner-border spinner-border-sm me-1"
+                          aria-hidden="true"
+                        ></span>
                         } Save quota
                       </button>
                     </div>
@@ -248,7 +270,10 @@
                     >
                       <span
                         >{{ a.alias }}
-                        <i class="bi bi-arrow-right mx-1 text-body-secondary" aria-hidden="true"></i>
+                        <i
+                          class="bi bi-arrow-right mx-1 text-body-secondary"
+                          aria-hidden="true"
+                        ></i>
                         {{ m.email }}</span
                       >
                       <button
@@ -265,13 +290,21 @@
                       </button>
                     </li>
                     } @empty {
-                    <li class="list-group-item px-0 py-1 text-body-secondary small bg-transparent">No aliases.</li>
+                    <li class="list-group-item px-0 py-1 text-body-secondary small bg-transparent">
+                      No aliases.
+                    </li>
                     }
                   </ul>
                   }
-                  <form class="row g-2 align-items-end" (submit)="onAddAlias(); $event.preventDefault()" novalidate>
+                  <form
+                    class="row g-2 align-items-end"
+                    (submit)="onAddAlias(); $event.preventDefault()"
+                    novalidate
+                  >
                     <div class="col-12 col-sm-8">
-                      <label [attr.for]="'al-' + m.email" class="form-label small mb-1">New alias address</label>
+                      <label [attr.for]="'al-' + m.email" class="form-label small mb-1"
+                        >New alias address</label
+                      >
                       <input
                         [id]="'al-' + m.email"
                         type="email"
@@ -288,7 +321,10 @@
                         [disabled]="addingAlias() || aliasForm().invalid()"
                       >
                         @if (addingAlias()) {
-                        <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+                        <span
+                          class="spinner-border spinner-border-sm me-1"
+                          aria-hidden="true"
+                        ></span>
                         } Add alias
                       </button>
                     </div>
@@ -307,8 +343,8 @@
                     Sieve filter
                   </h3>
                   <p class="form-text mt-0 mb-2">
-                    <code>{{ m.email }}.dovecot.sieve</code> — the account's personal filter, compiled when the
-                    mailserver starts. Saving an empty script removes it.
+                    <code>{{ m.email }}.dovecot.sieve</code> — the account's personal filter,
+                    compiled when the mailserver starts. Saving an empty script removes it.
                   </p>
                   @if (sieveLoading()) {
                   <div class="text-body-secondary small py-2">

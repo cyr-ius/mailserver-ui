@@ -20,8 +20,15 @@
     <div class="card-body">
       <form (submit)="onSubmit(); $event.preventDefault()" novalidate>
         <div class="form-check form-switch mb-4">
-          <input id="mail-enabled" type="checkbox" class="form-check-input" [formField]="mailForm.enabled" />
-          <label for="mail-enabled" class="form-check-label fw-medium">Enable the outgoing mail connector</label>
+          <input
+            id="mail-enabled"
+            type="checkbox"
+            class="form-check-input"
+            [formField]="mailForm.enabled"
+          />
+          <label for="mail-enabled" class="form-check-label fw-medium"
+            >Enable the outgoing mail connector</label
+          >
         </div>
 
         <h2 class="h6 text-uppercase text-body-secondary mb-3">SMTP server</h2>
@@ -38,7 +45,12 @@
           </div>
           <div class="col-12 col-lg-4">
             <label for="mail-port" class="form-label small mb-1">Port</label>
-            <input id="mail-port" type="number" class="form-control form-control-sm" [formField]="mailForm.port" />
+            <input
+              id="mail-port"
+              type="number"
+              class="form-control form-control-sm"
+              [formField]="mailForm.port"
+            />
             <div class="form-text">587 for STARTTLS, 465 for implicit TLS, 25 for plaintext.</div>
           </div>
 
@@ -86,7 +98,9 @@
               class="form-control form-control-sm"
               [formField]="mailForm.username"
             />
-            <div class="form-text">Leave empty for a server that does not require authentication.</div>
+            <div class="form-text">
+              Leave empty for a server that does not require authentication.
+            </div>
           </div>
           <div class="col-12 col-lg-6">
             <label for="mail-password" class="form-label small mb-1">Password</label>
@@ -138,7 +152,9 @@
             />
             <label for="mail-auth-events" class="form-check-label">
               Sign-in and sign-out
-              <span class="form-text d-block mt-0">Successful and refused sign-ins, and sign-outs.</span>
+              <span class="form-text d-block mt-0"
+                >Successful and refused sign-ins, and sign-outs.</span
+              >
             </label>
           </div>
           <div class="form-check form-switch">
@@ -177,12 +193,15 @@
     <div class="card-body">
       <h2 class="h6 text-uppercase text-body-secondary mb-3">Test</h2>
       <p class="text-body-secondary small">
-        Sends a test message using the <strong>saved</strong> configuration. Save your changes first.
+        Sends a test message using the <strong>saved</strong> configuration. Save your changes
+        first.
       </p>
 
       <div class="row g-2 align-items-end">
         <div class="col-12 col-lg-6">
-          <label for="mail-test-recipient" class="form-label small mb-1">Recipient (optional)</label>
+          <label for="mail-test-recipient" class="form-label small mb-1"
+            >Recipient (optional)</label
+          >
           <input
             id="mail-test-recipient"
             type="email"
@@ -193,7 +212,12 @@
           />
         </div>
         <div class="col-12 col-lg-auto">
-          <button type="button" class="btn btn-outline-primary" [disabled]="!canTest() || testing()" (click)="onTest()">
+          <button
+            type="button"
+            class="btn btn-outline-primary"
+            [disabled]="!canTest() || testing()"
+            (click)="onTest()"
+          >
             @if (testing()) {
             <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
             }

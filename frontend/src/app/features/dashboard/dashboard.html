@@ -11,7 +11,12 @@
     </div>
     @if (canManageMailboxes() || isAdmin()) {
     <div class="col-auto">
-      <button type="button" class="btn btn-outline-secondary" (click)="refresh()" [disabled]="refreshing()">
+      <button
+        type="button"
+        class="btn btn-outline-secondary"
+        (click)="refresh()"
+        [disabled]="refreshing()"
+      >
         @if (refreshing()) {
         <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
         } @else {
@@ -77,7 +82,8 @@
               <i class="bi bi-hdd-fill" aria-hidden="true"></i>
             </div>
           </div>
-          @if (usage().data; as summary) { @if (storagePercent() !== null && summary.total_limit_bytes) {
+          @if (usage().data; as summary) { @if (storagePercent() !== null &&
+          summary.total_limit_bytes) {
           <div
             class="progress mt-3"
             role="progressbar"
@@ -100,7 +106,10 @@
     } @if (isAdmin()) {
     <!-- Mail queue: the deferred backlog is what warrants attention -->
     <div class="col-md-6 col-lg-3">
-      <a class="card h-100 shadow-sm text-decoration-none text-reset" routerLink="/mailserver/queue">
+      <a
+        class="card h-100 shadow-sm text-decoration-none text-reset"
+        routerLink="/mailserver/queue"
+      >
         <div class="card-body">
           <div class="d-flex align-items-center justify-content-between">
             <div>
@@ -246,18 +255,24 @@
             {{ tls().error }}
           </p>
           } @else if (tls().data; as certificate) { @if (!certificate.configured) {
-          <p class="small text-body-secondary mb-0">No certificate configured (SSL_TYPE is unset).</p>
+          <p class="small text-body-secondary mb-0">
+            No certificate configured (SSL_TYPE is unset).
+          </p>
           } @else {
           <h3 class="mb-1" [class]="tlsClass()">
-            @if (certificate.days_remaining === null) { Unknown } @else if (certificate.days_remaining < 0) { Expired }
-            @else { {{ certificate.days_remaining }} day{{ certificate.days_remaining === 1 ? '' : 's' }} }
+            @if (certificate.days_remaining === null) { Unknown } @else if
+            (certificate.days_remaining < 0) { Expired } @else { {{ certificate.days_remaining }}
+            day{{ certificate.days_remaining === 1 ? '' : 's' }} }
           </h3>
           <p class="small text-body-secondary mb-2">
-            @if (certificate.days_remaining !== null && certificate.days_remaining >= 0) { until expiry } @else if
-            (certificate.days_remaining !== null) { — renew it now }
+            @if (certificate.days_remaining !== null && certificate.days_remaining >= 0) { until
+            expiry } @else if (certificate.days_remaining !== null) { — renew it now }
           </p>
           @if (certificate.domains.length) {
-          <p class="small text-body-secondary text-truncate mb-0" [title]="certificate.domains.join(', ')">
+          <p
+            class="small text-body-secondary text-truncate mb-0"
+            [title]="certificate.domains.join(', ')"
+          >
             {{ certificate.domains.join(', ') }}
           </p>
           } } }
@@ -394,8 +409,8 @@
             </div>
           </div>
           <p class="small text-body-secondary mb-0 mt-3">
-            Parsed from the last {{ counters.scanned_lines }} mail log lines. Greylisted senders come back on their own;
-            spam and virus counts overlap the rejections above.
+            Parsed from the last {{ counters.scanned_lines }} mail log lines. Greylisted senders
+            come back on their own; spam and virus counts overlap the rejections above.
           </p>
           } }
         </div>
@@ -464,7 +479,10 @@
     } @if (isAdmin()) {
     <!-- How the container was started: explains why a feature is unavailable -->
     <div class="col-lg-6">
-      <a class="card h-100 shadow-sm text-decoration-none text-reset" routerLink="/mailserver/environment">
+      <a
+        class="card h-100 shadow-sm text-decoration-none text-reset"
+        routerLink="/mailserver/environment"
+      >
         <div class="card-body">
           <h6 class="card-title text-muted mb-3 d-flex align-items-center justify-content-between">
             <span>

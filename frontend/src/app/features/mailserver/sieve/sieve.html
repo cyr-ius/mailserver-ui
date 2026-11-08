@@ -10,8 +10,8 @@
     Global Sieve scripts applied to every mailbox, before or after the user's own filters (<code
       >before.dovecot.sieve</code
     >
-    and <code>after.dovecot.sieve</code>). They are compiled when the mailserver starts: restart the container to apply
-    a change.
+    and <code>after.dovecot.sieve</code>). They are compiled when the mailserver starts: restart the
+    container to apply a change.
   </p>
 
   @if (success(); as msg) {
@@ -59,7 +59,12 @@
         (input)="onContent($event)"
       ></textarea>
       <div class="d-flex justify-content-end mt-3">
-        <button type="button" class="btn btn-sm btn-primary" (click)="onSave()" [disabled]="saving()">
+        <button
+          type="button"
+          class="btn btn-sm btn-primary"
+          (click)="onSave()"
+          [disabled]="saving()"
+        >
           @if (saving()) {
           <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
           } Save script

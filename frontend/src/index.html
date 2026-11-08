@@ -15,7 +15,11 @@
           var stored = localStorage.getItem("mailserver-ui-theme");
           var mode = stored === "light" || stored === "dark" ? stored : "auto";
           var theme =
-            mode === "auto" ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : mode;
+            mode === "auto"
+              ? window.matchMedia("(prefers-color-scheme: dark)").matches
+                ? "dark"
+                : "light"
+              : mode;
           document.documentElement.setAttribute("data-bs-theme", theme);
           document
             .querySelector('meta[name="theme-color"]')

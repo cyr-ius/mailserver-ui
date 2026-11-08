@@ -55,7 +55,11 @@
           }
         </div>
 
-        <button type="submit" class="btn btn-primary w-100" [disabled]="submitting() || loginForm().invalid()">
+        <button
+          type="submit"
+          class="btn btn-primary w-100"
+          [disabled]="submitting() || loginForm().invalid()"
+        >
           @if (submitting()) {
           <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
           } Sign in
