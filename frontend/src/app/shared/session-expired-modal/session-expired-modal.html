@@ -25,7 +25,13 @@
       </div>
 
       <div class="modal-footer border-0 pt-0">
-        <button #signIn type="button" class="btn btn-primary" [disabled]="signingIn()" (click)="onSignIn()">
+        <button
+          #signIn
+          type="button"
+          class="btn btn-primary"
+          [disabled]="signingIn()"
+          (click)="onSignIn()"
+        >
           @if (signingIn()) {
           <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
           } @else {

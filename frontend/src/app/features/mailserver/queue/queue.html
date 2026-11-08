@@ -5,7 +5,12 @@
       Mail queue
     </h1>
     <div class="d-flex gap-2">
-      <button type="button" class="btn btn-sm btn-outline-secondary" (click)="refresh()" [disabled]="loading()">
+      <button
+        type="button"
+        class="btn btn-sm btn-outline-secondary"
+        (click)="refresh()"
+        [disabled]="loading()"
+      >
         <i class="bi bi-arrow-clockwise me-1" aria-hidden="true"></i>
         Refresh
       </button>
@@ -31,8 +36,8 @@
   </div>
 
   <p class="text-body-secondary small">
-    Messages Postfix has accepted but not yet delivered. Deferred mail is retried automatically; flushing only asks
-    Postfix to try again now.
+    Messages Postfix has accepted but not yet delivered. Deferred mail is retried automatically;
+    flushing only asks Postfix to try again now.
   </p>
 
   @if (success(); as msg) {

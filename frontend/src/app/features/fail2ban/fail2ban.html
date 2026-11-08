@@ -17,19 +17,34 @@
 
   <ul class="nav nav-tabs mb-3">
     <li class="nav-item">
-      <button type="button" class="nav-link" [class.active]="activeTab() === 'overview'" (click)="setTab('overview')">
+      <button
+        type="button"
+        class="nav-link"
+        [class.active]="activeTab() === 'overview'"
+        (click)="setTab('overview')"
+      >
         <i class="bi bi-slash-circle me-1" aria-hidden="true"></i>
         Bans &amp; jails
       </button>
     </li>
     <li class="nav-item">
-      <button type="button" class="nav-link" [class.active]="activeTab() === 'policy'" (click)="setTab('policy')">
+      <button
+        type="button"
+        class="nav-link"
+        [class.active]="activeTab() === 'policy'"
+        (click)="setTab('policy')"
+      >
         <i class="bi bi-sliders me-1" aria-hidden="true"></i>
         Policy
       </button>
     </li>
     <li class="nav-item">
-      <button type="button" class="nav-link" [class.active]="activeTab() === 'log'" (click)="setTab('log')">
+      <button
+        type="button"
+        class="nav-link"
+        [class.active]="activeTab() === 'log'"
+        (click)="setTab('log')"
+      >
         <i class="bi bi-journal-text me-1" aria-hidden="true"></i>
         Log
       </button>
@@ -39,8 +54,8 @@
   @if (!statusLoading() && !fail2banEnabled()) {
   <div class="alert alert-warning py-2" role="alert">
     <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
-    Fail2ban is disabled on this container (<code>ENABLE_FAIL2BAN=0</code>). No daemon watches the logs: nothing is ever
-    banned, and the policy below is stored but never read.
+    Fail2ban is disabled on this container (<code>ENABLE_FAIL2BAN=0</code>). No daemon watches the
+    logs: nothing is ever banned, and the policy below is stored but never read.
   </div>
   }
 
@@ -48,8 +63,9 @@
   @if (activeTab() === 'policy') {
   <p class="text-body-secondary small">
     How aggressively fail2ban bans (<code>fail2ban-jail.cf</code>, section
-    <code>[DEFAULT]</code>). The mailserver reads this file when it starts, so a change only takes effect after the
-    container restarts. Saving rewrites the file: any jail-specific section added by hand is dropped.
+    <code>[DEFAULT]</code>). The mailserver reads this file when it starts, so a change only takes
+    effect after the container restarts. Saving rewrites the file: any jail-specific section added
+    by hand is dropped.
   </p>
 
   @if (policySuccess(); as msg) {
@@ -63,7 +79,8 @@
   </div>
   } @else { @if (!policyConfigured()) {
   <div class="alert alert-light border small" role="note">
-    No policy file yet — the values below are the defaults docker-mailserver ships with. Save to make them explicit.
+    No policy file yet — the values below are the defaults docker-mailserver ships with. Save to
+    make them explicit.
   </div>
   }
 
@@ -82,7 +99,9 @@
             <div class="form-text">How long a banned IP stays banned. 604800 = one week.</div>
           </div>
           <div class="col-12 col-lg-4">
-            <label for="policy-findtime" class="form-label small mb-1">Detection window (seconds)</label>
+            <label for="policy-findtime" class="form-label small mb-1"
+              >Detection window (seconds)</label
+            >
             <input
               id="policy-findtime"
               type="number"
@@ -130,7 +149,12 @@
         (input)="onDaemonConfig($event)"
       ></textarea>
       <div class="d-flex justify-content-end mt-3">
-        <button type="button" class="btn btn-sm btn-primary" (click)="onSaveConfig()" [disabled]="savingConfig()">
+        <button
+          type="button"
+          class="btn btn-sm btn-primary"
+          (click)="onSaveConfig()"
+          [disabled]="savingConfig()"
+        >
           @if (savingConfig()) {
           <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
           } Save configuration
@@ -171,7 +195,9 @@
             <div class="form-text">An IPv4 or IPv6 address.</div>
           </div>
           <div class="col-12 col-lg-3">
-            <label class="form-label small mb-1 d-none d-lg-inline-block" aria-hidden="true">&nbsp;</label>
+            <label class="form-label small mb-1 d-none d-lg-inline-block" aria-hidden="true"
+              >&nbsp;</label
+            >
             <button type="submit" class="btn btn-sm btn-danger w-100" [disabled]="banning()">
               @if (banning()) {
               <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
@@ -351,7 +377,8 @@
         @for (entry of visibleLog(); track $index) {
         <tr>
           <td class="font-monospace text-nowrap">
-            @if (entry.date) { {{ entry.date | date: 'yyyy-MM-dd HH:mm:ss' }} } @else { {{ entry.timestamp }} }
+            @if (entry.date) { {{ entry.date | date: 'yyyy-MM-dd HH:mm:ss' }} } @else { {{
+            entry.timestamp }} }
           </td>
           <td class="font-monospace text-nowrap">{{ entry.logger }}</td>
           <td class="font-monospace text-body-secondary text-end">{{ entry.pid }}</td>

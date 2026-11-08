@@ -8,8 +8,8 @@
 
   <p class="text-body-secondary small">
     Extra Postfix parameters. <code>postfix-main.cf</code> appends to <code>main.cf</code>, and
-    <code>postfix-master.cf</code> adjusts the services of <code>master.cf</code>. Both are read only when the
-    mailserver starts: restart the container to apply a change.
+    <code>postfix-master.cf</code> adjusts the services of <code>master.cf</code>. Both are read
+    only when the mailserver starts: restart the container to apply a change.
   </p>
 
   @if (success(); as msg) {
@@ -59,7 +59,11 @@
                 />
               </td>
               <td class="text-end">
-                <button type="button" class="btn btn-sm btn-outline-danger" (click)="removeOverride($index)">
+                <button
+                  type="button"
+                  class="btn btn-sm btn-outline-danger"
+                  (click)="removeOverride($index)"
+                >
                   <i class="bi bi-trash" aria-hidden="true"></i>
                 </button>
               </td>
@@ -75,7 +79,12 @@
           <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>
           Add parameter
         </button>
-        <button type="button" class="btn btn-sm btn-primary" (click)="onSave()" [disabled]="saving()">
+        <button
+          type="button"
+          class="btn btn-sm btn-primary"
+          (click)="onSave()"
+          [disabled]="saving()"
+        >
           @if (saving()) {
           <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
           } Save changes
@@ -89,7 +98,8 @@
       <h2 class="h6 text-uppercase text-body-secondary mb-3">master.cf service parameters</h2>
       <p class="text-body-secondary small">
         Each parameter targets one service of <code>master.cf</code> and is written as
-        <code>service/type/parameter</code>, for instance <code>submission/inet/smtpd_tls_security_level</code>.
+        <code>service/type/parameter</code>, for instance
+        <code>submission/inet/smtpd_tls_security_level</code>.
       </p>
 
       @if (masterOverrides().length === 0) {
@@ -126,7 +136,11 @@
                 />
               </td>
               <td class="text-end">
-                <button type="button" class="btn btn-sm btn-outline-danger" (click)="removeMasterOverride($index)">
+                <button
+                  type="button"
+                  class="btn btn-sm btn-outline-danger"
+                  (click)="removeMasterOverride($index)"
+                >
                   <i class="bi bi-trash" aria-hidden="true"></i>
                 </button>
               </td>
@@ -138,11 +152,20 @@
       }
 
       <div class="d-flex justify-content-between gap-2 mt-2">
-        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="addMasterOverride()">
+        <button
+          type="button"
+          class="btn btn-sm btn-outline-secondary"
+          (click)="addMasterOverride()"
+        >
           <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>
           Add parameter
         </button>
-        <button type="button" class="btn btn-sm btn-primary" (click)="onSaveMaster()" [disabled]="savingMaster()">
+        <button
+          type="button"
+          class="btn btn-sm btn-primary"
+          (click)="onSaveMaster()"
+          [disabled]="savingMaster()"
+        >
           @if (savingMaster()) {
           <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
           } Save changes

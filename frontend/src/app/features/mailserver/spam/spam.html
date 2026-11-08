@@ -7,9 +7,9 @@
   </div>
 
   <p class="text-body-secondary small">
-    Custom SpamAssassin rules, the Postgrey whitelists exempting a client or a recipient from greylisting, and the
-    Amavis overrides. docker-mailserver copies these files into place when it starts: restart the container to apply a
-    change.
+    Custom SpamAssassin rules, the Postgrey whitelists exempting a client or a recipient from
+    greylisting, and the Amavis overrides. docker-mailserver copies these files into place when it
+    starts: restart the container to apply a change.
   </p>
 
   @if (success(); as msg) {
@@ -19,8 +19,8 @@
   } @if (!loading() && !featureEnabled()) {
   <div class="alert alert-warning py-2" role="alert">
     <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
-    {{ current().feature }} is disabled on this container (<code>{{ featureVariable() }}=0</code>). This file is stored
-    but never read.
+    {{ current().feature }} is disabled on this container (<code>{{ featureVariable() }}=0</code>).
+    This file is stored but never read.
   </div>
   }
 
@@ -48,10 +48,11 @@
     <div class="card-body">
       <p class="form-text mt-0 mb-2">
         <code>{{ current().filename }}</code>
-        @switch (scope()) { @case ('rules') { — SpamAssassin only validates these rules when it starts. } @case
-        ('whitelist-clients') { — one per line: a client host name, a domain, or a <code>/regex/</code>. } @case
-        ('whitelist-recipients') { — one per line: a recipient address, a domain, or a <code>/regex/</code>. } @case
-        ('amavis') { — Perl, replacing <code>/etc/amavis/conf.d/50-user</code>; it must end with <code>1;</code>. } }
+        @switch (scope()) { @case ('rules') { — SpamAssassin only validates these rules when it
+        starts. } @case ('whitelist-clients') { — one per line: a client host name, a domain, or a
+        <code>/regex/</code>. } @case ('whitelist-recipients') { — one per line: a recipient
+        address, a domain, or a <code>/regex/</code>. } @case ('amavis') { — Perl, replacing
+        <code>/etc/amavis/conf.d/50-user</code>; it must end with <code>1;</code>. } }
       </p>
       <textarea
         class="form-control font-monospace"
@@ -63,7 +64,12 @@
         (input)="onContent($event)"
       ></textarea>
       <div class="d-flex justify-content-end mt-3">
-        <button type="button" class="btn btn-sm btn-primary" (click)="onSave()" [disabled]="saving()">
+        <button
+          type="button"
+          class="btn btn-sm btn-primary"
+          (click)="onSave()"
+          [disabled]="saving()"
+        >
           @if (saving()) {
           <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
           } Save file

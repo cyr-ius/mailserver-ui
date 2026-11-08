@@ -16,7 +16,8 @@
   </div>
 
   <p class="text-body-secondary small">
-    Latest lines of the mailserver mail log (<code>/var/log/mail/mail.log</code>). Requires a mounted Docker socket.
+    Latest lines of the mailserver mail log (<code>/var/log/mail/mail.log</code>). Requires a
+    mounted Docker socket.
   </p>
 
   @if (error(); as msg) {
@@ -103,7 +104,8 @@
         @for (entry of visible(); track $index) {
         <tr>
           <td class="font-monospace text-nowrap">
-            @if (entry.date) { {{ entry.date | date: 'yyyy-MM-dd HH:mm:ss' }} } @else { {{ entry.timestamp }} }
+            @if (entry.date) { {{ entry.date | date: 'yyyy-MM-dd HH:mm:ss' }} } @else { {{
+            entry.timestamp }} }
           </td>
           <td>
             @if (entry.product) {

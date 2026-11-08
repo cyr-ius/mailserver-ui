@@ -7,8 +7,8 @@
   </div>
 
   <p class="text-body-secondary small">
-    The environment the mailserver container started with. These values cannot be changed from here: edit the
-    container's environment and restart it.
+    The environment the mailserver container started with. These values cannot be changed from here:
+    edit the container's environment and restart it.
   </p>
 
   @if (error(); as msg) {
@@ -91,13 +91,17 @@
         <dt class="col-12 col-sm-4 text-body-secondary fw-normal">ClamAV</dt>
         <dd class="col-12 col-sm-8">
           {{ env.clamav_enabled ? 'enabled' : 'disabled' }} @if (env.clamav_enabled) {
-          <div class="form-text">Needs about 1 GB of RAM, and stays down while freshclam downloads its signatures.</div>
+          <div class="form-text">
+            Needs about 1 GB of RAM, and stays down while freshclam downloads its signatures.
+          </div>
           }
         </dd>
         <dt class="col-12 col-sm-4 text-body-secondary fw-normal">Greylisting</dt>
         <dd class="col-12 col-sm-8">
           {{ env.postgrey_enabled ? 'Postgrey' : 'disabled' }} @if (env.postgrey_enabled) {
-          <div class="form-text">Whitelists are editable under <a routerLink="/mailserver/spam">Spam filter</a>.</div>
+          <div class="form-text">
+            Whitelists are editable under <a routerLink="/mailserver/spam">Spam filter</a>.
+          </div>
           }
         </dd>
         <dt class="col-12 col-sm-4 text-body-secondary fw-normal mb-0">Update check</dt>
