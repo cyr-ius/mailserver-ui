@@ -14,7 +14,7 @@ dependencies = [
     "pydantic-settings==2.16.2",
     "python-jose[cryptography]==3.5.0",
     "python-multipart==0.0.33",
-    "sqlmodel>=0.0.48",
+    "sqlmodel>=0.0.50",
 ]
 
 [tool.setuptools]
